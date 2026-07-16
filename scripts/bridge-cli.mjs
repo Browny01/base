@@ -26,7 +26,7 @@ import { spawn, spawnSync } from "node:child_process";
 const PORT = Number(process.env.PORT || 8787);
 const HOST = "127.0.0.1";
 const TOKEN = process.env.BRIDGE_CLI_TOKEN || "";
-const DEFAULT_ORIGIN = "https://nexus-psi-ruddy.vercel.app";
+const DEFAULT_ORIGIN = "https://bridge-ten-lovat.vercel.app";
 const ALLOWED = (process.env.BRIDGE_ALLOWED_ORIGIN || DEFAULT_ORIGIN).split(",").map((s) => s.trim());
 // Local Ollama the bridge proxies to. The browser can't reach http://localhost from
 // the HTTPS site, and Ollama rejects non-loopback Host headers (DNS-rebind guard) — so
