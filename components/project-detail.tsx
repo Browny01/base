@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, getToday } from "@/lib/utils";
 import type { Task, Priority, TaskTag, ProjectStatus, ProjectColor, MilestoneStatus } from "@/lib/store";
@@ -43,7 +43,7 @@ const MILESTONE_STATUS: { value: MilestoneStatus; label: string; icon: React.Rea
 type Tab = "tasks" | "roadmap" | "docs" | "links";
 
 export function ProjectDetail({ id }: { id: string }) {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const { toast } = useToast();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("tasks");

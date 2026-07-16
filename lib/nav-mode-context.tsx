@@ -16,7 +16,7 @@ export function NavModeProvider({ children }: { children: React.ReactNode }) {
   // the attribute the pre-paint script set, so we must put it back after mount.
   useEffect(() => {
     let m: NavMode = "sidebar";
-    try { m = localStorage.getItem("nexus_nav_mode") === "dock" ? "dock" : "sidebar"; } catch {}
+    try { m = localStorage.getItem("bridge_nav_mode") === "dock" ? "dock" : "sidebar"; } catch {}
     setModeState(m);
     document.documentElement.dataset.nav = m;
   }, []);
@@ -24,7 +24,7 @@ export function NavModeProvider({ children }: { children: React.ReactNode }) {
   const setMode = (m: NavMode) => {
     setModeState(m);
     try {
-      localStorage.setItem("nexus_nav_mode", m);
+      localStorage.setItem("bridge_nav_mode", m);
       document.documentElement.dataset.nav = m;
     } catch {}
   };

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Uploads a (client-downscaled) image to Vercel Blob and returns its public URL.
 // The board stores that URL instead of a base64 data blob, keeping the synced
-// nexus:data payload small.
+// bridge:data payload small.
 export async function POST(req: NextRequest) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {

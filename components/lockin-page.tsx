@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import type { LockInSession, LockInTask, LockInTaskKind } from "@/lib/store";
 import {
@@ -724,7 +724,7 @@ function Actions({ onAddTask, onBreakdown, onSettings, onNew, onArchive, archive
 
 // ── Main page ────────────────────────────────────────────────────────────────────
 export function LockInPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const today = todayYmd();
 
   const sessions = data.lockInSessions ?? [];

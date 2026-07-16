@@ -72,8 +72,8 @@ export function CommandBar() {
 
   // Quick actions — commands, not destinations.
   const actions = useMemo<Item[]>(() => [
-    { kind: "action", key: "act:newtask", label: "New task", icon: CheckSquare, keywords: "create add todo", run: () => { try { localStorage.setItem("nexus_open_new_task", "1"); } catch {} router.push("/tasks"); } },
-    { kind: "action", key: "act:newproject", label: "New project", icon: FolderKanban, keywords: "create add", run: () => { try { localStorage.setItem("nexus_open_new_project", "1"); } catch {} router.push("/projects"); } },
+    { kind: "action", key: "act:newtask", label: "New task", icon: CheckSquare, keywords: "create add todo", run: () => { try { localStorage.setItem("bridge_open_new_task", "1"); } catch {} router.push("/tasks"); } },
+    { kind: "action", key: "act:newproject", label: "New project", icon: FolderKanban, keywords: "create add", run: () => { try { localStorage.setItem("bridge_open_new_project", "1"); } catch {} router.push("/projects"); } },
     { kind: "action", key: "act:newchat", label: "New chat", icon: Sparkles, keywords: "ai ask new conversation", run: () => router.push("/chat") },
     { kind: "action", key: "act:theme", label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode", icon: theme === "dark" ? Sun : Moon, keywords: "theme dark light appearance", run: toggleTheme },
     { kind: "action", key: "act:nav", label: mode === "dock" ? "Use sidebar navigation" : "Use dock navigation", icon: mode === "dock" ? LayoutDashboard : PanelBottom, keywords: "dock sidebar navigation layout", run: () => setMode(mode === "dock" ? "sidebar" : "dock") },
@@ -119,20 +119,20 @@ export function CommandBar() {
     if (it.kind === "page") { router.push(it.href); return; }
     if (it.kind === "project") { router.push(`/projects/${it.id}`); return; }
     if (it.kind === "wiki") {
-      try { localStorage.setItem("nexus_wiki_active", it.id); } catch {}
-      window.dispatchEvent(new CustomEvent("nexus:open-wiki", { detail: it.id }));
+      try { localStorage.setItem("bridge_wiki_active", it.id); } catch {}
+      window.dispatchEvent(new CustomEvent("bridge:open-wiki", { detail: it.id }));
       router.push("/notes");
       return;
     }
     if (it.kind === "chat") {
-      try { localStorage.setItem("nexus_chat_active", it.id); } catch {}
-      window.dispatchEvent(new CustomEvent("nexus:open-chat", { detail: it.id }));
+      try { localStorage.setItem("bridge_chat_active", it.id); } catch {}
+      window.dispatchEvent(new CustomEvent("bridge:open-chat", { detail: it.id }));
       router.push("/chat");
       return;
     }
     // board
-    try { localStorage.setItem("nexus_vision_active", it.id); } catch {}
-    window.dispatchEvent(new CustomEvent("nexus:open-vision", { detail: it.id }));
+    try { localStorage.setItem("bridge_vision_active", it.id); } catch {}
+    window.dispatchEvent(new CustomEvent("bridge:open-vision", { detail: it.id }));
     router.push("/vision");
   };
 

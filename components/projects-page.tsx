@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
 import type { ProjectColor, ProjectStatus, ProjectCategory } from "@/lib/store";
 import { Plus, FolderKanban, ChevronRight, Star, Layers } from "lucide-react";
@@ -84,10 +84,10 @@ function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: s
 }
 
 export function ProjectsPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [showForm, setShowForm] = useState(false);
   // ⌘K → "New project" opens the form on arrival
-  useEffect(() => { try { if (localStorage.getItem("nexus_open_new_project")) { localStorage.removeItem("nexus_open_new_project"); setShowForm(true); } } catch {} }, []);
+  useEffect(() => { try { if (localStorage.getItem("bridge_open_new_project")) { localStorage.removeItem("bridge_open_new_project"); setShowForm(true); } } catch {} }, []);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [form, setForm] = useState<{
     name: string; description: string; color: ProjectColor;

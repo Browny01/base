@@ -9,7 +9,7 @@ const MODEL = "gemini-2.5-flash";
 
 export async function GET() {
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH — one summary per hour
-  const key = `nexus:news:summary:v3:${hour}`;
+  const key = `bridge:news:summary:v3:${hour}`;
   const redis = mcpRedis();
 
   if (redis) {

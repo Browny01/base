@@ -49,7 +49,7 @@ export default function LoginPage() {
           >
             <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-lg font-semibold text-[var(--text)] tracking-tight">Nexus</span>
+          <span className="text-lg font-semibold text-[var(--text)] tracking-tight">Bridge</span>
         </div>
 
         {/* Card */}

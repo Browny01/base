@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, formatAUD, formatCurrency, formatDate, getToday, calcStreak } from "@/lib/utils";
 import type { Priority, TaskTag } from "@/lib/store";
 import { Repeat2, DollarSign, TrendingUp, TrendingDown, Zap, Plus, Circle, CheckSquare, LayoutGrid, NotebookText, Sparkles, Dumbbell, Lightbulb, Newspaper, Loader2, RefreshCw, FolderKanban } from "lucide-react";
@@ -20,7 +20,7 @@ const COLOR_DOT: Record<string, string> = {
 };
 
 export function Dashboard() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const now = new Date();
   const today = getToday();
 
