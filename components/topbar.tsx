@@ -7,12 +7,7 @@ export function TopBar() {
     <header className="sticky top-0 z-30 h-12 flex items-center gap-3 px-3 sm:px-4 bg-[var(--bg)]/80 backdrop-blur-xl border-b border-[var(--border)]">
       {/* Brand mark — mobile only (sidebar carries it on desktop) */}
       <div className="flex md:hidden items-center gap-2 shrink-0">
-        <div
-          className="w-[24px] h-[24px] rounded-[6px] flex items-center justify-center text-white text-[12px] font-bold"
-          style={{ background: "var(--accent)" }}
-        >
-          N
-        </div>
+        <img src="/icon.png" alt="Bridge" className="w-[24px] h-[24px] rounded-[6px]" />
       </div>
 
       {/* Centered command trigger */}

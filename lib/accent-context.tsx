@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 // Accent presets. --accent-soft / --accent-border are color-mix(var(--accent)…) in
 // globals.css, so overriding just --accent cascades to every accent surface.
 export const ACCENTS: { key: string; label: string; value: string }[] = [
+  { key: "steel",   label: "Steel",   value: "#62708a" },
   { key: "indigo",  label: "Indigo",  value: "#5b50e8" },
   { key: "violet",  label: "Violet",  value: "#7c3aed" },
   { key: "blue",    label: "Blue",    value: "#2563eb" },

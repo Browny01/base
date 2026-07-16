@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const [password, setPassword] = useState("");
@@ -43,12 +43,7 @@ export default function LoginPage() {
       <div className="w-full max-w-[340px]">
         {/* Logo — the one place the brand accent appears */}
         <div className="flex items-center justify-center gap-2.5 mb-10">
-          <div
-            className="w-8 h-8 rounded-[9px] flex items-center justify-center"
-            style={{ background: "var(--accent)" }}
-          >
-            <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
-          </div>
+          <img src="/icon.png" alt="" className="w-8 h-8 rounded-[9px]" />
           <span className="text-lg font-semibold text-[var(--text)] tracking-tight">Bridge</span>
         </div>
 

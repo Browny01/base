@@ -1,29 +1,30 @@
 @import "tailwindcss";
 
 /* ════════════════════════════════════════════════════════════════════════
-   BRIDGE — monochrome design system (Linear / Vercel inspired)
-   Strict grayscale. One accent (--accent) reserved for the brand mark only.
-   Light + dark are driven entirely by the CSS variables below, so every
-   component (which references var(--token)) flips automatically.
+   BRIDGE — liquid-metal design system (matches the brushed-silver mark)
+   Cool graphite/silver neutrals, frosted liquid-glass surfaces (.lg-*),
+   chrome-gradient metallic text. Light + dark are driven entirely by the
+   CSS variables below, so every component (which references var(--token))
+   flips automatically.
    ════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --bg:          #ffffff;   /* app canvas + inverted button text */
+  --bg:          #eef0f4;   /* app canvas — soft silver so glass reads */
   --surface:     #ffffff;   /* cards                 */
-  --surface-2:   #fafafa;   /* sunken / inputs       */
-  --chip:        #f5f5f5;   /* hover / chips / fills  */
-  --chip-2:      #ededed;   /* stronger hover        */
+  --surface-2:   #f5f6f9;   /* sunken / inputs       */
+  --chip:        #eef0f3;   /* hover / chips / fills  */
+  --chip-2:      #e4e7eb;   /* stronger hover        */
 
-  --text:        #0a0a0a;   /* primary text & black fills */
-  --muted:       #737373;   /* secondary text        */
-  --faint:       #a3a3a3;   /* meta / tertiary text  */
+  --text:        #0c0d10;   /* primary text & black fills */
+  --muted:       #6b7078;   /* secondary text        */
+  --faint:       #979da6;   /* meta / tertiary text  */
 
-  --border:      #e5e5e5;   /* hairlines             */
-  --border-2:    #d4d4d4;   /* emphasis / selected   */
-  --text-hover:  #262626;   /* primary-button hover  */
+  --border:      #dfe2e7;   /* hairlines             */
+  --border-2:    #c8cdd4;   /* emphasis / selected   */
+  --text-hover:  #272a2f;   /* primary-button hover  */
 
-  /* accent — brand mark + active nav, progress, highlights */
-  --accent:        #5b50e8;
+  /* accent — brand mark + active nav, progress, highlights (steel default) */
+  --accent:        #62708a;
   --accent-soft:   color-mix(in srgb, var(--accent) 12%, transparent);
   --accent-border: color-mix(in srgb, var(--accent) 34%, transparent);
 
@@ -43,22 +44,22 @@
 }
 
 html.dark {
-  --bg:          #0a0a0a;
-  --surface:     #131316;
-  --surface-2:   #161619;
-  --chip:        #1e1e22;
-  --chip-2:      #26262b;
+  --bg:          #0a0b0d;
+  --surface:     #131418;
+  --surface-2:   #16171b;
+  --chip:        #1e2024;
+  --chip-2:      #26282d;
 
-  --text:        #ededed;
-  --muted:       #9a9a9a;
-  --faint:       #6e6e72;
+  --text:        #eceef1;
+  --muted:       #9aa0a8;
+  --faint:       #6c7178;
 
-  --border:      #272729;
-  --border-2:    #3a3a3e;
-  --text-hover:  #f7f7f7;
+  --border:      #26282c;
+  --border-2:    #3a3d43;
+  --text-hover:  #f6f7f9;
 
   /* brighter hues so they read on the dark canvas */
-  --accent:    #7c72f0;
+  --accent:    #a5b1c4;
   --c-indigo:  #818cf8;
   --c-cyan:    #22d3ee;
   --c-emerald: #34d399;
@@ -144,22 +145,163 @@ h1, h2, h3, h4 { letter-spacing: -0.025em; font-weight: 650; }
   html[data-nav="dock"] .nx-main            { padding-bottom: 7rem; }
 }
 
-/* ── colourful gradient hero (dashboard header) ────────────────────────── */
-.nx-hero {
+/* ════════════════════════════════════════════════════════════════════════
+   LIQUID METAL / GLASS layer
+   .lg-card   — frosted glass panel (specular top edge, soft depth)
+   .lg-hero   — always-dark polished-graphite hero (like the app icon)
+   .lg-icon   — brushed-silver icon tile
+   .lg-pill   — white-alpha glass pill (for controls sitting on the hero)
+   .metal-text / .metal-shine — chrome gradient text (+ slow sheen)
+   .metal-bar — brushed-steel section marker
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* stationary ambient glow behind the scrolling content — gives the glass
+   panels something to refract. Background of the scroll container doesn't
+   move with its content, so this stays put while the page scrolls. */
+.nx-main {
   background:
-    radial-gradient(120% 150% at 0% 0%,   color-mix(in srgb, var(--c-indigo)  26%, transparent), transparent 58%),
-    radial-gradient(120% 150% at 100% 0%, color-mix(in srgb, var(--c-cyan)    20%, transparent), transparent 55%),
-    radial-gradient(140% 170% at 70% 130%,color-mix(in srgb, var(--c-purple)  24%, transparent), transparent 60%),
-    var(--surface);
+    radial-gradient(900px 520px at 85% -10%, color-mix(in srgb, var(--text) 7%, transparent), transparent 60%),
+    radial-gradient(760px 520px at -12% 22%, color-mix(in srgb, var(--text) 5%, transparent), transparent 55%),
+    radial-gradient(900px 700px at 55% 118%, color-mix(in srgb, var(--text) 4%, transparent), transparent 60%),
+    var(--bg);
 }
-.nx-hero-grid {
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 75%);
+
+.lg-card {
+  position: relative;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--surface) 72%, transparent),
+    color-mix(in srgb, var(--surface) 46%, transparent));
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255,255,255,.75),
+    0 1px 2px rgba(12,15,22,.05),
+    0 14px 36px -18px rgba(12,15,22,.22);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
+html.dark .lg-card {
+  border-color: rgba(255,255,255,.08);
+  background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018));
+  box-shadow:
+    inset 0 1px 0 0 rgba(255,255,255,.09),
+    0 1px 2px rgba(0,0,0,.35),
+    0 18px 44px -22px rgba(0,0,0,.65);
+}
+/* interactive variant — lifts on hover */
+a.lg-card:hover, .lg-card-int:hover {
+  border-color: color-mix(in srgb, var(--text) 18%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255,255,255,.85),
+    0 2px 4px rgba(12,15,22,.06),
+    0 20px 44px -18px rgba(12,15,22,.3);
+}
+html.dark a.lg-card:hover, html.dark .lg-card-int:hover {
+  border-color: rgba(255,255,255,.16);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255,255,255,.14),
+    0 2px 4px rgba(0,0,0,.4),
+    0 22px 52px -22px rgba(0,0,0,.75);
+}
+
+/* always-dark polished graphite hero, same material as the app icon */
+.lg-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255,255,255,.09);
+  background:
+    radial-gradient(120% 180% at 12% -35%, rgba(255,255,255,.13), transparent 46%),
+    radial-gradient(140% 170% at 88% -25%, rgba(168,178,192,.17), transparent 52%),
+    radial-gradient(130% 130% at 50% 135%, rgba(120,128,142,.14), transparent 58%),
+    linear-gradient(180deg, #17181c, #0a0b0d 62%, #0f1013);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.13),
+    inset 0 -1px 0 rgba(255,255,255,.04),
+    0 28px 70px -28px rgba(0,0,0,.55);
+}
+/* razor specular line along the top edge */
+.lg-hero::before {
+  content: "";
+  position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  pointer-events: none;
+}
+
+/* brushed-silver icon tile */
+.lg-icon {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  color: #3c424b;
+  background: linear-gradient(160deg, #f7f8fa, #ccd1d9 42%, #a9b0bb 58%, #dbdee4);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -1px 1px rgba(20,24,32,.18),
+    0 1px 2px rgba(12,15,22,.14);
+}
+html.dark .lg-icon {
+  color: #d3d8df;
+  background: linear-gradient(160deg, #454a53, #26292f 48%, #1d2025 62%, #33373e);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -1px 1px rgba(0,0,0,.5),
+    0 1px 2px rgba(0,0,0,.45);
+}
+
+/* white-alpha glass pill — for controls that sit on the dark hero,
+   independent of the light/dark theme */
+.lg-pill {
+  background: rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.16);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 10px 28px -14px rgba(0,0,0,.55);
+}
+
+/* chrome gradient text */
+.metal-text {
+  background: linear-gradient(112deg,
+    #fafbfc 0%, #c7ccd4 20%, #f1f3f7 36%, #9aa1ac 52%, #e8eaee 68%, #b6bcc6 84%, #eef0f3 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@keyframes metal-sheen { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
+.metal-shine {
+  background-size: 220% auto;
+  animation: metal-sheen 7s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) { .metal-shine { animation: none; } }
+
+/* brushed-steel section marker (replaces the old accent bar) */
+.metal-bar {
+  width: 6px; height: 20px; border-radius: 9999px; flex-shrink: 0;
+  background: linear-gradient(180deg, #eff1f4, #99a0ab 55%, #d5d8de);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.85), inset 0 -1px 1px rgba(20,24,32,.2);
+}
+html.dark .metal-bar {
+  background: linear-gradient(180deg, #e8ebef, #7d838d 55%, #b9bec7);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 1px rgba(0,0,0,.5);
+}
+
+/* brushed-steel progress fill */
+.metal-fill {
+  background: linear-gradient(90deg, #b7bdc7, #eceef2 45%, #a2a9b4 75%, #d8dbe1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+/* polished-silver button — NOT theme-flipped, for use on the dark hero */
+.lg-btn-metal {
+  color: #23262c;
+  background: linear-gradient(160deg, #f7f8fa, #c6cbd3 45%, #a5acb7 60%, #d9dce2);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -1px 1px rgba(20,24,32,.25),
+    0 2px 8px rgba(0,0,0,.4);
+  transition: filter .15s ease, opacity .15s ease;
+}
+.lg-btn-metal:hover:not(:disabled) { filter: brightness(1.06); }
 
 /* ── recharts: force monochrome + auto theme via vars ──────────────────── */
 .recharts-cartesian-grid line,
