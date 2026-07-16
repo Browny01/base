@@ -110,12 +110,11 @@ export function Sidebar() {
         "flex items-center h-14 shrink-0",
         collapsed ? "justify-center" : "px-4 gap-2.5"
       )}>
-        <div
-          className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center shrink-0 text-white text-[13px] font-bold"
-          style={{ background: "var(--accent)" }}
-        >
-          N
-        </div>
+        <img
+          src="/icon.png"
+          alt="Bridge"
+          className="w-[26px] h-[26px] rounded-[7px] shrink-0"
+        />
         {!collapsed && (
           <>
             <span className="text-[15px] font-semibold text-[var(--text)] tracking-tight">
