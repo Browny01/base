@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, getToday, calcStreak } from "@/lib/utils";
 import type { HabitType } from "@/lib/store";
 import { Plus, Trash2, Flame, ChevronDown, ChevronUp, Type, MousePointerClick } from "lucide-react";
@@ -67,7 +67,7 @@ function EmojiPicker({ value, onChange }: { value: string; onChange: (e: string)
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export function HabitsPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const today = getToday();
 
   // Form state

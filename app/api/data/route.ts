@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
-const KEY = "nexus:data";
-const HISTORY = "nexus:data:history";   // rolling backups (newest first)
+const KEY = "bridge:data";
+const HISTORY = "bridge:data:history";   // rolling backups (newest first)
 
 function getRedis(): Redis | null {
   // New Upstash Marketplace integration uses UPSTASH_REDIS_REST_* names
@@ -39,7 +39,7 @@ export async function GET() {
     const data = unwrap(await redis.get(KEY));
     return NextResponse.json({ data, configured: true });
   } catch (err) {
-    console.error("[nexus/data GET]", err);
+    console.error("[bridge/data GET]", err);
     return NextResponse.json({ data: null, configured: true, error: String(err) });
   }
 }
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     await redis.set(KEY, body);
     return NextResponse.json({ ok: true, configured: true });
   } catch (err) {
-    console.error("[nexus/data POST]", err);
+    console.error("[bridge/data POST]", err);
     return NextResponse.json({ ok: false, configured: true, error: String(err) });
   }
 }

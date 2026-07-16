@@ -119,7 +119,7 @@ export function Sidebar() {
         {!collapsed && (
           <>
             <span className="text-[15px] font-semibold text-[var(--text)] tracking-tight">
-              Nexus
+              Bridge
             </span>
             <button
               onClick={toggle}

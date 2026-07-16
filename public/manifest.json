@@ -1,6 +1,6 @@
 {
-  "name": "NEXUS — Personal Command Center",
-  "short_name": "NEXUS",
+  "name": "BRIDGE — Personal Command Center",
+  "short_name": "BRIDGE",
   "description": "Your personal hub for focus, productivity, and income.",
   "start_url": "/",
   "display": "standalone",

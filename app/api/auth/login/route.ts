@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { signSession } from "@/lib/session";
 
-const COOKIE = "nexus_auth";
+const COOKIE = "bridge_auth";
 const THIRTY_DAYS = 60 * 60 * 24 * 30;
 
 // Simple in-memory rate limit per IP to blunt password brute-forcing.
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { password } = await req.json();
-  const correct = process.env.NEXUS_PASSWORD ?? "151715";
+  const correct = process.env.BRIDGE_PASSWORD ?? "151715";
 
   if (typeof password !== "string" || !safeEqual(password, correct)) {
     recordFail(ip);

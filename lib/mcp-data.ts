@@ -2,9 +2,9 @@
 // The golden rule: locked (and trashed) notes pages must NEVER leave this file.
 
 import { Redis } from "@upstash/redis";
-import type { NexusData, WikiBlock, WikiPage } from "@/lib/store";
+import type { BridgeData, WikiBlock, WikiPage } from "@/lib/store";
 
-const KEY = "nexus:data";
+const KEY = "bridge:data";
 
 export function mcpRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
@@ -13,19 +13,19 @@ export function mcpRedis(): Redis | null {
   return new Redis({ url, token });
 }
 
-export async function readRawData(): Promise<NexusData | null> {
+export async function readRawData(): Promise<BridgeData | null> {
   const redis = mcpRedis();
   if (!redis) return null;
   let data = await redis.get(KEY);
   if (typeof data === "string") { try { data = JSON.parse(data); } catch { /* leave as-is */ } }
-  return (data as NexusData) ?? null;
+  return (data as BridgeData) ?? null;
 }
 
 // A live (non-deleted) notes page counts as "locked & hidden" for the MCP.
 export const isReadableNote = (p: WikiPage) => !p.locked && !p.deletedAt;
 
 // Strip locked/trashed notes from the blob so nothing downstream can leak them.
-export function sanitize(d: NexusData): NexusData {
+export function sanitize(d: BridgeData): BridgeData {
   return { ...d, wikiPages: (d.wikiPages ?? []).filter(isReadableNote) };
 }
 

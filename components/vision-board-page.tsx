@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useReducer, type ReactNode } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { getData } from "@/lib/store";
 import { uid, cn } from "@/lib/utils";
-import type { BoardItem, BoardDrawing, NoteColor, DrawTool, NexusData } from "@/lib/store";
+import type { BoardItem, BoardDrawing, NoteColor, DrawTool, BridgeData } from "@/lib/store";
 import {
   ImagePlus, StickyNote, Trash2, Pencil, Check, Sparkles, ChevronDown,
   Plus, X, Brush, MousePointer2, Pen, Minus, ArrowUpRight, Square, Circle, Eraser,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 // Slice of state the Vision Board undo/redo history snapshots.
-type BoardSnap = Pick<NexusData, "boards" | "boardItems" | "boardDrawings">;
+type BoardSnap = Pick<BridgeData, "boards" | "boardItems" | "boardDrawings">;
 
 // Canvas dimensions — a generous 2D space you can scroll around like a corkboard.
 const CANVAS_W = 2600;
@@ -110,7 +110,7 @@ type DragState = {
 };
 
 export function VisionBoardPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const boards = data.boards ?? [];
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -121,20 +121,20 @@ export function VisionBoardPage() {
 
   // ── Active board ───────────────────────────────────────────────────────────
   const [activeBoardId, setActiveBoardId] = useState<string>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("nexus_vision_active") || "" : "");
+    typeof window !== "undefined" ? localStorage.getItem("bridge_vision_active") || "" : "");
   const activeId = boards.some((b) => b.id === activeBoardId) ? activeBoardId : (boards[0]?.id ?? "");
   const activeBoard = boards.find((b) => b.id === activeId);
 
   function selectBoard(id: string) {
     setActiveBoardId(id);
-    if (typeof window !== "undefined") localStorage.setItem("nexus_vision_active", id);
+    if (typeof window !== "undefined") localStorage.setItem("bridge_vision_active", id);
   }
 
   // Open a specific board when navigated here from the command bar.
   useEffect(() => {
     const h = (e: Event) => selectBoard((e as CustomEvent<string>).detail);
-    window.addEventListener("nexus:open-vision", h);
-    return () => window.removeEventListener("nexus:open-vision", h);
+    window.addEventListener("bridge:open-vision", h);
+    return () => window.removeEventListener("bridge:open-vision", h);
   }, []);
 
   // ── UI state ───────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ export function VisionBoardPage() {
   }, []);
 
   // History-recording mutation: snapshot the board slice, then apply.
-  const commit = useCallback((updater: (d: NexusData) => NexusData) => {
+  const commit = useCallback((updater: (d: BridgeData) => BridgeData) => {
     past.current.push(snapshot());
     if (past.current.length > 80) past.current.shift();
     future.current = [];

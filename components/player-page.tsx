@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
-import type { PlayerSkill, DomainKey, SkillType, ReviewFreq, Goal, GoalPeriod, BodyMetrics, ProgressPhoto, NexusData } from "@/lib/store";
+import type { PlayerSkill, DomainKey, SkillType, ReviewFreq, Goal, GoalPeriod, BodyMetrics, ProgressPhoto, BridgeData } from "@/lib/store";
 import {
   DOMAIN_WEIGHTS, DOMAIN_META, getTier, calcDomainScore, calcSubdomainScore,
   calcOverallRating, getTopDomain, getWeakestDomain, getMostImproved,
@@ -903,7 +903,7 @@ function sleepScoreFromHours(h: number): number {
 
 type TrendMetric = "weight" | "fat" | "sleep";
 
-function BodyHealthSection({ data, mutate }: { data: NexusData; mutate: (fn: (d: NexusData) => NexusData) => void }) {
+function BodyHealthSection({ data, mutate }: { data: BridgeData; mutate: (fn: (d: BridgeData) => BridgeData) => void }) {
   const bm: BodyMetrics = data.bodyMetrics ?? { weightLog: [], sleepLog: [] };
   const today = new Date().toISOString().slice(0, 10);
   const [wInput, setWInput] = useState("");
@@ -1152,7 +1152,7 @@ function BodyHealthSection({ data, mutate }: { data: NexusData; mutate: (fn: (d:
 
 // ── Weekly review (AI) ────────────────────────────────────────────────────────────
 
-function WeeklyReview({ data, overallRating }: { data: NexusData; overallRating: number }) {
+function WeeklyReview({ data, overallRating }: { data: BridgeData; overallRating: number }) {
   const [state, setState] = useState<{ loading: boolean; review?: string; error?: string }>({ loading: false });
 
   const generate = async () => {
@@ -1207,7 +1207,7 @@ function WeeklyReview({ data, overallRating }: { data: NexusData; overallRating:
 type ViewFilter = "all" | "weakest" | "strongest" | "needs-review";
 
 export function PlayerPage() {
-  const { data, mutate, loaded } = useNexus();
+  const { data, mutate, loaded } = useBridge();
   const [selectedDomain, setSelectedDomain] = useState<DomainKey | null>(null);
   const [filterView, setFilterView]         = useState<ViewFilter>("all");
   const [showCalc, setShowCalc]             = useState(false);

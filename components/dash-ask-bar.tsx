@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { processFile } from "@/lib/chat-files";
 import { configuredChatModels, DEFAULT_CHAT_SETTINGS, DEFAULT_MODEL, providerOf, localProviderOf, type PerplexityTool } from "@/lib/chat-models";
 import { discoverOllama, discoverBridge, type LocalModel } from "@/lib/local-chat";
@@ -10,11 +10,11 @@ import type { ChatAttachment } from "@/lib/store";
 import { Sparkles, Send, Paperclip, X, FileText, Database, Globe, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// The dashboard "Ask Nexus AI" bar — a compact composer (model, files, Data + Web
+// The dashboard "Ask Bridge AI" bar — a compact composer (model, files, Data + Web
 // toggles) that hands everything off to the Chat page, which auto-sends it.
 export function DashAskBar() {
   const router = useRouter();
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const chatSettings = data.chatSettings ?? DEFAULT_CHAT_SETTINGS;
   const models = useMemo(() => configuredChatModels(chatSettings).filter((m) => m.enabled), [chatSettings]);
 
@@ -69,7 +69,7 @@ export function DashAskBar() {
   function askAI() {
     const text = ask.trim();
     if (!text && pending.length === 0) return;
-    try { localStorage.setItem("nexus_chat_handoff", JSON.stringify({ text, model, useData, attachments: pending, autoSend: true })); } catch {}
+    try { localStorage.setItem("bridge_chat_handoff", JSON.stringify({ text, model, useData, attachments: pending, autoSend: true })); } catch {}
     router.push("/chat");
   }
 
@@ -99,7 +99,7 @@ export function DashAskBar() {
           value={ask}
           onChange={(e) => setAsk(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") askAI(); }}
-          placeholder="Ask Nexus AI anything…"
+          placeholder="Ask Bridge AI anything…"
           className="flex-1 bg-transparent text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none min-w-0"
         />
         <button onClick={askAI} disabled={!ask.trim() && pending.length === 0} title="Ask" className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-[var(--text)] text-[var(--bg)] hover:bg-[var(--text-hover)] disabled:opacity-40 transition-colors">
@@ -130,7 +130,7 @@ export function DashAskBar() {
           <Paperclip className="w-3.5 h-3.5" /> Files
         </button>
 
-        <button onClick={() => setUseData((v) => !v)} title="Give the AI access to your Nexus data" className={cn(chip, useData ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg)]/70 text-[var(--muted)] hover:text-[var(--text)]")}>
+        <button onClick={() => setUseData((v) => !v)} title="Give the AI access to your Bridge data" className={cn(chip, useData ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] bg-[var(--bg)]/70 text-[var(--muted)] hover:text-[var(--text)]")}>
           <Database className="w-3.5 h-3.5" /> Data
         </button>
 

@@ -14,7 +14,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("nexus_sidebar_collapsed");
+      const stored = localStorage.getItem("bridge_sidebar_collapsed");
       if (stored !== null) setCollapsed(JSON.parse(stored));
     } catch {}
   }, []);
@@ -22,7 +22,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   function toggle() {
     setCollapsed((c) => {
       const next = !c;
-      try { localStorage.setItem("nexus_sidebar_collapsed", JSON.stringify(next)); } catch {}
+      try { localStorage.setItem("bridge_sidebar_collapsed", JSON.stringify(next)); } catch {}
       return next;
     });
   }

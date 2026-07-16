@@ -15,7 +15,7 @@ import {
 import { mdToHtml } from "@/lib/markdown";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import type { AssetData } from "@/app/api/market/charts/route";
 import type { LiveStatusItem } from "@/app/api/live-status/route";
 import type { NewsArticle } from "@/app/api/news/route";
@@ -463,7 +463,7 @@ export function NewsPage() {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [mktPage, setMktPage] = useState(0);
   const [cols, setCols] = useState(4);
-  const { data } = useNexus();
+  const { data } = useBridge();
   const prefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
 
   const selectedAsset = assets.find((asset) => asset.id === selectedAssetId) ?? assets[3] ?? assets[0] ?? null;

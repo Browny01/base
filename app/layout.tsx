@@ -11,10 +11,10 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Nexus — Personal Command Center",
+  title: "Bridge — Personal Command Center",
   description: "Your personal hub for focus, productivity, and income.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Nexus" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Bridge" },
 };
 
 export const viewport: Viewport = {
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Apply persisted theme before paint to avoid a flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('nexus_theme')||'light';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('nexus_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('nexus_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('light');document.documentElement.dataset.nav='sidebar'}`,
+            __html: `try{var t=localStorage.getItem('bridge_theme')||'light';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('bridge_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('bridge_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('light');document.documentElement.dataset.nav='sidebar'}`,
           }}
         />
       </head>

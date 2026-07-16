@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, getToday, formatCurrency } from "@/lib/utils";
 import type { IncomeType, PaymentSubscription, SubscriptionFrequency } from "@/lib/store";
 import { Plus, Trash2, TrendingUp, DollarSign, Clock, CheckCircle, CalendarClock, CreditCard, Bell } from "lucide-react";
@@ -33,7 +33,7 @@ function monthlyEquivalent(sub: PaymentSubscription) {
 }
 
 export function FinancePage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [currentPortfolioAud, setCurrentPortfolioAud] = useState<number | null>(null);
   const handleTotalUpdate = useCallback((total: number) => {
     setCurrentPortfolioAud(total);

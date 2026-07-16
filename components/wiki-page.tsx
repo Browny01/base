@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, cn } from "@/lib/utils";
 import type { WikiPage as WikiPageT, WikiBlock, WikiFolder } from "@/lib/store";
@@ -109,7 +109,7 @@ function pageToPrintDoc(page: WikiPageT): string {
 }
 
 export function WikiPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const { toast } = useToast();
   const allWiki = data.wikiPages ?? [];
   const pages = allWiki.filter((p) => !p.deletedAt);          // live pages
@@ -117,7 +117,7 @@ export function WikiPage() {
   const folders = data.wikiFolders ?? [];
 
   const [rawActive, setRawActive] = useState<string>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("nexus_wiki_active") || "" : "");
+    typeof window !== "undefined" ? localStorage.getItem("bridge_wiki_active") || "" : "");
   const [view, setView] = useState<"editor" | "graph">("editor");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
@@ -136,7 +136,7 @@ export function WikiPage() {
   function selectPage(id: string) {
     setRawActive(id);
     setSidebarOpen(false);   // close the mobile drawer on selection
-    if (typeof window !== "undefined") localStorage.setItem("nexus_wiki_active", id);
+    if (typeof window !== "undefined") localStorage.setItem("bridge_wiki_active", id);
   }
   function toggleExpand(id: string) {
     setExpanded((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -150,11 +150,11 @@ export function WikiPage() {
     const h = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       setRawActive(id);
-      try { localStorage.setItem("nexus_wiki_active", id); } catch {}
+      try { localStorage.setItem("bridge_wiki_active", id); } catch {}
       setView("editor");
     };
-    window.addEventListener("nexus:open-wiki", h);
-    return () => window.removeEventListener("nexus:open-wiki", h);
+    window.addEventListener("bridge:open-wiki", h);
+    return () => window.removeEventListener("bridge:open-wiki", h);
   }, []);
 
   function createPage(parentId: string | null = null, seed?: { icon: string; title: string; blocks: WikiBlock[] }, folderId: string | null = null): string {

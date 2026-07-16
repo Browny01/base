@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
 import type { SocialStat, SocialPlatform, BusinessKPI } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -554,7 +554,7 @@ function SectionHeader({ icon, title, sub, action }: {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export function BusinessPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [stripeData, setStripeData]   = useState<StripeData | null>(null);
   const [calcomData, setCalcomData]   = useState<CalcomData | null>(null);
   const [loadingStripe, setLS]        = useState(true);

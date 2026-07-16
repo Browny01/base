@@ -17,13 +17,13 @@ interface Task {
   projectId?: string;
 }
 
-interface NexusData {
+interface BridgeData {
   tasks?: Task[];
   updatedAt?: number;
   [key: string]: unknown;
 }
 
-const KEY = "nexus:data";
+const KEY = "bridge:data";
 const PRIORITIES = new Set(["P1", "P2", "P3"]);
 const TAGS = new Set(["@work", "@personal", "@money", "@admin"]);
 const RECURRING = new Set(["daily", "weekly", "monthly"]);
@@ -36,7 +36,7 @@ function getRedis(): Redis | null {
 }
 
 function isAuthorized(req: NextRequest) {
-  const token = process.env.NEXUS_AGENT_TOKEN || process.env.NEXUS_PASSWORD;
+  const token = process.env.BRIDGE_AGENT_TOKEN || process.env.BRIDGE_PASSWORD;
   return Boolean(token && req.headers.get("authorization") === `Bearer ${token}`);
 }
 
@@ -44,11 +44,11 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-async function readData(redis: Redis): Promise<NexusData> {
-  let data = await redis.get<NexusData | string>(KEY);
+async function readData(redis: Redis): Promise<BridgeData> {
+  let data = await redis.get<BridgeData | string>(KEY);
   if (typeof data === "string") {
     try {
-      data = JSON.parse(data) as NexusData;
+      data = JSON.parse(data) as BridgeData;
     } catch {
       data = {};
     }
@@ -56,7 +56,7 @@ async function readData(redis: Redis): Promise<NexusData> {
   return data && typeof data === "object" && !Array.isArray(data) ? data : {};
 }
 
-async function writeData(redis: Redis, data: NexusData) {
+async function writeData(redis: Redis, data: BridgeData) {
   const next = { ...data, tasks: data.tasks ?? [], updatedAt: Date.now() };
   await redis.set(KEY, next);
   return next;

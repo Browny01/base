@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ════════════════════════════════════════════════════════════════════════
-   NEXUS — monochrome design system (Linear / Vercel inspired)
+   BRIDGE — monochrome design system (Linear / Vercel inspired)
    Strict grayscale. One accent (--accent) reserved for the brand mark only.
    Light + dark are driven entirely by the CSS variables below, so every
    component (which references var(--token)) flips automatically.

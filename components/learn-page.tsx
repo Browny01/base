@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import type { Course, CourseModule, CourseLesson, CourseLevel, QuizQuestion } from "@/lib/store";
 import { CHAT_MODELS, DEFAULT_CHAT_SETTINGS, modelLabel, localProviderOf, type ChatModel } from "@/lib/chat-models";
@@ -78,7 +78,7 @@ const progressOf = (c: Course) => {
 const flatLessons = (c: Course) => c.modules.flatMap((m) => m.lessons.map((l) => ({ moduleId: m.id, lesson: l })));
 
 export function LearnPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const courses = useMemo(() => [...(data.courses ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), [data.courses]);
 
   const chatSettings = data.chatSettings ?? DEFAULT_CHAT_SETTINGS;

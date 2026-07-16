@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySession } from "@/lib/session";
 
-const COOKIE = "nexus_auth";
+const COOKIE = "bridge_auth";
 
 const OAUTH_META_CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS", "Access-Control-Allow-Headers": "*" };
 
@@ -19,13 +19,13 @@ function harden(res: NextResponse): NextResponse {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const agentToken = process.env.NEXUS_AGENT_TOKEN || process.env.NEXUS_PASSWORD;
+  const agentToken = process.env.BRIDGE_AGENT_TOKEN || process.env.BRIDGE_PASSWORD;
 
   // ── OAuth discovery metadata for the MCP server (public, no auth) ──────────────
   const origin = request.nextUrl.origin;
   if (pathname.startsWith("/.well-known/oauth-protected-resource")) {
     return NextResponse.json(
-      { resource: `${origin}/api/mcp`, authorization_servers: [origin], bearer_methods_supported: ["header"], scopes_supported: ["nexus"] },
+      { resource: `${origin}/api/mcp`, authorization_servers: [origin], bearer_methods_supported: ["header"], scopes_supported: ["bridge"] },
       { headers: OAUTH_META_CORS },
     );
   }
@@ -39,7 +39,7 @@ export async function proxy(request: NextRequest) {
       grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
-      scopes_supported: ["nexus"],
+      scopes_supported: ["bridge"],
     }, { headers: OAUTH_META_CORS });
   }
 
@@ -56,7 +56,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/market") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
-    pathname === "/icon.svg" ||
+    pathname === "/icon.png" ||
+    pathname === "/apple-icon.png" ||
     (pathname.startsWith("/icon-") && pathname.endsWith(".png")) ||
     pathname === "/manifest.json"
   ) {

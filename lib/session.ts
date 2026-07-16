@@ -7,9 +7,9 @@ const enc = new TextEncoder();
 
 // Prefer a dedicated secret; fall back to the login password, then a constant so
 // the app never hard-locks if env is momentarily missing (login + proxy always
-// derive the SAME key, so no lock-out). Set NEXUS_SESSION_SECRET for real safety.
+// derive the SAME key, so no lock-out). Set BRIDGE_SESSION_SECRET for real safety.
 function secretKey(): string {
-  return process.env.NEXUS_SESSION_SECRET || process.env.NEXUS_PASSWORD || "nexus-fallback-key";
+  return process.env.BRIDGE_SESSION_SECRET || process.env.BRIDGE_PASSWORD || "bridge-fallback-key";
 }
 
 async function hmac(msg: string): Promise<string> {

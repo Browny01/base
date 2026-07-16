@@ -1,8 +1,8 @@
-// Builds a compact, sanitized snapshot of the user's Nexus data to give the chat
+// Builds a compact, sanitized snapshot of the user's Bridge data to give the chat
 // AI site-wide context. Locked and trashed notes are never included — same rule
 // as the MCP server. Client-safe (no server-only imports).
 
-import type { NexusData, WikiBlock, WikiPage } from "@/lib/store";
+import type { BridgeData, WikiBlock, WikiPage } from "@/lib/store";
 
 const MAX_CHARS = 60000;
 
@@ -31,11 +31,11 @@ function blockText(b: WikiBlock): string {
 }
 const noteText = (p: WikiPage) => (p.blocks ?? []).map(blockText).filter(Boolean).join("\n");
 
-export function buildNexusContext(d: NexusData): string {
+export function buildBridgeContext(d: BridgeData): string {
   const parts: string[] = [];
   const push = (s: string) => parts.push(s);
 
-  push("=== NEXUS PERSONAL DASHBOARD DATA (the user's own data — use it to answer questions about their tasks, notes, finances, goals, etc. Locked/private notes are excluded.) ===");
+  push("=== BRIDGE PERSONAL DASHBOARD DATA (the user's own data — use it to answer questions about their tasks, notes, finances, goals, etc. Locked/private notes are excluded.) ===");
 
   const tasks = d.tasks ?? [];
   if (tasks.length) push(`\n## Tasks (${tasks.filter((t) => !t.done).length} open)\n` + tasks.slice(0, 60).map((t) => `- [${t.done ? "x" : " "}] ${t.title} (${t.priority}, ${t.tag}${t.dueDate ? `, due ${t.dueDate}` : ""})`).join("\n"));
