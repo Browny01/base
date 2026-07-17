@@ -35,13 +35,12 @@ export function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-export function calcStreak(logs: { date: string; completed: boolean }[]): number {
-  const today = getToday();
+export function calcStreak(logs: { date: string; completed: boolean }[], today = getToday()): number {
   const sorted = [...logs]
     .filter((l) => l.completed)
     .sort((a, b) => b.date.localeCompare(a.date));
   let streak = 0;
-  let cur = new Date(today);
+  const cur = new Date(today);
   for (const log of sorted) {
     const d = cur.toISOString().split("T")[0];
     if (log.date === d) {

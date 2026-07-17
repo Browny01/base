@@ -19,6 +19,7 @@ export interface Task {
   recurring: RecurringFreq;
   done: boolean;
   createdAt: string;
+  completedAt?: string | null;
   projectId?: string;
   subtasks?: SubTask[];
 }
@@ -696,7 +697,10 @@ function purgeOldTrash(data: BridgeData): BridgeData {
 function load(): BridgeData {
   if (typeof window === "undefined") return DEFAULT;
   try {
-    const raw = localStorage.getItem("bridge_data");
+    const raw = localStorage.getItem("bridge_data") ?? localStorage.getItem("nexus_data");
+    if (raw && !localStorage.getItem("bridge_data")) {
+      localStorage.setItem("bridge_data", raw);
+    }
     const parsed = raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
     return purgeOldTrash(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(parsed)))));
   } catch {

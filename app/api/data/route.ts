@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { DATA_KEY as KEY, readCurrentData } from "@/lib/bridge-data";
 
-const KEY = "bridge:data";
 const HISTORY = "bridge:data:history";   // rolling backups (newest first)
 
 function getRedis(): Redis | null {
@@ -36,7 +36,7 @@ export async function GET() {
   const redis = getRedis();
   if (!redis) return NextResponse.json({ data: null, configured: false });
   try {
-    const data = unwrap(await redis.get(KEY));
+    const data = unwrap(await readCurrentData(redis));
     return NextResponse.json({ data, configured: true });
   } catch (err) {
     console.error("[bridge/data GET]", err);
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const force = new URL(req.url).searchParams.get("force") === "1";
-    const existing = unwrap(await redis.get(KEY)) as Record<string, unknown> | null;
+    const existing = unwrap(await readCurrentData(redis)) as Record<string, unknown> | null;
 
     // Anti-wipe guard: never let a near-empty payload silently overwrite a populated
     // store (protects against client bugs that push before data has hydrated).

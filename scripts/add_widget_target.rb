@@ -1,7 +1,11 @@
 #!/usr/bin/env ruby
 # Adds the BridgeWidgetExtension (WidgetKit) target to the Capacitor iOS project
 # and embeds it in the App target. Idempotent — safe to re-run.
-require "xcodeproj"
+begin
+  require "xcodeproj"
+rescue LoadError
+  abort "Missing Ruby gem 'xcodeproj'. Run `bundle install`, then `bundle exec ruby scripts/add_widget_target.rb`."
+end
 
 proj_path = File.expand_path(File.join(__dir__, "..", "ios", "App", "App.xcodeproj"))
 project = Xcodeproj::Project.open(proj_path)
