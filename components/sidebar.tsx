@@ -110,9 +110,9 @@ export function Sidebar() {
         collapsed ? "justify-center" : "px-4 gap-2.5"
       )}>
         <img
-          src="/icon.png"
+          src="/bridge-mark.png"
           alt="Bridge"
-          className="w-[26px] h-[26px] rounded-[7px] shrink-0"
+          className="w-[26px] h-[26px] object-contain shrink-0"
         />
         {!collapsed && (
           <>
