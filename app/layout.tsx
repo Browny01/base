@@ -14,13 +14,17 @@ export const metadata: Metadata = {
   title: "Bridge — Personal Command Center",
   description: "Your personal hub for focus, productivity, and income.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Bridge" },
+  // black-translucent → the app draws edge-to-edge under the status bar; the
+  // chrome pads itself with env(safe-area-inset-*) so nothing is occluded.
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Bridge" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",              // extend into the safe areas (notch / home indicator)
+  themeColor: "#0a0a0b",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
