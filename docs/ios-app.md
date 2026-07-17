@@ -85,15 +85,25 @@ Groups).
   (a small `/api/push/register` endpoint), then send via APNs from the Bridge
   backend or a cron.
 
-### 2. Home-screen & Lock-screen widgets (WidgetKit)
-- File → New → Target → **Widget Extension**.
-- The widget is native SwiftUI. It needs data on-device: either
-  - read a small JSON the app wrote to the shared App Group container after each
-    sync, or
-  - fetch a read-only Bridge endpoint (e.g. an overview summary) using the agent
-    token.
-- Good first widgets: today's task count, revenue vs target, current streak,
-  portfolio value — all already computed on the dashboard.
+### 2. Home-screen widgets (WidgetKit) — ✅ DONE
+The **BridgeWidget** target already exists (`ios/App/BridgeWidget/`), built by
+`scripts/add_widget_target.rb`. It's a native SwiftUI widget that fetches the
+read-only **`/api/widget/summary`** endpoint (token-guarded; the device passes its
+local date so "today" matches the app) and shows:
+
+- **Small**: Tasks Left (big) + done-today, with streak + revenue at the bottom.
+- **Medium**: Tasks · Streak · Habits · Revenue-vs-target (with a progress bar).
+
+To put it on your phone/simulator: **long-press the home screen → tap `+` → search
+"Bridge" → pick a size → Add Widget.** It refreshes ~every 30 min.
+
+The token is currently hard-coded to the server default (`151715`). If you set a
+custom `BRIDGE_PASSWORD` / `BRIDGE_AGENT_TOKEN`, update `BridgeAPI.token` in
+`BridgeWidget.swift` (or later: have the app write the token to a shared App Group
+that the widget reads).
+
+To regenerate the target from scratch (e.g. after `npx cap add ios`):
+`ruby scripts/add_widget_target.rb`.
 
 ### 3. Live Activities (ActivityKit)
 - Add an **ActivityKit** widget to the Widget Extension; enable
