@@ -76,11 +76,11 @@ function DockIcon({ item, active, scale, hovered, onHover }: {
       </span>
       <span className={cn(
         "flex h-11 w-11 items-center justify-center rounded-2xl border transition-colors",
-        active ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-transparent text-[var(--muted)] hover:text-[var(--text)]"
+        active ? "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)]" : "border-transparent text-[var(--muted)] hover:text-[var(--text)]"
       )}>
         <Icon style={{ width: 21, height: 21 }} strokeWidth={active ? 2.1 : 1.85} />
       </span>
-      {active && <span className="absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[var(--accent)]" aria-hidden="true" />}
+      {active && <span className="absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[var(--text)]" aria-hidden="true" />}
     </Link>
   );
 }
@@ -108,7 +108,7 @@ export function Dock() {
                 return (
                   <Link key={href} href={href} onClick={() => setOpen(false)}
                     className={cn("nx-slide-up flex flex-col items-center gap-1.5 rounded-2xl border py-3 text-center",
-                      active ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-transparent text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]")}
+                      active ? "border-[var(--border-2)] bg-[var(--surface-2)] text-[var(--text)]" : "border-transparent text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]")}
                     style={{ animationDelay: `${i * 16}ms` }}>
                     <Icon style={{ width: 19, height: 19 }} strokeWidth={active ? 2.1 : 1.8} />
                     <span className="text-[10.5px] font-medium">{label}</span>
@@ -138,7 +138,7 @@ export function Dock() {
           </button>
           {/* Settings */}
           <Link href="/settings" onMouseEnter={() => setHover(null)} title="Settings"
-            className={cn("flex h-11 w-11 items-center justify-center rounded-2xl transition-colors", isActive(pathname, "/settings") ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)]")}>
+            className={cn("flex h-11 w-11 items-center justify-center rounded-2xl transition-colors", isActive(pathname, "/settings") ? "bg-[var(--surface-2)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)]")}>
             <Settings style={{ width: 20, height: 20 }} strokeWidth={1.9} />
           </Link>
           {/* Theme toggle */}

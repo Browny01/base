@@ -76,11 +76,10 @@ function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: strin
         "relative flex items-center rounded-[7px] text-[13.5px] transition-colors min-h-[34px]",
         collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
         active
-          ? "bg-[var(--accent-soft)] text-[var(--accent)] font-medium"
+          ? "bg-[var(--surface-2)] text-[var(--text)] font-medium"
           : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] font-normal"
       )}
     >
-      {active && !collapsed && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-[var(--accent)]" aria-hidden="true" />}
       <Icon
         className="shrink-0"
         style={{ width: 17, height: 17 }}
