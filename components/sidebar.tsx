@@ -76,11 +76,10 @@ function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: strin
         "relative flex items-center rounded-[7px] text-[13.5px] transition-colors min-h-[34px]",
         collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
         active
-          ? "bg-[var(--accent-soft)] text-[var(--accent)] font-medium"
+          ? "bg-[var(--surface-2)] text-[var(--text)] font-medium"
           : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] font-normal"
       )}
     >
-      {active && !collapsed && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-[var(--accent)]" aria-hidden="true" />}
       <Icon
         className="shrink-0"
         style={{ width: 17, height: 17 }}
@@ -110,16 +109,15 @@ export function Sidebar() {
         "flex items-center h-14 shrink-0",
         collapsed ? "justify-center" : "px-4 gap-2.5"
       )}>
-        <div
-          className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center shrink-0 text-white text-[13px] font-bold"
-          style={{ background: "var(--accent)" }}
-        >
-          N
-        </div>
+        <img
+          src="/bridge-mark.png"
+          alt="Bridge"
+          className="w-[26px] h-[26px] object-contain shrink-0"
+        />
         {!collapsed && (
           <>
             <span className="text-[15px] font-semibold text-[var(--text)] tracking-tight">
-              Nexus
+              Bridge
             </span>
             <button
               onClick={toggle}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import type { NexusData, Wallet } from "@/lib/store";
+import type { BridgeData, Wallet } from "@/lib/store";
 
 // This route is hit by a Vercel Cron Job once a day. It recomputes the
 // portfolio's total AUD value server-side (no browser needed) and appends a
@@ -10,7 +10,7 @@ import type { NexusData, Wallet } from "@/lib/store";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const KEY = "nexus:data";
+const KEY = "bridge:data";
 
 function getRedis(): Redis | null {
   const url   = process.env.UPSTASH_REDIS_REST_URL   || process.env.KV_REST_API_URL;
@@ -105,8 +105,8 @@ async function run(req: NextRequest) {
   if (!redis) return NextResponse.json({ ok: false, error: "redis not configured" });
 
   // Load current data blob (may be double-encoded)
-  let data = (await redis.get(KEY)) as NexusData | string | null;
-  if (typeof data === "string") { try { data = JSON.parse(data) as NexusData; } catch { data = null; } }
+  let data = (await redis.get(KEY)) as BridgeData | string | null;
+  if (typeof data === "string") { try { data = JSON.parse(data) as BridgeData; } catch { data = null; } }
   if (!data || typeof data !== "object") return NextResponse.json({ ok: false, error: "no data" });
 
   const wallets = data.wallets ?? [];
@@ -128,7 +128,7 @@ async function run(req: NextRequest) {
   else snapshots.push({ date: today, totalAud: grandTotal });
   snapshots.sort((a, b) => a.date.localeCompare(b.date));
 
-  const next: NexusData = {
+  const next: BridgeData = {
     ...data,
     portfolioSnapshots: snapshots.slice(-365),
     updatedAt: Date.now(),

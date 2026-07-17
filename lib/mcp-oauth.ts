@@ -47,14 +47,14 @@ export async function takeCode(code: string): Promise<CodeData | null> {
   return data;
 }
 
-export const saveToken = (token: string) => put(K.token(token), { scope: "nexus" }, ACCESS_TTL);
+export const saveToken = (token: string) => put(K.token(token), { scope: "bridge" }, ACCESS_TTL);
 export const validateAccessToken = async (token: string) => (await read(K.token(token))) != null;
 
-export const saveRefresh = (token: string) => put(K.refresh(token), { scope: "nexus" }, REFRESH_TTL);
+export const saveRefresh = (token: string) => put(K.refresh(token), { scope: "bridge" }, REFRESH_TTL);
 export const validateRefresh = async (token: string) => (await read(K.refresh(token))) != null;
 
 export function resourceMetadata(origin: string) {
-  return { resource: `${origin}/api/mcp`, authorization_servers: [origin], bearer_methods_supported: ["header"], scopes_supported: ["nexus"] };
+  return { resource: `${origin}/api/mcp`, authorization_servers: [origin], bearer_methods_supported: ["header"], scopes_supported: ["bridge"] };
 }
 export function authServerMetadata(origin: string) {
   return {
@@ -66,7 +66,7 @@ export function authServerMetadata(origin: string) {
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
-    scopes_supported: ["nexus"],
+    scopes_supported: ["bridge"],
   };
 }
 

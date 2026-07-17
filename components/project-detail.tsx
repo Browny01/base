@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, getToday } from "@/lib/utils";
 import type { Task, Priority, TaskTag, ProjectStatus, ProjectColor, MilestoneStatus } from "@/lib/store";
@@ -43,7 +43,7 @@ const MILESTONE_STATUS: { value: MilestoneStatus; label: string; icon: React.Rea
 type Tab = "tasks" | "roadmap" | "docs" | "links";
 
 export function ProjectDetail({ id }: { id: string }) {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const { toast } = useToast();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("tasks");
@@ -211,7 +211,14 @@ export function ProjectDetail({ id }: { id: string }) {
     setTaskTitle(""); setShowTaskForm(false);
   }
   function toggleTask(taskId: string) {
-    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, done: !t.done } : t) }));
+    mutate((d) => ({
+      ...d,
+      tasks: d.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const done = !t.done;
+        return { ...t, done, completedAt: done ? new Date().toISOString() : null };
+      }),
+    }));
   }
   function deleteTask(taskId: string) {
     mutate((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== taskId) }));

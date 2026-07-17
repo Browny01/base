@@ -25,8 +25,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Main column */}
           <div className="flex-1 flex flex-col min-w-0">
             <TopBar />
-            {/* extra bottom padding on mobile clears the floating glass nav */}
-            <main className="nx-main flex-1 overflow-y-auto pb-28 md:pb-0">
+            {/* extra bottom padding on mobile clears the floating glass tab bar (+ home indicator) */}
+            <main className="nx-main flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
               <ContentContainer>{children}</ContentContainer>
             </main>
           </div>

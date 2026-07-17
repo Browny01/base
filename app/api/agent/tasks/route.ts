@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { DATA_KEY as KEY, readCurrentData } from "@/lib/bridge-data";
+import { bridgeAgentToken } from "@/lib/env";
 
 type Priority = "P1" | "P2" | "P3";
 type TaskTag = "@work" | "@personal" | "@money" | "@admin";
@@ -14,16 +16,16 @@ interface Task {
   recurring: RecurringFreq;
   done: boolean;
   createdAt: string;
+  completedAt?: string | null;
   projectId?: string;
 }
 
-interface NexusData {
+interface BridgeData {
   tasks?: Task[];
   updatedAt?: number;
   [key: string]: unknown;
 }
 
-const KEY = "nexus:data";
 const PRIORITIES = new Set(["P1", "P2", "P3"]);
 const TAGS = new Set(["@work", "@personal", "@money", "@admin"]);
 const RECURRING = new Set(["daily", "weekly", "monthly"]);
@@ -36,7 +38,7 @@ function getRedis(): Redis | null {
 }
 
 function isAuthorized(req: NextRequest) {
-  const token = process.env.NEXUS_AGENT_TOKEN || process.env.NEXUS_PASSWORD;
+  const token = bridgeAgentToken();
   return Boolean(token && req.headers.get("authorization") === `Bearer ${token}`);
 }
 
@@ -44,11 +46,11 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-async function readData(redis: Redis): Promise<NexusData> {
-  let data = await redis.get<NexusData | string>(KEY);
+async function readData(redis: Redis): Promise<BridgeData> {
+  let data = await readCurrentData(redis) as BridgeData | string | null;
   if (typeof data === "string") {
     try {
-      data = JSON.parse(data) as NexusData;
+      data = JSON.parse(data) as BridgeData;
     } catch {
       data = {};
     }
@@ -56,7 +58,7 @@ async function readData(redis: Redis): Promise<NexusData> {
   return data && typeof data === "object" && !Array.isArray(data) ? data : {};
 }
 
-async function writeData(redis: Redis, data: NexusData) {
+async function writeData(redis: Redis, data: BridgeData) {
   const next = { ...data, tasks: data.tasks ?? [], updatedAt: Date.now() };
   await redis.set(KEY, next);
   return next;
@@ -86,6 +88,15 @@ function parseTaskInput(input: Record<string, unknown>, existing?: Task): Task {
       ? null
       : existing?.dueDate ?? null;
 
+  const done = typeof input.done === "boolean" ? input.done : existing?.done ?? false;
+  const completedAt = done
+    ? typeof input.completedAt === "string" && input.completedAt.trim()
+      ? input.completedAt.trim()
+      : existing?.done === done
+        ? existing?.completedAt ?? null
+        : new Date().toISOString()
+    : null;
+
   return {
     id: existing?.id ?? crypto.randomUUID(),
     title,
@@ -93,8 +104,9 @@ function parseTaskInput(input: Record<string, unknown>, existing?: Task): Task {
     tag,
     dueDate,
     recurring,
-    done: typeof input.done === "boolean" ? input.done : existing?.done ?? false,
+    done,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
+    completedAt,
     projectId: typeof input.projectId === "string" && input.projectId.trim()
       ? input.projectId.trim()
       : input.projectId === null

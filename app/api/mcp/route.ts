@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
-import type { NexusData } from "@/lib/store";
+import type { BridgeData } from "@/lib/store";
 import { readRawData, sanitize, noteToText, isReadableNote } from "@/lib/mcp-data";
 import { validateAccessToken } from "@/lib/mcp-oauth";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const SERVER_INFO = { name: "nexus", title: "Nexus — Personal Data", version: "1.0.0" };
+const SERVER_INFO = { name: "bridge", title: "Bridge — Personal Data", version: "1.0.0" };
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -26,13 +26,13 @@ async function authorized(req: NextRequest): Promise<boolean> {
 }
 
 // ── Tools ─────────────────────────────────────────────────────────────────────────
-type Tool = { name: string; description: string; inputSchema: object; run: (a: Record<string, unknown>, d: NexusData) => unknown };
+type Tool = { name: string; description: string; inputSchema: object; run: (a: Record<string, unknown>, d: BridgeData) => unknown };
 const obj = (props: object = {}, required: string[] = []) => ({ type: "object", properties: props, required, additionalProperties: false });
 
 const TOOLS: Tool[] = [
   {
     name: "get_overview",
-    description: "High-level snapshot of everything in the Nexus dashboard: counts per section and key stats. Start here.",
+    description: "High-level snapshot of everything in the Bridge dashboard: counts per section and key stats. Start here.",
     inputSchema: obj(),
     run: (_a, d) => ({
       tasks: { total: d.tasks?.length ?? 0, open: (d.tasks ?? []).filter((t) => !t.done).length },
@@ -101,7 +101,7 @@ const TOOLS: Tool[] = [
     inputSchema: obj({ id: { type: "string" } }, ["id"]),
     // Uses RAW data so it can detect (and refuse) locked pages explicitly.
     run: (a, d) => {
-      const raw = (d as NexusData & { __raw?: NexusData }).__raw ?? d;
+      const raw = (d as BridgeData & { __raw?: BridgeData }).__raw ?? d;
       const p = (raw.wikiPages ?? []).find((x) => x.id === a.id);
       if (!p || p.deletedAt) return { error: "not_found" };
       if (p.locked) return { error: "locked", message: "This note is locked; its contents are private and cannot be read." };
@@ -125,12 +125,12 @@ const TOOLS: Tool[] = [
 ];
 
 // ── Data (sanitized; get_note gets raw attached for its locked-check) ──────────────
-let cache: { at: number; data: NexusData } | null = null;
-async function loadData(): Promise<NexusData | null> {
+let cache: { at: number; data: BridgeData } | null = null;
+async function loadData(): Promise<BridgeData | null> {
   if (cache && Date.now() - cache.at < 3000) return cache.data;
   const raw = await readRawData();
   if (!raw) return null;
-  const s = sanitize(raw) as NexusData & { __raw?: NexusData };
+  const s = sanitize(raw) as BridgeData & { __raw?: BridgeData };
   s.__raw = raw; // internal handle for get_note's locked detection
   cache = { at: Date.now(), data: s };
   return s;
@@ -151,7 +151,7 @@ async function handle(msg: RpcReq): Promise<object | null> {
         protocolVersion: (params?.protocolVersion as string) || "2025-06-18",
         capabilities: { tools: {}, resources: {} },
         serverInfo: SERVER_INFO,
-        instructions: "Read-only access to the user's Nexus personal dashboard. Locked notes pages are private and excluded. Use get_overview first.",
+        instructions: "Read-only access to the user's Bridge personal dashboard. Locked notes pages are private and excluded. Use get_overview first.",
       });
     case "ping": return ok(id, {});
     case "tools/list":
@@ -161,7 +161,7 @@ async function handle(msg: RpcReq): Promise<object | null> {
       const tool = TOOLS.find((t) => t.name === name);
       if (!tool) return err(id, -32602, `Unknown tool: ${name}`);
       const data = await loadData();
-      if (!data) return ok(id, { content: [{ type: "text", text: "Nexus data store isn't configured (no Redis)." }], isError: true });
+      if (!data) return ok(id, { content: [{ type: "text", text: "Bridge data store isn't configured (no Redis)." }], isError: true });
       try {
         const result = tool.run((params?.arguments as Record<string, unknown>) || {}, data);
         return ok(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
@@ -171,12 +171,12 @@ async function handle(msg: RpcReq): Promise<object | null> {
     }
     case "resources/list": {
       const res = TOOLS.filter((t) => (t.inputSchema as { required?: string[] }).required?.length !== 1 && t.name !== "search" && t.name !== "get_note")
-        .map((t) => ({ uri: `nexus://${t.name.replace(/^get_|^list_/, "")}`, name: t.name, description: t.description, mimeType: "application/json" }));
+        .map((t) => ({ uri: `bridge://${t.name.replace(/^get_|^list_/, "")}`, name: t.name, description: t.description, mimeType: "application/json" }));
       return ok(id, { resources: res });
     }
     case "resources/read": {
       const uri = String(params?.uri || "");
-      const key = uri.replace("nexus://", "");
+      const key = uri.replace("bridge://", "");
       const tool = TOOLS.find((t) => t.name === `get_${key}` || t.name === `list_${key}`);
       if (!tool) return err(id, -32602, `Unknown resource: ${uri}`);
       const data = await loadData();

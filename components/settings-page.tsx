@@ -7,7 +7,7 @@ import { useSidebar } from "@/lib/sidebar-context";
 import { useNavMode } from "@/lib/nav-mode-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAccent, ACCENTS } from "@/lib/accent-context";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { CHAT_MODELS, DEFAULT_CHAT_SETTINGS, type ChatSettings } from "@/lib/chat-models";
 import {
   CATEGORY_LABEL,
@@ -216,7 +216,7 @@ function ChatModelManager({ settings, setSettings }: { settings: ChatSettings; s
             value={settings.chatMemory ?? ""}
             onChange={(e) => setSettings({ ...settings, chatMemory: e.target.value })}
             rows={4}
-            placeholder="e.g. My name is Lucas. I run Systemly (WA lead-gen). Prefer concise answers. Building Nexus in Next.js…"
+            placeholder="e.g. My name is Lucas. I run Systemly (WA lead-gen). Prefer concise answers. Building Bridge in Next.js…"
             className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]"
           />
         </div>
@@ -230,7 +230,7 @@ export function SettingsPage() {
   const { accent, setAccent } = useAccent();
   const { collapsed, toggle } = useSidebar();
   const { mode, setMode } = useNavMode();
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const newsPrefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
   const chatSettings = data.chatSettings ?? DEFAULT_CHAT_SETTINGS;
   const setNewsPrefs = (prefs: NewsPrefs) => mutate((d) => ({ ...d, newsPrefs: prefs }));
@@ -245,7 +245,7 @@ export function SettingsPage() {
           </div>
           <h1 className="text-2xl font-bold text-[var(--text)]">Settings</h1>
         </div>
-        <p className="text-sm text-[var(--muted)]">Preferences for the Nexus workspace.</p>
+        <p className="text-sm text-[var(--muted)]">Preferences for the Bridge workspace.</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">

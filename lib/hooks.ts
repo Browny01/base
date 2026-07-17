@@ -1,23 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getData, updateData, DEFAULT, type NexusData } from "./store";
+import { getData, updateData, DEFAULT, type BridgeData } from "./store";
 
 const SYNC_DELAY_MS = 2500;
 
-async function serverGet(): Promise<NexusData | null> {
+async function serverGet(): Promise<BridgeData | null> {
   try {
     const res = await fetch("/api/data", { cache: "no-store" });
     if (!res.ok) return null;
     const { data } = await res.json();
     if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-    return data as NexusData;
+    return data as BridgeData;
   } catch {
     return null;
   }
 }
 
-async function serverSet(data: NexusData): Promise<void> {
+async function serverSet(data: BridgeData): Promise<void> {
   try {
     await fetch("/api/data", {
       method: "POST",
@@ -29,8 +29,8 @@ async function serverSet(data: NexusData): Promise<void> {
   }
 }
 
-export function useNexus() {
-  const [data, setData] = useState<NexusData>(DEFAULT);
+export function useBridge() {
+  const [data, setData] = useState<BridgeData>(DEFAULT);
   const [loaded, setLoaded] = useState(false);   // true once Redis hydration has settled
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,11 +64,11 @@ export function useNexus() {
     init();
 
     const sync = () => setData(getData());
-    window.addEventListener("nexus_update", sync);
-    return () => window.removeEventListener("nexus_update", sync);
+    window.addEventListener("bridge_update", sync);
+    return () => window.removeEventListener("bridge_update", sync);
   }, []);
 
-  const mutate = useCallback((updater: (d: NexusData) => NexusData) => {
+  const mutate = useCallback((updater: (d: BridgeData) => BridgeData) => {
     const next = updateData((d) => ({ ...updater(d), updatedAt: Date.now() }));
     setData(next);
 

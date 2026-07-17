@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, formatAUD, getToday } from "@/lib/utils";
 import type { WalletNetwork } from "@/lib/store";
 import { fetchWalletBalance, fetchCryptoPrices, NETWORK_INFO } from "@/lib/crypto";
@@ -80,7 +80,7 @@ function TokenIcon({ logoUri, symbol }: { logoUri?: string; symbol: string }) {
 }
 
 export function WalletSection({ onTotalUpdate }: Props) {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [showForm, setShowForm] = useState(false);
   const [formNetwork, setFormNetwork] = useState<WalletNetwork>("ethereum");
   const [formAddress, setFormAddress] = useState("");
