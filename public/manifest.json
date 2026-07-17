@@ -1,11 +1,11 @@
 {
-  "name": "BRIDGE — Personal Command Center",
-  "short_name": "BRIDGE",
+  "name": "Bridge — Personal Command Center",
+  "short_name": "Bridge",
   "description": "Your personal hub for focus, productivity, and income.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#0a0a0f",
+  "background_color": "#0a0a0b",
+  "theme_color": "#0a0a0b",
   "orientation": "portrait-primary",
   "icons": [
     {
