@@ -95,7 +95,7 @@ export function Dashboard() {
   const activeProjects = data.projects.filter((p) => p.status === "active");
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px] mx-auto">
+    <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
       {/* ── Greeting — sits directly on the canvas, subtle watermark on the right ── */}
       <header className="relative mb-6">
         <img
@@ -340,22 +340,22 @@ function MetricCard({
   series: number[]; seriesColor: string; href: string; footer?: React.ReactNode;
 }) {
   return (
-    <Link href={href} className="group card card-hover p-4 relative overflow-hidden block">
-      <div className="flex items-center gap-2 mb-2.5">
+    <Link href={href} className="group card card-hover p-4 relative overflow-hidden block min-h-[132px]">
+      <div className="flex items-center gap-2 mb-3">
         <span style={{ color: iconColor }}>{icon}</span>
         <span className="eyebrow">{label}</span>
       </div>
-      <p className="text-[1.55rem] font-bold text-[var(--text)] tabular leading-none truncate">{value}</p>
+      <p className="text-[1.7rem] font-bold text-[var(--text)] tabular leading-none truncate">{value}</p>
       {delta ? (
-        <p className="text-[11px] mt-2 font-medium tabular flex items-center gap-1" style={{ color: delta.up ? "var(--c-emerald)" : "var(--c-rose)" }}>
-          {delta.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+        <p className="text-[11.5px] mt-2.5 font-medium tabular flex items-center gap-1" style={{ color: delta.up ? "var(--c-emerald)" : "var(--c-rose)" }}>
+          {delta.up ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
           {Math.abs(delta.pct).toFixed(1)}% <span className="text-[var(--faint)]">· {delta.note}</span>
         </p>
       ) : sub ? (
-        <p className="text-[11px] text-[var(--faint)] mt-2 font-medium">{sub}</p>
+        <p className="text-[11.5px] text-[var(--faint)] mt-2.5 font-medium">{sub}</p>
       ) : null}
       {footer}
-      <div className="absolute bottom-2.5 right-2 w-[88px] h-[30px] opacity-90 pointer-events-none">
+      <div className="absolute bottom-3.5 right-3.5 w-[128px] h-[42px] opacity-90 pointer-events-none">
         <Sparkline data={series} color={seriesColor} className="w-full h-full" />
       </div>
     </Link>
