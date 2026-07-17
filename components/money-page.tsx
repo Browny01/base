@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, getToday, formatCurrency } from "@/lib/utils";
 import type { IncomeType } from "@/lib/store";
 import { Plus, Trash2, TrendingUp, DollarSign, Clock, CheckCircle } from "lucide-react";
@@ -14,7 +14,7 @@ const TYPES: { value: IncomeType; label: string; color: string }[] = [
 ];
 
 export function MoneyPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     source: "",

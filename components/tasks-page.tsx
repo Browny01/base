@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, getToday } from "@/lib/utils";
 import type { Task, Priority, TaskTag, RecurringFreq } from "@/lib/store";
@@ -24,7 +24,7 @@ const PRIORITY_STYLE: Record<Priority, { badge: string; col: string; label: stri
 };
 
 export function TasksPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const { toast } = useToast();
   const [filter, setFilter] = useState<"all" | "today" | TaskTag>("all");
   const [view, setView] = useState<"list" | "kanban">("list");
@@ -36,7 +36,7 @@ export function TasksPage() {
   const today = getToday();
 
   // ⌘K → "New task" opens the form on arrival
-  useEffect(() => { try { if (localStorage.getItem("nexus_open_new_task")) { localStorage.removeItem("nexus_open_new_task"); setShowForm(true); } } catch {} }, []);
+  useEffect(() => { try { if (localStorage.getItem("bridge_open_new_task")) { localStorage.removeItem("bridge_open_new_task"); setShowForm(true); } } catch {} }, []);
 
   const filtered = data.tasks.filter((t) => {
     if (filter === "today") return t.dueDate === today && !t.done;
@@ -62,14 +62,14 @@ export function TasksPage() {
         if (t.id !== id) return t;
         const done = !t.done;
         if (done && t.recurring) setTimeout(() => resetRecurring(t), 0);
-        return { ...t, done };
+        return { ...t, done, completedAt: done ? new Date().toISOString() : null };
       }),
     }));
   }
 
   function resetRecurring(task: Task) {
     const nextDue = computeNextDue(task.dueDate, task.recurring!);
-    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === task.id ? { ...t, done: false, dueDate: nextDue } : t) }));
+    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === task.id ? { ...t, done: false, completedAt: null, dueDate: nextDue } : t) }));
   }
 
   function deleteTask(id: string) {

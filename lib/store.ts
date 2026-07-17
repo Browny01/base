@@ -19,6 +19,7 @@ export interface Task {
   recurring: RecurringFreq;
   done: boolean;
   createdAt: string;
+  completedAt?: string | null;
   projectId?: string;
   subtasks?: SubTask[];
 }
@@ -258,7 +259,7 @@ export interface ChatThread {
   messages: ChatMessage[];
   pinned?: boolean;
   folderId?: string | null; // groups chats under a sidebar folder
-  projectId?: string | null; // links a chat to a Nexus project
+  projectId?: string | null; // links a chat to a Bridge project
   deletedAt?: string | null; // soft-deleted to Trash (purged after 14 days)
   locked?: boolean;         // requires a passcode to open
   lockPass?: string;        // the passcode (client-side soft lock)
@@ -525,7 +526,7 @@ export interface BodyMetrics {
   photos?: ProgressPhoto[];
 }
 
-export interface NexusData {
+export interface BridgeData {
   tasks: Task[];
   focusSessions: FocusSession[];
   incomeEntries: IncomeEntry[];
@@ -564,7 +565,7 @@ export interface NexusData {
   updatedAt?: number;
 }
 
-export const DEFAULT: NexusData = {
+export const DEFAULT: BridgeData = {
   tasks: [],
   focusSessions: [],
   incomeEntries: [],
@@ -617,7 +618,7 @@ export const DEFAULT: NexusData = {
   newsPrefs: DEFAULT_NEWS_PREFS,
 };
 
-function migrateIncomeTypes(data: NexusData): NexusData {
+function migrateIncomeTypes(data: BridgeData): BridgeData {
   return {
     ...data,
     incomeEntries: data.incomeEntries.map((e) => {
@@ -629,7 +630,7 @@ function migrateIncomeTypes(data: NexusData): NexusData {
   };
 }
 
-function migrateHabits(data: NexusData): NexusData {
+function migrateHabits(data: BridgeData): BridgeData {
   return {
     ...data,
     habits: data.habits.map((raw) => {
@@ -646,7 +647,7 @@ function migrateHabits(data: NexusData): NexusData {
   };
 }
 
-function migrateProjects(data: NexusData): NexusData {
+function migrateProjects(data: BridgeData): BridgeData {
   return {
     ...data,
     projects: data.projects.map((raw) => {
@@ -657,7 +658,7 @@ function migrateProjects(data: NexusData): NexusData {
 }
 
 // Ensure at least one board exists and every item/drawing is assigned to one.
-function migrateBoards(data: NexusData): NexusData {
+function migrateBoards(data: BridgeData): BridgeData {
   let boards = data.boards ?? [];
   if (boards.length === 0) {
     boards = [{ id: "board-default", name: "My Board", createdAt: new Date().toISOString() }];
@@ -673,7 +674,7 @@ function migrateBoards(data: NexusData): NexusData {
 
 // Permanently drop notes pages that have been in the Trash for over 14 days.
 const TRASH_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-function purgeOldTrash(data: NexusData): NexusData {
+function purgeOldTrash(data: BridgeData): BridgeData {
   const now = Date.now();
   const expired = (t?: string | null) => !!t && now - new Date(t).getTime() > TRASH_TTL_MS;
   let out = data;
@@ -693,10 +694,13 @@ function purgeOldTrash(data: NexusData): NexusData {
   return out;
 }
 
-function load(): NexusData {
+function load(): BridgeData {
   if (typeof window === "undefined") return DEFAULT;
   try {
-    const raw = localStorage.getItem("nexus_data");
+    const raw = localStorage.getItem("bridge_data") ?? localStorage.getItem("nexus_data");
+    if (raw && !localStorage.getItem("bridge_data")) {
+      localStorage.setItem("bridge_data", raw);
+    }
     const parsed = raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
     return purgeOldTrash(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(parsed)))));
   } catch {
@@ -704,19 +708,19 @@ function load(): NexusData {
   }
 }
 
-function save(data: NexusData) {
+function save(data: BridgeData) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("nexus_data", JSON.stringify(data));
+  localStorage.setItem("bridge_data", JSON.stringify(data));
 }
 
-export function getData(): NexusData {
+export function getData(): BridgeData {
   return load();
 }
 
-export function updateData(updater: (d: NexusData) => NexusData) {
+export function updateData(updater: (d: BridgeData) => BridgeData) {
   const next = updater(load());
   save(next);
-  window.dispatchEvent(new Event("nexus_update"));
+  window.dispatchEvent(new Event("bridge_update"));
   return next;
 }
 

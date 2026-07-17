@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Workout, WorkoutExercise, WorkoutSet } from "@/lib/store";
@@ -520,7 +520,7 @@ function ExerciseLibrary({ workouts }: { workouts: Workout[] }) {
 }
 
 export function GymPage() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [editing, setEditing] = useState<Workout | null>(null);
   const [showEditor, setShowEditor] = useState(false);
 

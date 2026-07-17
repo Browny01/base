@@ -1,3 +1,5 @@
+import { bridgeSessionSecret } from "@/lib/env";
+
 // Signed session tokens for the site auth cookie. Replaces the old "cookie is
 // present" check (which any value satisfied) with an HMAC-signed, expiring token
 // that can't be forged without the server secret. Uses Web Crypto so it runs in
@@ -7,9 +9,9 @@ const enc = new TextEncoder();
 
 // Prefer a dedicated secret; fall back to the login password, then a constant so
 // the app never hard-locks if env is momentarily missing (login + proxy always
-// derive the SAME key, so no lock-out). Set NEXUS_SESSION_SECRET for real safety.
+// derive the SAME key, so no lock-out). Set BRIDGE_SESSION_SECRET for real safety.
 function secretKey(): string {
-  return process.env.NEXUS_SESSION_SECRET || process.env.NEXUS_PASSWORD || "nexus-fallback-key";
+  return bridgeSessionSecret();
 }
 
 async function hmac(msg: string): Promise<string> {

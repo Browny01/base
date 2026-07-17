@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   let stats: unknown = {};
   try { stats = (await req.json()).stats ?? {}; } catch { /* ignore */ }
 
-  const prompt = `You are a sharp, honest personal-performance coach reviewing the user's past 7 days for their Nexus dashboard. Write a concise WEEKLY REVIEW in markdown with exactly these sections:
+  const prompt = `You are a sharp, honest personal-performance coach reviewing the user's past 7 days for their Bridge dashboard. Write a concise WEEKLY REVIEW in markdown with exactly these sections:
 
 ## Wins
 ## Misses

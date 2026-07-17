@@ -11,16 +11,20 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Nexus — Personal Command Center",
+  title: "Bridge — Personal Command Center",
   description: "Your personal hub for focus, productivity, and income.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Nexus" },
+  // black-translucent → the app draws edge-to-edge under the status bar; the
+  // chrome pads itself with env(safe-area-inset-*) so nothing is occluded.
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Bridge" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",              // extend into the safe areas (notch / home indicator)
+  themeColor: "#0a0a0b",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Apply persisted theme before paint to avoid a flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('nexus_theme')||'light';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('nexus_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('nexus_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('light');document.documentElement.dataset.nav='sidebar'}`,
+            __html: `try{var t=localStorage.getItem('bridge_theme')||'dark';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('bridge_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('bridge_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('dark');document.documentElement.dataset.nav='sidebar'}`,
           }}
         />
       </head>

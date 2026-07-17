@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ────────────────────────────────────────────────────────────────────────────────
-// Nexus local bridge — lets the Nexus chat talk to CLIs on YOUR machine
+// Bridge local bridge — lets the Bridge chat talk to CLIs on YOUR machine
 // (Claude Code with your Claude Pro/Max plan, or Codex with your ChatGPT plan).
 //
 // The browser calls this server directly; nothing goes through Vercel, and your
@@ -9,13 +9,13 @@
 // SECURITY
 //   • Binds to 127.0.0.1 only — not exposed on your LAN. Reach it remotely via
 //     `tailscale serve` (HTTPS, tailnet-only), never a raw public port.
-//   • If NEXUS_BRIDGE_TOKEN is set, every request must send
-//     `Authorization: Bearer <token>`. Set it in Nexus → Chat → Local models.
-//   • CORS is limited to the Nexus origin (NEXUS_ALLOWED_ORIGIN).
+//   • If BRIDGE_CLI_TOKEN is set, every request must send
+//     `Authorization: Bearer <token>`. Set it in Bridge → Chat → Local models.
+//   • CORS is limited to the Bridge origin (BRIDGE_ALLOWED_ORIGIN).
 //
 // USAGE
-//   NEXUS_BRIDGE_TOKEN=<secret> node scripts/nexus-bridge.mjs      # port 8787
-//   PORT=8787 NEXUS_BRIDGE_TOKEN=<secret> node scripts/nexus-bridge.mjs
+//   BRIDGE_CLI_TOKEN=<secret> node scripts/bridge-cli.mjs      # port 8787
+//   PORT=8787 BRIDGE_CLI_TOKEN=<secret> node scripts/bridge-cli.mjs
 //
 //   Uses your personal subscriptions via their official CLIs. Single-user use.
 // ────────────────────────────────────────────────────────────────────────────────
@@ -25,13 +25,13 @@ import { spawn, spawnSync } from "node:child_process";
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = "127.0.0.1";
-const TOKEN = process.env.NEXUS_BRIDGE_TOKEN || "";
-const DEFAULT_ORIGIN = "https://nexus-psi-ruddy.vercel.app";
-const ALLOWED = (process.env.NEXUS_ALLOWED_ORIGIN || DEFAULT_ORIGIN).split(",").map((s) => s.trim());
+const TOKEN = process.env.BRIDGE_CLI_TOKEN || "";
+const DEFAULT_ORIGIN = "https://bridge-ten-lovat.vercel.app";
+const ALLOWED = (process.env.BRIDGE_ALLOWED_ORIGIN || DEFAULT_ORIGIN).split(",").map((s) => s.trim());
 // Local Ollama the bridge proxies to. The browser can't reach http://localhost from
 // the HTTPS site, and Ollama rejects non-loopback Host headers (DNS-rebind guard) — so
 // we forward here with the Host rewritten to loopback. Tailnet-only; Ollama has no auth.
-const OLLAMA_TARGET = process.env.NEXUS_OLLAMA_URL || "http://127.0.0.1:11434";
+const OLLAMA_TARGET = process.env.BRIDGE_OLLAMA_URL || "http://127.0.0.1:11434";
 
 function corsHeaders(req) {
   const origin = req.headers.origin || "";
@@ -103,7 +103,7 @@ const server = createServer((req, res) => {
 
   if (!authed(req)) {
     res.writeHead(401, { "Content-Type": "application/json", ...cors });
-    return res.end(JSON.stringify({ error: "Unauthorized — set the bridge token in Nexus." }));
+    return res.end(JSON.stringify({ error: "Unauthorized — set the bridge token in Bridge." }));
   }
 
   if (req.method === "GET" && req.url.startsWith("/models")) {
@@ -139,13 +139,13 @@ const server = createServer((req, res) => {
     return;
   }
 
-  res.writeHead(404, cors); res.end("Nexus bridge. Try GET /models or POST /chat.");
+  res.writeHead(404, cors); res.end("Bridge bridge. Try GET /models or POST /chat.");
 });
 
 server.listen(PORT, HOST, () => {
   const found = models();
-  console.log(`\n  Nexus bridge → http://${HOST}:${PORT}  (localhost only)`);
-  console.log(`  Auth: ${TOKEN ? "token required ✓" : "OPEN (no NEXUS_BRIDGE_TOKEN set — set one!)"}`);
+  console.log(`\n  Bridge bridge → http://${HOST}:${PORT}  (localhost only)`);
+  console.log(`  Auth: ${TOKEN ? "token required ✓" : "OPEN (no BRIDGE_CLI_TOKEN set — set one!)"}`);
   console.log(`  CLIs: ${found.length ? found.map((m) => m.id).join(", ") : "none (install `claude` / `codex` and log in)"}`);
   console.log(`  Ollama proxy: /ollama/* → ${OLLAMA_TARGET}`);
   console.log(`  Expose over HTTPS with: tailscale serve --bg --https=8443 http://127.0.0.1:${PORT}\n`);

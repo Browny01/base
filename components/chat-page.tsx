@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import type { ChatThread, ChatMessage, ChatAttachment, ChatFolder } from "@/lib/store";
 import { configuredChatModels, DEFAULT_CHAT_SETTINGS, DEFAULT_MODEL, modelLabel, SOURCES_SENTINEL, localProviderOf, providerOf, type PerplexityTool } from "@/lib/chat-models";
 import { discoverOllama, discoverBridge, streamOllama, streamBridge, type LocalModel } from "@/lib/local-chat";
 import { mdToHtml } from "@/lib/markdown";
-import { buildNexusContext } from "@/lib/nexus-context";
+import { buildBridgeContext } from "@/lib/bridge-context";
 import { processFile } from "@/lib/chat-files";
 import {
   Sparkles, Send, Plus, Trash2, ChevronDown, ChevronRight, PanelLeftClose, PanelLeft,
@@ -31,11 +31,11 @@ const splitSources = (s: string): { content: string; sources: string[] } => {
 };
 
 const SYSTEM_PROMPT =
-  "You are a helpful, concise assistant living inside Nexus, the user's personal command-center app. Answer clearly and get to the point.";
+  "You are a helpful, concise assistant living inside Bridge, the user's personal command-center app. Answer clearly and get to the point.";
 
 // ════════════════════════════════════════════════════════════════════════════════
 export function ChatPage() {
-  const { data, mutate, loaded } = useNexus();
+  const { data, mutate, loaded } = useBridge();
   const allThreads = data.chatThreads ?? [];
   const folders = data.chatFolders ?? [];
   const projects = data.projects ?? [];
@@ -63,7 +63,7 @@ export function ChatPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [dragOver, setDragOver] = useState(false);
-  const [useData, setUseData] = useState(true);            // give the AI Nexus data access
+  const [useData, setUseData] = useState(true);            // give the AI Bridge data access
   const [autoSend, setAutoSend] = useState(false);         // fire once after a dashboard handoff
   const [skillsMenu, setSkillsMenu] = useState(false);
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());   // chats unlocked this session
@@ -93,12 +93,12 @@ export function ChatPage() {
   // open a chat from the command bar (live event + a localStorage handoff for
   // navigations that mount this page after the event already fired)
   useEffect(() => {
-    try { const id = localStorage.getItem("nexus_chat_active"); if (id) { setActiveId(id); localStorage.removeItem("nexus_chat_active"); } } catch {}
-    // Handoff from the dashboard "Ask Nexus AI" bar: text + model + files + toggles.
+    try { const id = localStorage.getItem("bridge_chat_active"); if (id) { setActiveId(id); localStorage.removeItem("bridge_chat_active"); } } catch {}
+    // Handoff from the dashboard "Ask Bridge AI" bar: text + model + files + toggles.
     try {
-      const raw = localStorage.getItem("nexus_chat_handoff");
+      const raw = localStorage.getItem("bridge_chat_handoff");
       if (raw) {
-        localStorage.removeItem("nexus_chat_handoff");
+        localStorage.removeItem("bridge_chat_handoff");
         const p = JSON.parse(raw);
         setActiveId(null);
         if (typeof p.text === "string") setInput(p.text);
@@ -107,13 +107,13 @@ export function ChatPage() {
         if (Array.isArray(p.attachments)) setPending(p.attachments);
         if (p.autoSend) setAutoSend(true); else setTimeout(() => taRef.current?.focus(), 60);
       } else {
-        const q = localStorage.getItem("nexus_chat_prefill");
-        if (q) { setActiveId(null); setInput(q); localStorage.removeItem("nexus_chat_prefill"); setTimeout(() => taRef.current?.focus(), 60); }
+        const q = localStorage.getItem("bridge_chat_prefill");
+        if (q) { setActiveId(null); setInput(q); localStorage.removeItem("bridge_chat_prefill"); setTimeout(() => taRef.current?.focus(), 60); }
       }
     } catch {}
     const h = (e: Event) => { setActiveId((e as CustomEvent<string>).detail); };
-    window.addEventListener("nexus:open-chat", h);
-    return () => window.removeEventListener("nexus:open-chat", h);
+    window.addEventListener("bridge:open-chat", h);
+    return () => window.removeEventListener("bridge:open-chat", h);
   }, []);
 
   // ── mutations ──
@@ -167,7 +167,7 @@ export function ChatPage() {
     if (mem) sys += "\n\n[Memory — persistent facts about the user, remembered across every chat]\n" + mem;
     const on = (data.chatSkills ?? []).filter((s) => s.enabled && s.instructions.trim());
     if (on.length) sys += "\n\n" + on.map((s) => `[Skill: ${s.name}]\n${s.instructions}`).join("\n\n");
-    if (useData) sys += "\n\n" + buildNexusContext(data);
+    if (useData) sys += "\n\n" + buildBridgeContext(data);
     return sys;
   };
 
@@ -448,10 +448,10 @@ export function ChatPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center gap-2 h-12 px-3 sm:px-4 shrink-0 border-b border-[var(--border)]">
           <button onClick={() => setSidebarOpen(true)} title="Conversations" className="md:hidden p-1.5 -ml-1 rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"><PanelLeft className="w-4 h-4" /></button>
-          {/* Nexus data access */}
-          <button onClick={() => setUseData((v) => !v)} title="Let the AI read your Nexus data (locked notes excluded)"
+          {/* Bridge data access */}
+          <button onClick={() => setUseData((v) => !v)} title="Let the AI read your Bridge data (locked notes excluded)"
             className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[12.5px] font-medium transition-colors", useData ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]" : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)]")}>
-            <Database className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Nexus data</span>
+            <Database className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Bridge data</span>
           </button>
           {/* Skills */}
           <div className="relative">
@@ -492,7 +492,7 @@ export function ChatPage() {
             <div className="text-center max-w-md mb-6">
               <span className="flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--chip)] border border-[var(--border)] mx-auto mb-4"><Sparkles className="w-6 h-6 text-[var(--text)]" strokeWidth={1.8} /></span>
               <p className="text-lg font-bold text-[var(--text)] mb-1">Ask anything</p>
-              <p className="text-sm text-[var(--faint)]">Pick a model, attach files, or toggle <b>Nexus data</b> to let the AI read your dashboard.</p>
+              <p className="text-sm text-[var(--faint)]">Pick a model, attach files, or toggle <b>Bridge data</b> to let the AI read your dashboard.</p>
             </div>
             <div className="w-full max-w-2xl">{composer}</div>
             <p className="text-[10.5px] text-[var(--faint)] text-center mt-2">Enter to send · Shift+Enter for a new line · drag &amp; drop or 📎 to attach</p>
@@ -560,11 +560,11 @@ function LocalConfig({ ollama, bridge, token, ollamaCount, bridgeCount, onSave, 
           <div>
             <label className="text-[10px] text-[var(--faint)] uppercase tracking-[0.15em] font-semibold flex items-center justify-between mb-1.5"><span>Bridge URL (Codex / Claude Code)</span>{dot(bridgeCount)}</label>
             <input className={inputCls} value={b} onChange={(e) => setB(e.target.value)} placeholder="https://your-host.ts.net:8443" />
-            <p className="text-[11px] text-[var(--faint)] mt-1">Run the <code className="text-[var(--muted)]">nexus-bridge</code> script on your machine (uses your Claude Pro / ChatGPT plans locally).</p>
+            <p className="text-[11px] text-[var(--faint)] mt-1">Run the <code className="text-[var(--muted)]">bridge-cli</code> script on your machine (uses your Claude Pro / ChatGPT plans locally).</p>
           </div>
           <div>
             <label className="text-[10px] text-[var(--faint)] uppercase tracking-[0.15em] font-semibold mb-1.5 block">Bridge token</label>
-            <input className={inputCls} type="password" value={tk} onChange={(e) => setTk(e.target.value)} placeholder="paste the bridge's NEXUS_BRIDGE_TOKEN" />
+            <input className={inputCls} type="password" value={tk} onChange={(e) => setTk(e.target.value)} placeholder="paste the bridge's BRIDGE_CLI_TOKEN" />
           </div>
           <p className="text-[11px] text-[var(--faint)] bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2">These run entirely on your computer — the browser talks to them directly. Your machine must be on and the server running.</p>
         </div>

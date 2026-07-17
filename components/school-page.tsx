@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useNexus } from "@/lib/hooks";
+import { useBridge } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
 import type { SchoolDay, PeriodKey, ProjectColor } from "@/lib/store";
 import {
@@ -51,7 +51,7 @@ function colorBg(c?: ProjectColor) {
 // ── Timetable view ────────────────────────────────────────────────────────────
 
 function TimetableView() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [editing, setEditing] = useState<{ day: SchoolDay; period: PeriodKey } | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -184,7 +184,7 @@ function TimetableView() {
 // ── Calendar view ─────────────────────────────────────────────────────────────
 
 function CalendarView() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [cursor, setCursor] = useState(() => {
     const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() };
   });
@@ -400,7 +400,7 @@ function CalendarView() {
 // ── Notes / Homework panel ────────────────────────────────────────────────────
 
 function NotesPanel() {
-  const { data, mutate } = useNexus();
+  const { data, mutate } = useBridge();
   const [input, setInput] = useState("");
 
   const notes = data.schoolNotes ?? [];
