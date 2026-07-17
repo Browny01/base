@@ -211,7 +211,14 @@ export function ProjectDetail({ id }: { id: string }) {
     setTaskTitle(""); setShowTaskForm(false);
   }
   function toggleTask(taskId: string) {
-    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === taskId ? { ...t, done: !t.done } : t) }));
+    mutate((d) => ({
+      ...d,
+      tasks: d.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const done = !t.done;
+        return { ...t, done, completedAt: done ? new Date().toISOString() : null };
+      }),
+    }));
   }
   function deleteTask(taskId: string) {
     mutate((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== taskId) }));

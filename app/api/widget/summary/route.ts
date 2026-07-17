@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { readCurrentData } from "@/lib/bridge-data";
+import { bridgeAgentToken } from "@/lib/env";
 import { calcStreak } from "@/lib/utils";
 
 // Read-only summary for the iOS home-screen widget. Guarded by a token (query
 // ?token= or x-bridge-token header) so it can be fetched from the WidgetKit
 // timeline provider without the app running. Single-user app → one shared blob.
 export const dynamic = "force-dynamic";
-
-const KEY = "bridge:data";
 
 function getRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
@@ -24,17 +24,18 @@ const unwrap = (data: unknown): unknown => {
 type AnyRec = Record<string, unknown>;
 const arr = (v: unknown): AnyRec[] => (Array.isArray(v) ? (v as AnyRec[]) : []);
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+const day = (v: unknown): string => (typeof v === "string" ? v.slice(0, 10) : "");
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const token = url.searchParams.get("token") || req.headers.get("x-bridge-token") || "";
-  const expected = process.env.BRIDGE_AGENT_TOKEN || process.env.BRIDGE_PASSWORD || "151715";
+  const expected = bridgeAgentToken();
   if (token !== expected) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const redis = getRedis();
   if (!redis) return NextResponse.json({ error: "not configured" }, { status: 503 });
 
-  const data = unwrap(await redis.get(KEY)) as AnyRec | null;
+  const data = unwrap(await readCurrentData(redis)) as AnyRec | null;
   if (!data) return NextResponse.json({ error: "no data" }, { status: 404 });
 
   // The device passes its LOCAL date so "today" matches what the app shows.
@@ -47,12 +48,12 @@ export async function GET(req: NextRequest) {
   const snaps = arr(data.portfolioSnapshots);
 
   const tasksLeft = tasks.filter((t) => !t.done && (t.dueDate === today || !t.dueDate)).length;
-  const doneToday = tasks.filter((t) => t.done && typeof t.createdAt === "string" && (t.createdAt as string).startsWith(today)).length;
+  const doneToday = tasks.filter((t) => t.done && day(t.completedAt ?? t.createdAt) === today).length;
 
   const habitsDone = habitLogs.filter((l) => l.date === today && l.completed).length;
   const habitsTotal = habits.length;
   const streak = habits.length
-    ? Math.max(0, ...habits.map((h) => calcStreak(habitLogs.filter((l) => l.habitId === (h.id as string)))))
+    ? Math.max(0, ...habits.map((h) => calcStreak(habitLogs.filter((l) => l.habitId === (h.id as string)), today)))
     : 0;
 
   const revenueToday = income

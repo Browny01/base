@@ -25,7 +25,6 @@ From the repo root:
 
 ```bash
 npm install            # pulls the @capacitor/* deps already in package.json
-npx cap add ios        # generates the native project in ./ios  (run once)
 npm run ios            # cap sync + open Xcode
 ```
 
@@ -35,6 +34,10 @@ and set the Bundle Identifier (defaults to `app.bridge.personal` from
 
 That's it — the app opens straight into the live Bridge web app, full-screen,
 with the native status bar, splash, and the liquid-glass tab bar.
+
+The native `ios/` project is already committed in this repository. Only run
+`npx cap add ios` if you intentionally delete `ios/` and want to regenerate it
+from scratch.
 
 ## How auto-update works
 

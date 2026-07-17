@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bridgePassword } from "@/lib/env";
 import { signSession } from "@/lib/session";
 
 const COOKIE = "bridge_auth";
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { password } = await req.json();
-  const correct = process.env.BRIDGE_PASSWORD ?? "151715";
+  const correct = bridgePassword();
 
   if (typeof password !== "string" || !safeEqual(password, correct)) {
     recordFail(ip);

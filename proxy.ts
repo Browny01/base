@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { bridgeAgentToken } from "@/lib/env";
 import { verifySession } from "@/lib/session";
 
 const COOKIE = "bridge_auth";
@@ -19,7 +20,7 @@ function harden(res: NextResponse): NextResponse {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const agentToken = process.env.BRIDGE_AGENT_TOKEN || process.env.BRIDGE_PASSWORD;
+  const agentToken = bridgeAgentToken();
 
   // ── OAuth discovery metadata for the MCP server (public, no auth) ──────────────
   const origin = request.nextUrl.origin;
@@ -57,6 +58,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/market") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
+    pathname === "/bridge-mark.png" ||
     pathname === "/icon.png" ||
     pathname === "/apple-icon.png" ||
     (pathname.startsWith("/icon-") && pathname.endsWith(".png")) ||

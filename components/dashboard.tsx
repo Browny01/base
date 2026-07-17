@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useId, useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, formatAUD, formatCurrency, formatDate, getToday, calcStreak } from "@/lib/utils";
-import type { Priority, TaskTag } from "@/lib/store";
+import type { Priority, Task, TaskTag } from "@/lib/store";
 import { Repeat2, TrendingUp, Flame, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,10 @@ const COLOR_DOT: Record<string, string> = {
   yellow: "bg-[var(--c-amber)]",  red: "bg-[var(--c-rose)]",  purple: "bg-[var(--c-purple)]",
   orange: "bg-[var(--c-orange)]", pink: "bg-[var(--c-pink)]",
 };
+
+function taskCompletionDay(task: Task): string {
+  return (task.completedAt ?? task.createdAt).slice(0, 10);
+}
 
 // ── local YYYY-MM-DD for the last `n` days, oldest → newest ──────────────────
 function lastNDays(n: number): string[] {
@@ -43,7 +47,7 @@ export function Dashboard() {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const todayTasks = data.tasks.filter((t) => !t.done && (t.dueDate === today || !t.dueDate));
-  const doneTodayCount = data.tasks.filter((t) => t.done && t.createdAt?.startsWith(today)).length;
+  const doneTodayCount = data.tasks.filter((t) => t.done && taskCompletionDay(t) === today).length;
   const completedHabitsToday = data.habitLogs.filter((l) => l.date === today && l.completed).length;
   const overallStreak = data.habits.length > 0
     ? Math.max(...data.habits.map((h) => calcStreak(data.habitLogs.filter((l) => l.habitId === h.id))), 0)
@@ -57,7 +61,7 @@ export function Dashboard() {
 
   // ── Real-data mini-series for the metric sparklines (no fabricated data) ─────
   const days14 = lastNDays(14);
-  const tasksDoneSeries = days14.map((d) => data.tasks.filter((t) => t.done && t.createdAt?.startsWith(d)).length);
+  const tasksDoneSeries = days14.map((d) => data.tasks.filter((t) => t.done && taskCompletionDay(t) === d).length);
   const habitsSeries = days14.map((d) => data.habitLogs.filter((l) => l.date === d && l.completed).length);
   const revenueSeries = days14.map((d) =>
     data.incomeEntries.filter((e) => e.date === d && e.type === "income").reduce((s, e) => s + e.amount, 0),
@@ -88,7 +92,14 @@ export function Dashboard() {
   }
 
   function toggleTask(id: string) {
-    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === id ? { ...t, done: !t.done } : t) }));
+    mutate((d) => ({
+      ...d,
+      tasks: d.tasks.map((t) => {
+        if (t.id !== id) return t;
+        const done = !t.done;
+        return { ...t, done, completedAt: done ? new Date().toISOString() : null };
+      }),
+    }));
   }
 
   const greetText = greeting(now);
@@ -306,6 +317,7 @@ function PriorityBadge({ priority }: { priority: Priority }) {
 // ── Lightweight inline sparkline (no chart lib) ──────────────────────────────
 function Sparkline({ data, color, className }: { data: number[]; color: string; className?: string }) {
   const pts = data.filter((n) => Number.isFinite(n));
+  const gid = `sg-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
   if (pts.length < 2 || pts.every((n) => n === pts[0])) return null;
   const w = 88, h = 30, pad = 2;
   const min = Math.min(...pts), max = Math.max(...pts);
@@ -317,7 +329,6 @@ function Sparkline({ data, color, className }: { data: number[]; color: string; 
   });
   const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const area = `${line} L${coords[coords.length - 1][0].toFixed(1)},${h} L${coords[0][0].toFixed(1)},${h} Z`;
-  const gid = `sg-${Math.random().toString(36).slice(2, 8)}`;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className={className} preserveAspectRatio="none" fill="none" aria-hidden="true">
       <defs>

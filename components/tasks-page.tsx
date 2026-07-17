@@ -62,14 +62,14 @@ export function TasksPage() {
         if (t.id !== id) return t;
         const done = !t.done;
         if (done && t.recurring) setTimeout(() => resetRecurring(t), 0);
-        return { ...t, done };
+        return { ...t, done, completedAt: done ? new Date().toISOString() : null };
       }),
     }));
   }
 
   function resetRecurring(task: Task) {
     const nextDue = computeNextDue(task.dueDate, task.recurring!);
-    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === task.id ? { ...t, done: false, dueDate: nextDue } : t) }));
+    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === task.id ? { ...t, done: false, completedAt: null, dueDate: nextDue } : t) }));
   }
 
   function deleteTask(id: string) {
