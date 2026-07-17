@@ -11,7 +11,7 @@ const Ctx = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Them
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>("dark");
 
   // Hydrate from the class the pre-paint script already applied
   useEffect(() => {

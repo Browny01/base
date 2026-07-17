@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Apply persisted theme before paint to avoid a flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('bridge_theme')||'light';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('bridge_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('bridge_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('light');document.documentElement.dataset.nav='sidebar'}`,
+            __html: `try{var t=localStorage.getItem('bridge_theme')||'dark';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('bridge_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('bridge_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('dark');document.documentElement.dataset.nav='sidebar'}`,
           }}
         />
       </head>
