@@ -27,13 +27,13 @@ export function ProjectLogo({
   className?: string;
 }) {
   const hex = COLOR_HEX[color];
-  const sizeClass = size === "lg" ? "w-14 h-14 rounded-xl" : "w-8 h-8 rounded-lg";
-  const iconClass = size === "lg" ? "w-6 h-6" : "w-4 h-4";
+  const sizeClass = size === "lg" ? "w-16 h-16 rounded-xl" : "w-12 h-12 rounded-xl";
+  const iconClass = size === "lg" ? "w-7 h-7" : "w-5 h-5";
 
   return (
     <div
       className={cn("relative shrink-0 overflow-hidden flex items-center justify-center", sizeClass, className)}
-      style={{ background: `${hex}22` }}
+      style={src ? undefined : { background: `${hex}22` }}
     >
       {src ? (
         <img src={src} alt={`${name} logo`} className="w-full h-full object-cover" />
