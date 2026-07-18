@@ -1,0 +1,13 @@
+# The Xcode project is generated from project.yml by XcodeGen — don't commit it.
+# Run `xcodegen generate` (or `npm run mac`) to (re)create it.
+Bridge.xcodeproj/
+
+# Xcode / build artifacts
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+
+# Local build output from install/release scripts
+.build/

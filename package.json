@@ -9,7 +9,11 @@
     "lint": "eslint",
     "cap:sync": "cap sync ios",
     "cap:open": "cap open ios",
-    "ios": "cap sync ios && cap open ios"
+    "ios": "cap sync ios && cap open ios",
+    "mac:gen": "cd macos && xcodegen generate",
+    "mac": "cd macos && xcodegen generate && open Bridge.xcodeproj",
+    "mac:install": "./scripts/install_mac.sh",
+    "mac:release": "./scripts/release_mac.sh"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
