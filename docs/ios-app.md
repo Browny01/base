@@ -111,7 +111,7 @@ To regenerate the target from scratch (e.g. after `npx cap add ios`):
 ### 3. Live Activities (ActivityKit)
 - Add an **ActivityKit** widget to the Widget Extension; enable
   **Supports Live Activities** in the App target's Info.
-- Natural fit: the **Focus / Lock In timer** — start an Activity when a session
+- Natural fit: the **Focus timer** — start an Activity when a session
   begins (via a tiny Capacitor plugin bridging JS → Swift), update it as the timer
   ticks, end it on completion. Shows on the Lock Screen and Dynamic Island.
 

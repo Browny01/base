@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, ChevronsLeft, Settings,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, MessageCircle, Lightbulb,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,7 +27,6 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Personal",
     items: [
       { href: "/player", label: "Personal", icon: Trophy   },
-      { href: "/lockin", label: "Lock In",  icon: Lock     },
       { href: "/gym",    label: "Gym",      icon: Dumbbell },
     ],
   },

@@ -57,9 +57,6 @@ export function buildBridgeContext(d: BridgeData): string {
   const workouts = d.workouts ?? [];
   if (workouts.length) push(`\n## Recent workouts\n` + [...workouts].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map((w) => `- ${w.date} ${w.name} (${w.exercises.length} exercises)`).join("\n"));
 
-  const lockins = d.lockInSessions ?? [];
-  if (lockins.length) push(`\n## Lock-In sessions\n` + lockins.map((s) => `- ${s.name} (${s.startDate}→${s.endDate}, ${s.archived ? "archived" : "active"}, ${s.tasks.length} tasks)`).join("\n"));
-
   const skills = d.playerSkills ?? [];
   if (skills.length) push(`\n## Self-improvement skills\n` + skills.slice(0, 40).map((s) => `- ${s.name} (${s.domain}): ${s.currentScore}/10 → ${s.targetScore}`).join("\n"));
 

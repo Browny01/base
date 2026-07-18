@@ -8,7 +8,6 @@ const NAV: { key: string; href: string; label: string }[] = [
   { key: "d", href: "/",         label: "Dashboard" },
   { key: "c", href: "/chat",     label: "Chat" },
   { key: "p", href: "/player",   label: "Personal" },
-  { key: "l", href: "/lockin",   label: "Lock In" },
   { key: "g", href: "/gym",      label: "Gym" },
   { key: "b", href: "/business", label: "Business" },
   { key: "j", href: "/projects", label: "Projects" },

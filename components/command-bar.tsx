@@ -9,8 +9,8 @@ import { useNavMode } from "@/lib/nav-mode-context";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, Trophy, Briefcase,
-  Search, CornerDownLeft, NotebookText, LayoutGrid, Dumbbell, Lock, MessageCircle, type LucideIcon,
-  Settings, Sun, Moon, Plus, PanelBottom,
+  Search, CornerDownLeft, NotebookText, LayoutGrid, Dumbbell, MessageCircle, type LucideIcon,
+  Settings, Sun, Moon, PanelBottom,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,6 @@ const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string 
   { href: "/",         label: "Dashboard", icon: LayoutDashboard, keywords: "home overview" },
   { href: "/chat",     label: "Chat",      icon: MessageCircle,   keywords: "ai assistant gemini claude gpt" },
   { href: "/player",   label: "Personal",  icon: Trophy,          keywords: "self ratings skills goals" },
-  { href: "/lockin",   label: "Lock In",   icon: Lock,            keywords: "focus discipline streak points challenge 75 hard sprint" },
   { href: "/gym",      label: "Gym",       icon: Dumbbell,        keywords: "workout lifting training exercise sets reps" },
   { href: "/business", label: "Business",  icon: Briefcase,       keywords: "stripe revenue bookings" },
   { href: "/projects", label: "Projects",  icon: FolderKanban,    keywords: "roadmap docs kanban" },
