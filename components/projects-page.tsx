@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
+import { prepareProjectLogo } from "@/lib/project-logo";
 import type { ProjectColor, ProjectStatus, ProjectCategory } from "@/lib/store";
-import { Plus, FolderKanban, ChevronRight, Star, Layers } from "lucide-react";
+import { Plus, FolderKanban, ChevronRight, Star, Layers, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { ProjectLogo } from "@/components/project-logo";
 
 const COLORS: ProjectColor[] = [
   "indigo", "cyan", "emerald", "yellow", "red", "purple", "orange", "pink",
@@ -34,7 +36,7 @@ const STATUS_COLOR: Record<ProjectStatus, string> = {
 };
 
 function ProjectCard({ proj, taskCount, doneCount, linkCount, hasNote }: {
-  proj: { id: string; name: string; description: string; color: ProjectColor; status: ProjectStatus; category: ProjectCategory };
+  proj: { id: string; name: string; description: string; color: ProjectColor; status: ProjectStatus; category: ProjectCategory; logoUrl?: string | null };
   taskCount: number; doneCount: number; linkCount: number; hasNote: boolean;
 }) {
   const hex = COLOR_HEX[proj.color];
@@ -45,9 +47,7 @@ function ProjectCard({ proj, taskCount, doneCount, linkCount, hasNote }: {
       style={{ borderColor: `${hex}59` }}
     >
       <div className="flex items-start justify-between mb-3">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${hex}22` }}>
-          <FolderKanban className="w-4 h-4" style={{ color: hex }} />
-        </div>
+        <ProjectLogo src={proj.logoUrl} color={proj.color} name={proj.name} />
         <div className="flex items-center gap-2">
           <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", STATUS_COLOR[proj.status])}>
             {STATUS_LABEL[proj.status]}
@@ -91,8 +91,8 @@ export function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [form, setForm] = useState<{
     name: string; description: string; color: ProjectColor;
-    status: ProjectStatus; category: ProjectCategory;
-  }>({ name: "", description: "", color: "indigo", status: "active", category: "major" });
+    status: ProjectStatus; category: ProjectCategory; logoUrl: string | null;
+  }>({ name: "", description: "", color: "indigo", status: "active", category: "major", logoUrl: null });
 
   function addProject() {
     if (!form.name.trim()) return;
@@ -105,11 +105,22 @@ export function ProjectsPage() {
         color: form.color,
         status: form.status,
         category: form.category,
+        logoUrl: form.logoUrl,
         createdAt: new Date().toISOString(),
       }],
     }));
-    setForm({ name: "", description: "", color: "indigo", status: "active", category: "major" });
+    setForm({ name: "", description: "", color: "indigo", status: "active", category: "major", logoUrl: null });
     setShowForm(false);
+  }
+
+  async function setLogo(file: File | undefined) {
+    if (!file) return;
+    try {
+      const logoUrl = await prepareProjectLogo(file);
+      setForm((f) => ({ ...f, logoUrl }));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Could not upload this logo.");
+    }
   }
 
   const filtered = statusFilter === "all"
@@ -147,6 +158,34 @@ export function ProjectsPage() {
         <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-xl p-5 mb-6 space-y-4">
           <h2 className="text-sm font-semibold text-[var(--text)]">New Project</h2>
           <div className="grid md:grid-cols-2 gap-3">
+            <div className="md:col-span-2 flex items-center gap-3">
+              <ProjectLogo src={form.logoUrl} color={form.color} name={form.name || "Project"} size="lg" />
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-2 px-3 py-2 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border-2)] transition-colors cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload Logo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      void setLogo(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {form.logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, logoUrl: null }))}
+                    className="inline-flex items-center justify-center w-8 h-8 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+                    title="Remove logo"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="md:col-span-2">
               <label className="text-xs text-[var(--muted)] uppercase tracking-widest font-semibold mb-1 block">Name</label>
               <input

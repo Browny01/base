@@ -86,6 +86,7 @@ export interface Project {
   color: ProjectColor;
   status: ProjectStatus;
   category: ProjectCategory;
+  logoUrl?: string | null;
   createdAt: string;
 }
 
@@ -114,6 +115,16 @@ export interface ProjectDocument {
   content: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectFile {
+  id: string;
+  projectId: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+  createdAt: string;
 }
 
 export interface ProjectLink {
@@ -541,6 +552,7 @@ export interface BridgeData {
   portfolioSnapshots: PortfolioSnapshot[];
   milestones: Milestone[];
   projectDocuments: ProjectDocument[];
+  projectFiles: ProjectFile[];
   exams: Exam[];
   timetable: Timetable;
   schoolNotes: SchoolNote[];
@@ -580,6 +592,7 @@ export const DEFAULT: BridgeData = {
   portfolioSnapshots: [],
   milestones: [],
   projectDocuments: [],
+  projectFiles: [],
   playerSkills: [],
   goals: [],
   bodyMetrics: { weightLog: [], sleepLog: [] },
