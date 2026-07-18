@@ -49,7 +49,7 @@ const COLLECTIONS = [
   "tasks", "focusSessions", "incomeEntries", "subscriptions", "habits", "habitLogs",
   "projects", "projectNotes", "projectLinks", "wallets", "portfolioSnapshots", "milestones",
   "projectDocuments", "projectFiles", "exams", "schoolNotes", "playerSkills", "goals",
-  "workouts", "lockInSessions", "socialStats", "businessKPIs", "chatThreads", "chatFolders",
+  "workouts", "socialStats", "businessKPIs", "chatThreads", "chatFolders",
   "chatSkills", "courses", "wikiFolders",
 ] as const;
 type Collection = typeof COLLECTIONS[number];

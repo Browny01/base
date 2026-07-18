@@ -19,7 +19,7 @@ const unwrap = (data: unknown): unknown => {
 };
 
 // Collections whose emptying signals real data loss (not a normal edit).
-const IMPORTANT = ["tasks", "projects", "wikiPages", "wallets", "lockInSessions", "chatThreads", "courses", "habits", "incomeEntries", "milestones", "goals", "boards", "playerSkills"];
+const IMPORTANT = ["tasks", "projects", "wikiPages", "wallets", "chatThreads", "courses", "habits", "incomeEntries", "milestones", "goals", "boards", "playerSkills"];
 
 // How many important collections went from "had items" to "empty" between two states.
 function emptiedCount(existing: Record<string, unknown>, incoming: Record<string, unknown>): number {
