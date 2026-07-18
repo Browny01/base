@@ -9,6 +9,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
 import { DashAskBar } from "@/components/dash-ask-bar";
+import { ProjectLogo } from "@/components/project-logo";
 
 const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
 const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
@@ -214,16 +215,16 @@ export function Dashboard() {
                 .sort((a, b) => ({ P1: 0, P2: 1, P3: 2 } as Record<Priority, number>)[a.priority] - ({ P1: 0, P2: 1, P3: 2 } as Record<Priority, number>)[b.priority])
                 .slice(0, 6)
                 .map((task) => (
-                  <li key={task.id} className="flex items-center gap-3 group rounded-lg px-2 py-2 hover:bg-[var(--surface-2)] transition-colors">
-                    <button onClick={() => toggleTask(task.id)} className="shrink-0 text-[var(--faint)] hover:text-[var(--text)] transition-colors">
+                  <li key={task.id} className="flex items-start gap-3 group px-2 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-2)] transition-colors">
+                    <button onClick={() => toggleTask(task.id)} className="shrink-0 mt-0.5 text-[var(--faint)] hover:text-[var(--text)] transition-colors">
                       <Circle style={{ width: 16, height: 16 }} />
                     </button>
-                    <span className="flex-1 text-sm text-[var(--text)] truncate">{task.title}</span>
-                    <PriorityBadge priority={task.priority} />
+                    <span className="flex-1 min-w-0 text-sm leading-snug text-[var(--text)] whitespace-normal break-words [overflow-wrap:anywhere]">{task.title}</span>
+                    <div className="shrink-0 mt-0.5"><PriorityBadge priority={task.priority} /></div>
                   </li>
                 ))}
               {todayTasks.length > 6 && (
-                <li className="px-2 pt-1"><Link href="/tasks" className="text-xs text-[var(--muted)] hover:text-[var(--text)] font-medium">+{todayTasks.length - 6} more →</Link></li>
+                <li className="px-2 pt-2 border-t border-[var(--border)]"><Link href="/tasks" className="text-xs text-[var(--muted)] hover:text-[var(--text)] font-medium">+{todayTasks.length - 6} more →</Link></li>
               )}
             </ul>
           )}
@@ -243,13 +244,13 @@ export function Dashboard() {
                 const done = data.habitLogs.some((l) => l.habitId === habit.id && l.date === today && l.completed);
                 const streak = calcStreak(data.habitLogs.filter((l) => l.habitId === habit.id));
                 return (
-                  <li key={habit.id} className="flex items-center gap-3 text-sm rounded-lg px-2 py-2 hover:bg-[var(--surface-2)] transition-colors">
+                  <li key={habit.id} className="flex items-start gap-3 text-sm px-2 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-2)] transition-colors">
                     <span className={cn("w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 transition-all",
                       done ? "bg-[var(--c-emerald)] border-[var(--c-emerald)]" : "border-[var(--border-2)]")} style={{ width: 18, height: 18 }}>
                       {done && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-[var(--bg)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </span>
-                    <span className={cn("flex-1 truncate", done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{habit.name}</span>
-                    {streak > 0 && <span className="text-[11px] text-[var(--faint)] tabular shrink-0">{streak}d</span>}
+                    <span className={cn("flex-1 min-w-0 leading-snug whitespace-normal break-words [overflow-wrap:anywhere]", done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{habit.name}</span>
+                    {streak > 0 && <span className="text-[11px] text-[var(--faint)] tabular shrink-0 mt-0.5">{streak}d</span>}
                   </li>
                 );
               })}
@@ -269,9 +270,7 @@ export function Dashboard() {
           return (
             <Link key={proj.id} href={`/projects/${proj.id}`} className="group card card-hover p-4 flex flex-col gap-3.5">
               <div className="flex items-center justify-between">
-                <span className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center text-[15px] font-semibold text-[var(--text)]">
-                  {proj.name.charAt(0).toUpperCase()}
-                </span>
+                <ProjectLogo src={proj.logoUrl} color={proj.color} name={proj.name} />
                 {taskCount > 0 && <span className="text-[11px] font-medium text-[var(--muted)] tabular">{taskCount} open</span>}
               </div>
               <div>
