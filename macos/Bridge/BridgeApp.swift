@@ -5,6 +5,7 @@ import SwiftUI
 
 @main
 struct BridgeApp: App {
+    @StateObject private var model = WebModel()
     @StateObject private var store = BridgeStore()
 
     private let updaterController = SPUStandardUpdaterController(
@@ -15,24 +16,57 @@ struct BridgeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store)
+            ContentView(model: model, store: store)
                 .background(WindowConfigurator())
                 .onAppear { BridgeGlobalShortcut.shared.start() }
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 1180, height: 800)
         .commands {
-            CommandGroup(replacing: .newItem) {
-                Button("Show Bridge") { BridgeGlobalShortcut.shared.activate() }
-                    .keyboardShortcut(" ", modifiers: [.control, .option])
-            }
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
+            BridgeCommands(model: model)
             CommandMenu("Sync") {
-                Button("Sync Now") { Task { await store.sync() } }
+                Button("Sync Offline Changes") { Task { await store.sync() } }
                     .keyboardShortcut("R", modifiers: [.command, .shift])
             }
+        }
+    }
+}
+
+struct BridgeCommands: Commands {
+    @ObservedObject var model: WebModel
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("Show Bridge") { BridgeGlobalShortcut.shared.activate() }
+                .keyboardShortcut(" ", modifiers: [.control, .option])
+            Button("Home") { model.goHome() }
+                .keyboardShortcut("H", modifiers: [.command, .shift])
+        }
+
+        CommandMenu("View") {
+            Button("Reload") { model.reload() }
+                .keyboardShortcut("R", modifiers: .command)
+            Divider()
+            Button("Actual Size") { model.zoomReset() }
+                .keyboardShortcut("0", modifiers: .command)
+            Button("Zoom In") { model.zoomIn() }
+                .keyboardShortcut("+", modifiers: .command)
+            Button("Zoom Out") { model.zoomOut() }
+                .keyboardShortcut("-", modifiers: .command)
+        }
+
+        CommandMenu("History") {
+            Button("Back") { model.goBack() }
+                .keyboardShortcut("[", modifiers: .command)
+                .disabled(!model.canGoBack)
+            Button("Forward") { model.goForward() }
+                .keyboardShortcut("]", modifiers: .command)
+                .disabled(!model.canGoForward)
+            Divider()
+            Button("Open in Browser") { model.openCurrentInBrowser() }
         }
     }
 }
@@ -69,7 +103,7 @@ struct WindowConfigurator: NSViewRepresentable {
             guard let window = view.window else { return }
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            window.backgroundColor = .windowBackgroundColor
+            window.backgroundColor = NSColor(red: 0.039, green: 0.039, blue: 0.043, alpha: 1)
         }
         return view
     }

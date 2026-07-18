@@ -1,8 +1,9 @@
 # Bridge for macOS
 
-Bridge for macOS is a native SwiftUI app built from the same offline-first core as
-the iPhone app. It launches from local data, supports record editing without a
-connection, and syncs queued changes when connectivity returns.
+Bridge for macOS is a native SwiftUI/WebKit host for the production Bridge site.
+The normal online experience is the complete website, with the same interface,
+routes, and behavior as a browser. If the site cannot load, the app switches to
+the shared native workspace so core records remain available offline.
 
 ## Install
 
@@ -33,14 +34,17 @@ but macOS may reserve that key for system features on some keyboards.
 If the shortcut is already owned by another app, change or disable the conflicting
 shortcut in **System Settings > Keyboard > Keyboard Shortcuts**.
 
-## Offline behavior
+## Website and offline behavior
 
-The Mac app includes native screens for Today, Tasks, Projects, Notes, Habits,
-Focus, Finance, and cached News. Edits are saved locally before network work begins.
-`native/BridgeCore/BridgeStore.swift` queues record-level operations, watches
-connectivity with Network.framework, and sends them to `/api/native/sync` after
-reconnection. The server merges each record atomically so unrelated changes from
-the web or iPhone app are preserved.
+`macos/Bridge/WebView.swift` loads the production URL in a persistent `WKWebView`,
+including the normal website navigation, settings, uploads, AI tools, and browser
+session. External links open in the default browser, while Bridge links stay in
+the app.
+
+If initial navigation fails, `ContentView` displays native screens for Today,
+Tasks, Projects, Notes, Habits, Focus, Finance, and cached News. Edits are saved
+locally and queued by `native/BridgeCore/BridgeStore.swift`. Network.framework
+retries the website and synchronizes native changes after connectivity returns.
 
 Cloud-generated features still require internet. News displays the last cached
 briefing while offline.
@@ -56,7 +60,8 @@ macos/
   project.yml            XcodeGen source of truth
   Bridge/
     BridgeApp.swift      app lifecycle, global shortcut, Sparkle
-    ContentView.swift    shared native root view
+    ContentView.swift    website host and native fallback switch
+    WebView.swift        persistent Bridge web view and navigation
     Info.plist           app and Sparkle configuration
     Assets.xcassets/     icon and accent assets
 ```
@@ -77,12 +82,13 @@ the Sparkle EdDSA key and published to the public
 Publish a native release with:
 
 ```bash
-npm run mac:release -- 0.2.0 "Offline-first native Bridge"
+npm run mac:release -- 0.2.1 "Full Bridge website with offline fallback"
 ```
 
 The release script bumps the version, builds and signs the app archive, regenerates
 `appcast.xml`, and uploads both assets. Commit the resulting version change in
 `macos/project.yml`.
 
-Web/API changes deploy through Vercel. Shared native SwiftUI changes require a
-Sparkle release for installed Mac copies and a new Xcode build for iPhone.
+Web changes appear in the Mac app after their Vercel deployment. Changes to the
+Mac host or shared offline fallback require a Sparkle release; iPhone native
+changes require a new Xcode build.
