@@ -20,7 +20,7 @@ export function FocusPage() {
   const [modeIdx, setModeIdx] = useState(0);
   const [seconds, setSeconds] = useState(MODES[0].mins * 60);
   const [running, setRunning] = useState(false);
-  const [lockIn, setLockIn] = useState(false);
+  const [immersive, setImmersive] = useState(false);
   const [tag, setTag] = useState<TaskTag>("@work");
   const [notes, setNotes] = useState("");
   const [sessionStart, setSessionStart] = useState<number | null>(null);
@@ -96,23 +96,23 @@ export function FocusPage() {
   const todayMins = todaySessions.reduce((s, f) => s + f.durationMins, 0);
 
   return (
-    <div className={cn("min-h-screen transition-colors", lockIn ? "bg-[var(--text)]" : "bg-[var(--surface)]")}>
-      <div className={cn("p-6 max-w-xl mx-auto", lockIn && "flex flex-col items-center justify-center min-h-screen")}>
-        {!lockIn && (
+    <div className={cn("min-h-screen transition-colors", immersive ? "bg-[var(--text)]" : "bg-[var(--surface)]")}>
+      <div className={cn("p-6 max-w-xl mx-auto", immersive && "flex flex-col items-center justify-center min-h-screen")}>
+        {!immersive && (
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-2xl font-bold text-[var(--text)]">Deep Work</h1>
               <p className="text-sm text-[var(--muted)]">Today: {todayMins}m focused</p>
             </div>
-            <button onClick={() => setLockIn(true)} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+            <button onClick={() => setImmersive(true)} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors">
               <Maximize2 className="w-5 h-5" />
             </button>
           </div>
         )}
 
-        {lockIn && (
+        {immersive && (
           <button
-            onClick={() => setLockIn(false)}
+            onClick={() => setImmersive(false)}
             className="absolute top-4 right-4 text-[var(--faint)] hover:text-[var(--text)] transition-colors"
           >
             <Minimize2 className="w-5 h-5" />
@@ -120,7 +120,7 @@ export function FocusPage() {
         )}
 
         {/* Mode Selector */}
-        {!lockIn && (
+        {!immersive && (
           <div className="flex gap-2 mb-8 bg-[var(--surface)] p-1 rounded-lg">
             {MODES.map((m, i) => (
               <button
@@ -188,7 +188,7 @@ export function FocusPage() {
         </div>
 
         {/* Session Context */}
-        {!lockIn && (
+        {!immersive && (
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 space-y-3">
             <div>
               <label className="text-xs text-[var(--muted)] mb-1 block">Context Tag</label>
@@ -222,7 +222,7 @@ export function FocusPage() {
         )}
 
         {/* Today's Sessions */}
-        {!lockIn && todaySessions.length > 0 && (
+        {!immersive && todaySessions.length > 0 && (
           <div className="mt-6">
             <h2 className="text-xs text-[var(--muted)] uppercase tracking-wider mb-3">Today&apos;s Sessions</h2>
             <div className="space-y-2">

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
-  FolderKanban, Newspaper, Settings, MoreHorizontal, X,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, MessageCircle, Lightbulb,
+  FolderKanban, Newspaper, MoreHorizontal, X,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,6 @@ const DOCK: Item[] = [
   { href: "/",        label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat",    label: "Chat",      icon: MessageCircle   },
   { href: "/player",  label: "Personal",  icon: Trophy          },
-  { href: "/lockin",  label: "Lock In",   icon: Lock            },
   { href: "/gym",     label: "Gym",       icon: Dumbbell        },
   { href: "/projects",label: "Projects",  icon: FolderKanban    },
   { href: "/tasks",   label: "Tasks",     icon: CheckSquare     },
@@ -33,7 +32,6 @@ const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat",     label: "Chat",      icon: MessageCircle },
   { href: "/player",   label: "Personal",  icon: Trophy        },
-  { href: "/lockin",   label: "Lock In",   icon: Lock          },
   { href: "/gym",      label: "Gym",       icon: Dumbbell      },
   { href: "/business", label: "Business",  icon: Briefcase     },
   { href: "/projects", label: "Projects",  icon: FolderKanban  },
@@ -135,11 +133,6 @@ export function Dock() {
             className={cn("flex h-11 w-11 items-center justify-center rounded-2xl transition-colors", open ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)]")}>
             <MoreHorizontal style={{ width: 21, height: 21 }} strokeWidth={2} />
           </button>
-          {/* Settings */}
-          <Link href="/settings" onMouseEnter={() => setHover(null)} title="Settings"
-            className={cn("flex h-11 w-11 items-center justify-center rounded-2xl transition-colors", isActive(pathname, "/settings") ? "bg-[var(--surface-2)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)]")}>
-            <Settings style={{ width: 20, height: 20 }} strokeWidth={1.9} />
-          </Link>
           {/* Theme toggle */}
           <button onMouseEnter={() => setHover(null)} onClick={toggleTheme} title={isDark ? "Light mode" : "Dark mode"}
             className="flex h-11 w-11 items-center justify-center rounded-2xl text-[var(--muted)] transition-colors hover:bg-[var(--chip)] hover:text-[var(--text)]">

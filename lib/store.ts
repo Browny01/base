@@ -364,39 +364,6 @@ export interface Workout {
   createdAt: string;
 }
 
-// ── Lock In (focus sessions + points engine) ────────────────────────────────────
-
-export type LockInTaskKind = "daily" | "specific";
-
-export interface LockInTask {
-  id: string;
-  title: string;
-  category: string;          // "Gym" | "Study" | "Business" | "Mind" | "Health" | "Other"
-  kind: LockInTaskKind;
-  date?: string;             // for specific tasks: due date YYYY-MM-DD
-  points: number;            // base points awarded on completion
-  icon?: string;             // optional custom emoji icon
-  createdAt: string;         // ISO — daily tasks become active from this day
-}
-
-export interface LockInCompletion {
-  id: string;
-  taskId: string;
-  date: string;              // YYYY-MM-DD the task was credited as done
-}
-
-export interface LockInSession {
-  id: string;
-  name: string;
-  startDate: string;         // YYYY-MM-DD
-  endDate: string;           // YYYY-MM-DD
-  tasks: LockInTask[];
-  completions: LockInCompletion[];
-  basePoints: number;        // default base points for new tasks
-  archived: boolean;
-  createdAt: string;
-}
-
 // ── Vision Board ──────────────────────────────────────────────────────────────
 
 export type BoardItemType = "photo" | "note" | "music";
@@ -561,7 +528,6 @@ export interface BridgeData {
   goals: Goal[];
   bodyMetrics: BodyMetrics;
   workouts: Workout[];
-  lockInSessions: LockInSession[];
   socialStats: SocialStat[];
   businessKPIs: BusinessKPI[];
   boards: VisionBoard[];
@@ -598,7 +564,6 @@ export const DEFAULT: BridgeData = {
   goals: [],
   bodyMetrics: { weightLog: [], sleepLog: [] },
   workouts: [],
-  lockInSessions: [],
   socialStats: [
     { platform: "x",         followers: 0, posts: 0, lastUpdated: "" },
     { platform: "instagram", followers: 0, posts: 0, lastUpdated: "" },
