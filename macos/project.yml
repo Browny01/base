@@ -3,7 +3,8 @@
 # Regenerate the Xcode project after editing this file (or after a fresh clone):
 #   cd macos && xcodegen generate && open Bridge.xcodeproj
 #
-# The app uses shared native SwiftUI screens and an offline-first local store.
+# The app renders the full Bridge website and falls back to the shared native
+# offline workspace when the website cannot be reached.
 # Native-code changes ship via Sparkle auto-update (see scripts/release_mac.sh).
 name: Bridge
 options:
