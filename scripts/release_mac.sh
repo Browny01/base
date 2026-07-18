@@ -9,9 +9,8 @@
 #   4. Uploads the zip + appcast.xml to the "latest" GitHub Release of the PUBLIC
 #      repo `bridge-mac-releases`, replacing the previous assets.
 #
-# Installed copies check that feed and prompt to update. You do NOT need this for
-# web-app feature changes (those update live) — only when the native Swift shell
-# changes (new menu item, new capability, the web URL, etc.).
+# Installed copies check that feed and prompt to update. Run this whenever shared
+# native SwiftUI code, BridgeApp.swift, or native configuration changes.
 #
 # Usage:  ./scripts/release_mac.sh <version> [release notes]
 #   e.g.  ./scripts/release_mac.sh 0.2.0 "Adds a native menu-bar shortcut"
