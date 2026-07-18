@@ -1,133 +1,88 @@
-# Bridge for macOS (native SwiftUI shell + auto-update)
+# Bridge for macOS
 
-Bridge ships to the Mac as a small **native SwiftUI app** that renders the live
-web app in a `WKWebView`. Like the iOS build, it points at the production URL, so
-**every Vercel deploy of the web app updates the Mac app instantly** — no rebuild.
-Unlike iOS (Capacitor), this is a hand-written native shell: a proper Mac window,
-titlebar, app icon, and menu-bar commands. **Native-code** changes ship via
-**Sparkle** auto-update.
+Bridge for macOS is a native SwiftUI app built from the same offline-first core as
+the iPhone app. It launches from local data, supports record editing without a
+connection, and syncs queued changes when connectivity returns.
 
-```
-Web app (Next.js on Vercel)  ──loads──►  WKWebView  ──shell──►  macOS app
-      every deploy auto-updates the app            + native window / menu bar / icon
-                                                    + Sparkle auto-update for the shell itself
-```
-
-There are two update layers — this is the key mental model:
-
-| You changed…                          | How it reaches the Mac app                  |
-| ------------------------------------- | ------------------------------------------- |
-| A web feature (page, dashboard, fix)  | **Automatic & instant** — it loads live     |
-| The native shell (menu, URL, capability) | Run `npm run mac:release` → Sparkle prompts |
-
-The Mac gets the web app's **desktop** layout (WKWebView sends a desktop user
-agent), not the mobile tab-bar UI.
-
----
-
-## Install it permanently
+## Install
 
 ```bash
-brew install xcodegen        # one-time, if not installed
-npm run mac:install          # builds Release + installs to /Applications + launches
+brew install xcodegen   # one time
+npm run mac:install
 ```
 
-That copies `Bridge.app` into **/Applications**, so it lives in Spotlight,
-Launchpad, and the Dock like any other app. Because it's a locally-built app
-without a paid Developer ID, the install script clears the Gatekeeper quarantine
-flag so it opens without a warning. From then on it keeps itself updated (below) —
-you only re-run `mac:install` if you want to reinstall from source.
+The install script generates the Xcode project, builds a Release app, installs it
+at `/Applications/Bridge.app`, and launches it. Bridge then appears in Spotlight,
+Launchpad, and the Dock.
 
-### Develop in Xcode instead
+For development:
 
 ```bash
-npm run mac                  # xcodegen generate + open Bridge.xcodeproj
+npm run mac
 ```
 
-Pick the **Bridge** target and press ▶.
+Select the `Bridge` scheme and press Run.
 
----
+## Global shortcut
 
-## Auto-updates (Sparkle)
+Press `Control+Option+Space` from any application to activate Bridge and bring its
+window to the front. The shortcut is registered with Carbon, so it does not need
+Accessibility permission. A tap of Fn/Globe is also supported as a convenience,
+but macOS may reserve that key for system features on some keyboards.
 
-The app uses [Sparkle](https://sparkle-project.org), the standard macOS
-auto-update framework.
+If the shortcut is already owned by another app, change or disable the conflicting
+shortcut in **System Settings > Keyboard > Keyboard Shortcuts**.
 
-- **On launch and ~daily** it checks the feed in the background. When a newer
-  version exists it shows a dialog: **Update / Later / Skip** (it never installs
-  silently — `SUAutomaticallyUpdate` is `false`).
-- **Manually**: **Bridge menu → Check for Updates…** any time.
+## Offline behavior
 
-### Where updates come from
+The Mac app includes native screens for Today, Tasks, Projects, Notes, Habits,
+Focus, Finance, and cached News. Edits are saved locally before network work begins.
+`native/BridgeCore/BridgeStore.swift` queues record-level operations, watches
+connectivity with Network.framework, and sends them to `/api/native/sync` after
+reconnection. The server merges each record atomically so unrelated changes from
+the web or iPhone app are preserved.
 
-Your app source stays in the **private** `bridge` repo. The built app + update
-feed live in a separate **public** repo, `Browny01/bridge-mac-releases`, as assets
-on its rolling **`latest`** GitHub Release — so the app can check anonymously:
+Cloud-generated features still require internet. News displays the last cached
+briefing while offline.
 
-```
-bridge-mac-releases  (public)  ▸ Release "latest"
-  ├── appcast.xml            ← the feed (SUFeedURL points here)
-  └── Bridge-<version>.zip   ← the signed app
-```
+## Project layout
 
-Updates are secured by an **EdDSA** signature independent of Apple code signing.
-The private key is in your **login keychain**; the public key is baked into
-`macos/Bridge/Info.plist` (`SUPublicEDKey`). Sparkle only installs a zip whose
-signature matches — so the private key never leaves your Mac and nobody can push
-a rogue update.
-
-### Ship a new native version
-
-Only needed when the **native shell** changes (a new menu item, a new capability,
-the web URL). Web-app features need nothing.
-
-```bash
-npm run mac:release -- 0.2.0 "What changed in this version"
-```
-
-That bumps the version, builds Release, zips + EdDSA-signs the app, regenerates
-`appcast.xml`, and uploads both to the `latest` GitHub Release (replacing the old
-assets). Installed copies pick it up on their next check (or immediately via
-**Check for Updates…**). Commit the version bump it makes in `macos/project.yml`.
-
-> If the Sparkle signing key is ever lost, run Sparkle's `generate_keys` again,
-> put the new `SUPublicEDKey` in `Info.plist`, and ship one update signed with the
-> old key that carries the new key (or reinstall via `mac:install`).
-
----
-
-## Layout
-
-```
+```text
+native/BridgeCore/
+  BridgeData.swift       JSON-preserving record model
+  BridgeStore.swift      local snapshot, queue, reachability, sync
+  BridgeViews.swift      shared iPhone/Mac SwiftUI screens
 macos/
-  project.yml                 # XcodeGen spec — the source of truth for the project
+  project.yml            XcodeGen source of truth
   Bridge/
-    BridgeApp.swift           # @main App, window config, menu bar, Sparkle updater
-    WebView.swift             # WebModel (owns the WKWebView) + NSViewRepresentable
-    ContentView.swift         # web view + top loading bar over a dark background
-    Info.plist                # incl. Sparkle SUFeedURL / SUPublicEDKey
-    Assets.xcassets/          # AppIcon (generated from the iOS 1024px icon) + accent
-scripts/
-  install_mac.sh              # build Release → install to /Applications (npm run mac:install)
-  release_mac.sh              # build + sign + publish an update    (npm run mac:release)
+    BridgeApp.swift      app lifecycle, global shortcut, Sparkle
+    ContentView.swift    shared native root view
+    Info.plist           app and Sparkle configuration
+    Assets.xcassets/     icon and accent assets
 ```
 
-`Bridge.xcodeproj` and `macos/.build/` are **generated** and git-ignored —
-regenerate rather than editing project settings by hand.
+Regenerate `macos/Bridge.xcodeproj` after changing `project.yml`:
 
-## Native touches already wired up
+```bash
+npm run mac:gen
+```
 
-- **Menu bar** — `⌘R` reload, `⌘[` / `⌘]` back/forward (auto-disabled at ends),
-  `⌘0` / `⌘+` / `⌘-` zoom, `⌘⇧H` home, **Open in Browser**, and **Check for
-  Updates…**.
-- **Window** — transparent dark titlebar that blends into the app; min size
-  720×480, opens at 1180×800.
-- **Session persistence** — default `WKWebsiteDataStore`, so you stay logged in.
-- **External links** — clicks to non-Bridge domains (and `target="_blank"`) open in
-  your default browser; Bridge links stay in-app.
-- **Loading bar** — a thin accent progress bar along the top while pages load.
+## Sparkle updates
 
-## If the production domain changes
+Installed builds check the Sparkle feed on launch and approximately once per day.
+Use **Bridge > Check for Updates...** to check manually. Updates are signed with
+the Sparkle EdDSA key and published to the public
+`Browny01/bridge-mac-releases` release repository.
 
-Update `homeURL` in `macos/Bridge/WebView.swift` (and `capacitor.config.ts` for
-iOS), then `npm run mac:release -- <version> "Point at new domain"`.
+Publish a native release with:
+
+```bash
+npm run mac:release -- 0.2.0 "Offline-first native Bridge"
+```
+
+The release script bumps the version, builds and signs the app archive, regenerates
+`appcast.xml`, and uploads both assets. Commit the resulting version change in
+`macos/project.yml`.
+
+Web/API changes deploy through Vercel. Shared native SwiftUI changes require a
+Sparkle release for installed Mac copies and a new Xcode build for iPhone.

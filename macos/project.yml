@@ -3,8 +3,7 @@
 # Regenerate the Xcode project after editing this file (or after a fresh clone):
 #   cd macos && xcodegen generate && open Bridge.xcodeproj
 #
-# The app is a thin SwiftUI shell around a WKWebView pointed at the live web app,
-# mirroring the iOS Capacitor approach — every Vercel deploy updates it instantly.
+# The app uses shared native SwiftUI screens and an offline-first local store.
 # Native-code changes ship via Sparkle auto-update (see scripts/release_mac.sh).
 name: Bridge
 options:
@@ -36,6 +35,8 @@ targets:
     platform: macOS
     sources:
       - path: Bridge
+      - path: ../native/BridgeCore
+        name: BridgeCore
     dependencies:
       - package: Sparkle
     settings:

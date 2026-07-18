@@ -1,9 +1,9 @@
 # Bridge
 
 Bridge is a personal command center for planning, focus, money, learning, notes,
-projects, and AI-assisted daily work. The core product is a Next.js app deployed
-to Vercel, with native iOS and macOS shells that load the live web app so product
-updates ship immediately after deployment.
+projects, and AI-assisted daily work. It includes a Next.js web app plus native
+SwiftUI apps for iPhone and Mac. The native apps keep a local copy of Bridge data,
+queue edits without a connection, and merge those edits when the internet returns.
 
 ## Highlights
 
@@ -14,16 +14,15 @@ updates ship immediately after deployment.
   conversations, file attachments, optional Bridge data context, reusable skills,
   local Ollama relay support, and web/search tools.
 - **Tasks** - priority/tagged tasks, due dates, recurring settings, subtasks, AI
-  task breakdowns, completion tracking, and quick-create handoffs from native
-  shells.
+  task breakdowns, completion tracking, and native offline creation.
 - **Habits** - button and numeric habits, reminders, daily logs, streak-style
   progress, and history-aware dashboard metrics.
-- **Focus** - deep-work timer with session logging, task tags, notes, ambient
-  lock mode, and saved focus history.
+- **Focus** - deep-work timer with session logging, task tags, notes, and saved
+  focus history.
 - **Projects** - active/on-hold/done project tracking with categories, logos,
   milestones, notes, documents, files, links, and detail pages.
 - **Notes** - block-based wiki with folders, nested pages, rich blocks, page
-  locks, trash/restore, print/export helpers, graph view, and local handoffs.
+  locks, trash/restore, print/export helpers, graph view, and native offline notes.
 - **Vision board** - full-bleed canvas for photos, notes, music cards, drawings,
   shapes, arrows, undo/redo, board switching, and image uploads.
 - **Finance** - income/spend ledger, daily revenue target, subscriptions, wallet
@@ -42,11 +41,12 @@ updates ship immediately after deployment.
   AI context, news/feed sources, and local app preferences.
 - **Command palette and shortcuts** - `Cmd+K` search across pages, projects,
   notes, chats, boards, and common actions.
-- **Native iPhone support** - Capacitor iOS app, branded icons/splash, liquid
-  glass mobile tab bar, WidgetKit home-screen widget, push-notification plumbing,
-  and a roadmap for Live Activities.
-- **Native Mac support** - SwiftUI `WKWebView` shell with native menu commands,
-  Spotlight/Dock install flow, external-link handling, and Sparkle update support.
+- **Native iPhone support** - SwiftUI dashboard, tasks, projects, notes, habits,
+  focus, finance, cached news, offline mutation queue, and WidgetKit home-screen
+  widget.
+- **Native Mac support** - the same offline-first SwiftUI workspace, a reliable
+  `Control+Option+Space` global shortcut, Spotlight/Dock install flow, and Sparkle
+  update support.
 - **Backend integrations** - Upstash Redis/KV persistence, Vercel Blob uploads,
   Gemini, Perplexity, Stripe, Cal.com, wallet/token APIs, cron snapshots, and an
   OAuth-capable MCP server.
@@ -56,7 +56,8 @@ updates ship immediately after deployment.
 - **Framework:** Next.js 16 App Router, React 19, TypeScript
 - **Styling:** Tailwind CSS v4 with custom monochrome/liquid-glass tokens
 - **Storage:** Upstash Redis/KV for app state, Vercel Blob for uploads
-- **Native:** Capacitor 8 for iOS, SwiftUI/WebKit for macOS, WidgetKit for widgets
+- **Native:** shared SwiftUI core for iOS and macOS, Network framework for
+  reconnect detection, WidgetKit for widgets, Sparkle for Mac updates
 - **AI/search:** Gemini, Perplexity, optional local Ollama relay
 - **Deployment:** Vercel with daily cron snapshots
 
@@ -74,8 +75,9 @@ app/
 components/              Page components, navigation, command palette, UI
 lib/                     Store, contexts, sessions, AI context, utilities
 public/                  Brand assets and PWA manifest
-ios/                     Capacitor iOS project and Bridge Widget extension
-macos/                   Native SwiftUI macOS shell
+native/BridgeCore/       Shared native models, offline store, sync queue, and views
+ios/                     Native SwiftUI iOS project and Bridge Widget extension
+macos/                   Native SwiftUI macOS app and Sparkle configuration
 scripts/                 Native install/release helpers and maintenance scripts
 docs/                    iOS/macOS app notes
 ```
@@ -136,37 +138,25 @@ Keep env files local. `.env*` and `.vercel/` are intentionally gitignored.
 
 ## Native iOS App
 
-The iOS app is a Capacitor shell pointed at the live Vercel deployment:
-
-```ts
-server: { url: "https://bridge-ten-lovat.vercel.app" }
-```
-
-That means web changes update the installed app as soon as Vercel deploys. Native
-changes, such as plugins, widgets, push notifications, Live Activities, app icons,
-or signing settings, still require an Xcode build.
-
-Useful commands:
+The iPhone app is a real SwiftUI client, not a web view. It opens from local data,
+so tasks, projects, notes, habits, focus sessions, and finance entries remain usable
+without internet. Each change is written to disk immediately and added to a durable
+operation queue. On reconnect, `/api/native/sync` atomically merges those record
+changes into the main Bridge document and downloads the latest state.
 
 ```bash
-npm run cap:sync   # sync web config/plugins into ios/
-npm run cap:open   # open the Xcode project
-npm run ios        # sync and open Xcode
+npm run ios   # open ios/App/App.xcodeproj
 ```
 
-The iOS project includes:
-
-- Bridge app icon and splash assets
-- Capacitor plugins for app lifecycle, status bar, splash screen, haptics,
-  keyboard, and push notifications
-- `BridgeWidget` WidgetKit extension for task, streak, habit, and revenue metrics
-- Safe-area aware mobile UI and liquid-glass bottom navigation
+Choose the `App` scheme and your signing team in Xcode, then run on a simulator or
+connected iPhone. The project also includes the `BridgeWidget` WidgetKit extension.
+See `docs/ios-app.md` for signing, offline behavior, and installation details.
 
 ## Native macOS App
 
-The macOS app is a native SwiftUI/WebKit wrapper around the same live web app. It
-adds native window behavior, menu-bar commands, external-link handling, and
-Sparkle auto-update support for native shell releases.
+The macOS app uses the same native SwiftUI views and offline store as iOS. Press
+`Control+Option+Space` from any app to bring Bridge forward; tapping Fn/Globe is
+also retained as a convenience shortcut. Sparkle distributes native app updates.
 
 Useful commands:
 
@@ -191,9 +181,9 @@ declares the framework and schedules the daily snapshot cron:
 }
 ```
 
-Connect the Vercel project to GitHub for automatic deployments on commits. The
-iOS and macOS shells will load the latest deployed web app automatically because
-both shells point at the production URL.
+Connect the Vercel project to GitHub for automatic web/API deployments. Native app
+code ships separately through Xcode/TestFlight on iOS and Sparkle on macOS. The
+native clients use the deployed API for synchronization and news refreshes.
 
 ## Available Scripts
 
@@ -203,9 +193,7 @@ both shells point at the production URL.
 | `npm run build` | Create a production Next.js build |
 | `npm run start` | Start the production server |
 | `npm run lint` | Run ESLint |
-| `npm run cap:sync` | Sync Capacitor iOS project |
-| `npm run cap:open` | Open iOS project in Xcode |
-| `npm run ios` | Sync and open iOS project |
+| `npm run ios` | Open the native iOS project |
 | `npm run mac:gen` | Generate the macOS Xcode project |
 | `npm run mac` | Generate and open the macOS project |
 | `npm run mac:install` | Install the macOS app locally |
@@ -217,9 +205,10 @@ both shells point at the production URL.
   abstractions.
 - Do not commit secrets, `.vercel/`, local env files, native build output, or
   generated caches.
-- Keep native shells thin: product features should usually live in the web app so
-  they deploy once and update everywhere.
-- When changing native iOS capabilities, run `npm run cap:sync` and verify the
-  Xcode project still builds.
+- Put shared iOS/macOS data behavior and screens in `native/BridgeCore`; keep only
+  platform lifecycle and shortcut code in the platform folders.
+- Preserve unknown JSON fields when extending native sync so older clients cannot
+  erase newer web-only data.
+- Verify both native targets after shared Swift changes.
 - When changing the macOS shell source, regenerate the project from
   `macos/project.yml` rather than hand-editing generated project files.

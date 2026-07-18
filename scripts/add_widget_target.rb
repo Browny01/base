@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# Adds the BridgeWidgetExtension (WidgetKit) target to the Capacitor iOS project
+# Adds the BridgeWidgetExtension (WidgetKit) target to the native iOS project
 # and embeds it in the App target. Idempotent — safe to re-run.
 begin
   require "xcodeproj"

@@ -1,136 +1,89 @@
-# Bridge for iPhone (Capacitor)
+# Bridge for iPhone
 
-Bridge ships to the App Store as a **Capacitor** app that loads the live web app.
-Because it points at the production URL, **every Vercel deploy of the web app
-updates the iOS app instantly** — no rebuild, no resubmit. Native capabilities
-(widgets, push, live activities) are added as separate Xcode targets.
+Bridge for iPhone is a native SwiftUI app. It does not load the website in a web
+view. The app launches from an on-device snapshot and keeps a durable queue of
+changes made while offline.
 
-```
-Web app (Next.js on Vercel)  ──loads──►  Capacitor WKWebView  ──shell──►  iOS app
-      every deploy auto-updates the app                 + native targets (widgets / push / live activities)
-```
+## Requirements
 
----
+- macOS with Xcode 16 or newer
+- An Apple ID selected as the signing team for a personal device build
+- A paid Apple Developer membership only for TestFlight or App Store distribution
 
-## Prerequisites (one time)
+## Install on a real iPhone
 
-- A **Mac** with **Xcode 16+** (from the App Store).
-- An **Apple Developer account** ($99/yr) for a real device, TestFlight, and the
-  App Store. The simulator works without it.
-- **CocoaPods** is not required — Capacitor 8 uses Swift Package Manager.
-
-## First run
-
-From the repo root:
+From the repository root:
 
 ```bash
-npm install            # pulls the @capacitor/* deps already in package.json
-npm run ios            # cap sync + open Xcode
+npm install
+npm run ios
 ```
 
-In Xcode: select the **App** target → **Signing & Capabilities** → pick your Team
-and set the Bundle Identifier (defaults to `app.bridge.personal` from
-`capacitor.config.ts`). Press ▶ to run on a simulator or your iPhone.
+In Xcode:
 
-That's it — the app opens straight into the live Bridge web app, full-screen,
-with the native status bar, splash, and the liquid-glass tab bar.
+1. Select the `App` project and the `App` target.
+2. Open **Signing & Capabilities** and choose your Team.
+3. Keep `app.bridge.personal` as the bundle identifier, or choose a unique one if
+   Xcode reports that it is unavailable for your team.
+4. Connect and unlock the iPhone, trust the Mac when prompted, and select the
+   phone from the run destination menu.
+5. Press Run. On first use, iOS may ask you to enable Developer Mode and trust the
+   developer certificate in **Settings > General > VPN & Device Management**.
 
-The native `ios/` project is already committed in this repository. Only run
-`npx cap add ios` if you intentionally delete `ios/` and want to regenerate it
-from scratch.
+The `BridgeWidgetExtension` target is embedded automatically. Its bundle
+identifier must remain prefixed by the app bundle identifier when changing IDs.
 
-## How auto-update works
+## Native features
 
-`capacitor.config.ts` sets `server.url` to the production URL:
+- Today dashboard with task, project, habit, and pending-sync metrics
+- Offline task creation, completion, and deletion
+- Offline project creation and status updates
+- Native notes with safe paragraph appends that preserve existing rich blocks
+- Daily habits and completion logs
+- Focus timer and session history
+- Income/spend ledger
+- Cached news briefing with online refresh
+- WidgetKit home-screen widget
 
-```ts
-server: { url: "https://bridge-ten-lovat.vercel.app" }
-```
+AI chat, live news generation, market APIs, and other cloud integrations still
+require a connection. Previously downloaded data and the last news briefing remain
+available offline.
 
-The WKWebView loads that URL on launch, so the app always shows the latest
-deployed web app. You only rebuild/resubmit the iOS app when you change **native**
-code (a new widget, a permission, an SDK) — never for UI or feature changes to the
-web app.
+## Offline sync
 
-> If you point this at a new production domain later, change it here and re-run
-> `npm run cap:sync`.
+`native/BridgeCore/BridgeStore.swift` writes the complete Bridge JSON snapshot and
+pending operations to the app's Application Support directory. Every native edit:
 
-### Offline fallback (optional, later)
-`webDir` is `public` as a placeholder. For a graceful offline screen, build a
-static fallback into a folder and set `webDir` to it; Capacitor serves it when the
-remote server is unreachable.
+1. Updates the local snapshot immediately.
+2. Adds an `upsert` or `delete` operation for one record.
+3. Attempts sync if the Network framework reports connectivity.
+4. Keeps the operation on disk if the request fails or the device is offline.
 
-## What's already handled on the web side
+On reconnect, `POST /api/native/sync` applies the operation batch atomically in
+Redis, preserves unrelated web-only fields, and returns the merged document. The
+same algorithm is used by the Mac app.
 
-- **Safe areas** — the top bar pads `env(safe-area-inset-top)` and the tab bar
-  pads `env(safe-area-inset-bottom)`, so nothing sits under the notch or home
-  indicator. `viewport-fit=cover` is set.
-- **Status bar** — `apple-mobile-web-app-status-bar-style: black-translucent`, so
-  content runs edge-to-edge under a dark status bar.
-- **Liquid-glass tab bar** — the mobile bottom nav is a floating frosted bar
-  (`components/bottom-nav.tsx`).
-- **PWA manifest** — `public/manifest.json`, standalone, dark theme colour.
+The sync API must be deployed before a fresh install can download existing data.
+Until then, local edits remain queued and will upload after the API is available.
 
----
-
-## Roadmap: native capabilities
-
-All of these live in the generated `ios/` Xcode project and share data with the
-app through an **App Group** (e.g. `group.app.bridge.personal`). Add the App Group
-capability to the App target first (Signing & Capabilities → + Capability → App
-Groups).
-
-### 1. Push notifications
-- `@capacitor/push-notifications` is already installed.
-- In Xcode add the **Push Notifications** capability; create an **APNs key** in the
-  Apple Developer portal.
-- Register for a token in the web app via the plugin and store it against the user
-  (a small `/api/push/register` endpoint), then send via APNs from the Bridge
-  backend or a cron.
-
-### 2. Home-screen widgets (WidgetKit) — ✅ DONE
-The **BridgeWidget** target already exists (`ios/App/BridgeWidget/`), built by
-`scripts/add_widget_target.rb`. It's a native SwiftUI widget that fetches the
-read-only **`/api/widget/summary`** endpoint (token-guarded; the device passes its
-local date so "today" matches the app) and shows:
-
-- **Small**: Tasks Left (big) + done-today, with streak + revenue at the bottom.
-- **Medium**: Tasks · Streak · Habits · Revenue-vs-target (with a progress bar).
-
-To put it on your phone/simulator: **long-press the home screen → tap `+` → search
-"Bridge" → pick a size → Add Widget.** It refreshes ~every 30 min.
-
-The token is currently hard-coded to the server default (`151715`). If you set a
-custom `BRIDGE_PASSWORD` / `BRIDGE_AGENT_TOKEN`, update `BridgeAPI.token` in
-`BridgeWidget.swift` (or later: have the app write the token to a shared App Group
-that the widget reads).
-
-To regenerate the target from scratch (e.g. after `npx cap add ios`):
-`ruby scripts/add_widget_target.rb`.
-
-### 3. Live Activities (ActivityKit)
-- Add an **ActivityKit** widget to the Widget Extension; enable
-  **Supports Live Activities** in the App target's Info.
-- Natural fit: the **Focus timer** — start an Activity when a session
-  begins (via a tiny Capacitor plugin bridging JS → Swift), update it as the timer
-  ticks, end it on completion. Shows on the Lock Screen and Dynamic Island.
-
-### 4. Nice-to-haves
-- `@capacitor/haptics` (installed) — fire a light tap on key actions.
-- `@capacitor/keyboard` (installed) — resize behaviour for the chat/composer.
-
----
-
-## App Store review note
-
-Apps that load remote web content are allowed, but must provide native value and
-not be "just a website." Bridge clears this by adding native widgets, push, and
-live activities. Keep at least one native capability shipping before submitting.
-
-## Handy scripts
+## Build verification
 
 ```bash
-npm run cap:sync   # copy config + plugins into the iOS project
-npm run cap:open   # open the iOS project in Xcode
-npm run ios        # sync + open
+xcodebuild \
+  -project ios/App/App.xcodeproj \
+  -scheme App \
+  -sdk iphonesimulator \
+  -configuration Debug \
+  -derivedDataPath ios/App/DerivedData/native-check \
+  CODE_SIGNING_ALLOWED=NO build
 ```
+
+Native app changes require a new Xcode/TestFlight/App Store build. Web-only
+changes continue to deploy independently to Vercel.
+
+## Home-screen widget
+
+Long-press the Home Screen, tap `+`, search for Bridge, and choose a widget size.
+The widget uses `/api/widget/summary` and refreshes separately from the app's
+offline store. If the production authentication token changes, update
+`BridgeAPI.token` in `ios/App/BridgeWidget/BridgeWidget.swift`.

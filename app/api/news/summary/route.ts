@@ -5,11 +5,11 @@ import { mcpRedis } from "@/lib/mcp-data";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.1-flash-lite";
 
 export async function GET() {
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH — one summary per hour
-  const key = `bridge:news:summary:v3:${hour}`;
+  const key = `bridge:news:summary:v4:${hour}`;
   const redis = mcpRedis();
 
   if (redis) {
