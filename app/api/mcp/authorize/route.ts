@@ -68,7 +68,7 @@ function form(p: Params, err = ""): string {
     <form method="post" class="card">
       <div class="logo">N</div>
       <h1>Connect to Bridge</h1>
-      <p class="sub">An AI assistant wants read-only access to your Bridge data. Locked notes stay private. Enter your MCP password to approve.</p>
+      <p class="sub">An AI assistant wants permission to read and edit your Bridge workspace. Locked notes stay private. Enter your MCP password to approve.</p>
       ${err ? `<p class="err">${escapeHtml(err)}</p>` : ""}
       ${hidden}
       <input type="password" name="password" placeholder="MCP password" autofocus autocomplete="off" />

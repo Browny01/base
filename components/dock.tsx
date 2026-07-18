@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, Settings, MoreHorizontal, X,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, Sparkles, Lightbulb,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, MessageCircle, Lightbulb,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ type Item = { href: string; label: string; icon: LucideIcon };
 // The always-visible dock row (curated). Everything else lives in "More".
 const DOCK: Item[] = [
   { href: "/",        label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat",    label: "Chat",      icon: Sparkles        },
+  { href: "/chat",    label: "Chat",      icon: MessageCircle   },
   { href: "/player",  label: "Personal",  icon: Trophy          },
   { href: "/lockin",  label: "Lock In",   icon: Lock            },
   { href: "/gym",     label: "Gym",       icon: Dumbbell        },
@@ -31,7 +31,7 @@ const DOCK: Item[] = [
 // The full list (shown in the More panel that expands upward).
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat",     label: "Chat",      icon: Sparkles      },
+  { href: "/chat",     label: "Chat",      icon: MessageCircle },
   { href: "/player",   label: "Personal",  icon: Trophy        },
   { href: "/lockin",   label: "Lock In",   icon: Lock          },
   { href: "/gym",      label: "Gym",       icon: Dumbbell      },

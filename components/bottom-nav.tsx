@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Repeat2, Newspaper, X, MoreHorizontal,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, Sparkles, Lightbulb,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, MessageCircle, Lightbulb,
   Settings, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ type Item = { href: string; label: string; icon: LucideIcon };
 // The five fixed tabs — a standard iOS tab bar. Everything else lives in "More".
 const TABS: Item[] = [
   { href: "/",         label: "Home",     icon: LayoutDashboard },
-  { href: "/chat",     label: "Chat",     icon: Sparkles        },
+  { href: "/chat",     label: "Chat",     icon: MessageCircle   },
   { href: "/projects", label: "Projects", icon: FolderKanban    },
   { href: "/tasks",    label: "Tasks",    icon: CheckSquare     },
 ];
@@ -25,7 +25,7 @@ const TABS: Item[] = [
 // Everything — the More sheet
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat",     label: "Chat",      icon: Sparkles      },
+  { href: "/chat",     label: "Chat",      icon: MessageCircle },
   { href: "/player",   label: "Personal",  icon: Trophy        },
   { href: "/lockin",   label: "Lock In",   icon: Lock          },
   { href: "/gym",      label: "Gym",       icon: Dumbbell      },

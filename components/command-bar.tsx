@@ -9,7 +9,7 @@ import { useNavMode } from "@/lib/nav-mode-context";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, Trophy, Briefcase,
-  Search, CornerDownLeft, NotebookText, LayoutGrid, Dumbbell, Lock, Sparkles, type LucideIcon,
+  Search, CornerDownLeft, NotebookText, LayoutGrid, Dumbbell, Lock, MessageCircle, type LucideIcon,
   Settings, Sun, Moon, Plus, PanelBottom,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ type Item =
 
 const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string }[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard, keywords: "home overview" },
-  { href: "/chat",     label: "Chat",      icon: Sparkles,        keywords: "ai assistant gemini claude gpt" },
+  { href: "/chat",     label: "Chat",      icon: MessageCircle,   keywords: "ai assistant gemini claude gpt" },
   { href: "/player",   label: "Personal",  icon: Trophy,          keywords: "self ratings skills goals" },
   { href: "/lockin",   label: "Lock In",   icon: Lock,            keywords: "focus discipline streak points challenge 75 hard sprint" },
   { href: "/gym",      label: "Gym",       icon: Dumbbell,        keywords: "workout lifting training exercise sets reps" },
@@ -73,7 +73,7 @@ export function CommandBar() {
   const actions = useMemo<Item[]>(() => [
     { kind: "action", key: "act:newtask", label: "New task", icon: CheckSquare, keywords: "create add todo", run: () => { try { localStorage.setItem("bridge_open_new_task", "1"); } catch {} router.push("/tasks"); } },
     { kind: "action", key: "act:newproject", label: "New project", icon: FolderKanban, keywords: "create add", run: () => { try { localStorage.setItem("bridge_open_new_project", "1"); } catch {} router.push("/projects"); } },
-    { kind: "action", key: "act:newchat", label: "New chat", icon: Sparkles, keywords: "ai ask new conversation", run: () => router.push("/chat") },
+    { kind: "action", key: "act:newchat", label: "New chat", icon: MessageCircle, keywords: "ai ask new conversation", run: () => router.push("/chat") },
     { kind: "action", key: "act:theme", label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode", icon: theme === "dark" ? Sun : Moon, keywords: "theme dark light appearance", run: toggleTheme },
     { kind: "action", key: "act:nav", label: mode === "dock" ? "Use sidebar navigation" : "Use dock navigation", icon: mode === "dock" ? LayoutDashboard : PanelBottom, keywords: "dock sidebar navigation layout", run: () => setMode(mode === "dock" ? "sidebar" : "dock") },
   ], [router, theme, toggleTheme, mode, setMode]);
@@ -145,7 +145,7 @@ export function CommandBar() {
   const renderRow = (it: Item, idx: number) => {
     const isActive = idx === active;
     const isCurrent = it.kind === "page" && (it.href === "/" ? pathname === "/" : pathname.startsWith(it.href));
-    const Icon = it.kind === "page" || it.kind === "action" ? it.icon : it.kind === "chat" ? Sparkles : it.kind === "project" ? FolderKanban : LayoutGrid;
+    const Icon = it.kind === "page" || it.kind === "action" ? it.icon : it.kind === "chat" ? MessageCircle : it.kind === "project" ? FolderKanban : LayoutGrid;
     return (
       <button
         key={it.key}

@@ -35,6 +35,7 @@ export async function POST(req: Request) {
   const provider = providerOf(model);
   if (provider === "gemini") return streamGemini(model, messages, system);
   if (provider === "anthropic") return streamAnthropic(model, messages, system);
+  if (provider === "openai") return streamOpenAI(model, messages, system);
   if (provider === "perplexity") return runPerplexity(model, messages, system, perplexityTools);
   return new Response("Unsupported model", { status: 400 });
 }
@@ -120,6 +121,43 @@ async function streamAnthropic(model: string, messages: Msg[], system?: string) 
   const stream = sseToText(upstream.body, (json) => {
     const j = json as { type?: string; delta?: { type?: string; text?: string } };
     return j?.type === "content_block_delta" && j.delta?.type === "text_delta" ? (j.delta.text ?? "") : "";
+  });
+  return new Response(stream, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+}
+
+// ── OpenAI Responses API ─────────────────────────────────────────────────────────
+async function streamOpenAI(model: string, messages: Msg[], system?: string) {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return textResponse("⚠️ OpenAI isn't set up yet. Add OPENAI_API_KEY to your environment to enable GPT models.");
+
+  const input = await Promise.all(messages.filter(hasContent).map(async (m) => {
+    const content: Record<string, unknown>[] = [];
+    if (m.content?.trim()) content.push({ type: m.role === "assistant" ? "output_text" : "input_text", text: m.content });
+    for (const a of m.attachments ?? []) {
+      if (a.kind === "text" && a.text) content.push({ type: "input_text", text: `\n[File: ${a.name}]\n${a.text}` });
+      else if (a.kind === "image" && a.url) content.push({ type: "input_image", image_url: a.url });
+      else if (a.kind === "pdf") content.push({ type: "input_text", text: `[Attached PDF: ${a.name}]` });
+    }
+    return { role: m.role, content: content.length ? content : [{ type: "input_text", text: "" }] };
+  }));
+
+  let upstream: Response;
+  try {
+    upstream = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model, input, instructions: system, stream: true, store: false, max_output_tokens: 4096 }),
+    });
+  } catch (e) {
+    return textResponse("Couldn't reach OpenAI: " + String(e));
+  }
+  if (!upstream.ok || !upstream.body) {
+    const t = await upstream.text().catch(() => "");
+    return textResponse(`OpenAI error ${upstream.status}. ${t.slice(0, 400)}`);
+  }
+  const stream = sseToText(upstream.body, (json) => {
+    const event = json as { type?: string; delta?: string };
+    return event.type === "response.output_text.delta" ? (event.delta ?? "") : "";
   });
   return new Response(stream, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 }
