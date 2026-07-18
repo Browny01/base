@@ -86,6 +86,7 @@ export interface Project {
   color: ProjectColor;
   status: ProjectStatus;
   category: ProjectCategory;
+  archived?: boolean;
   logoUrl?: string | null;
   createdAt: string;
 }

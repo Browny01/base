@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Repeat2, Newspaper, X, MoreHorizontal,
-  GraduationCap, Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, Sparkles, Lightbulb,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, Sparkles, Lightbulb,
   Settings, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,6 @@ const ALL: Item[] = [
   { href: "/habits",   label: "Habits",    icon: Repeat2       },
   { href: "/finance",  label: "Finance",   icon: DollarSign    },
   { href: "/learn",    label: "Learn",     icon: Lightbulb     },
-  { href: "/school",   label: "School",    icon: GraduationCap },
   { href: "/news",     label: "News",      icon: Newspaper     },
   { href: "/settings", label: "Settings",  icon: Settings      },
 ];

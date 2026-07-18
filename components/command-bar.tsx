@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import { useNavMode } from "@/lib/nav-mode-context";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
-  FolderKanban, Newspaper, GraduationCap, Trophy, Briefcase,
+  FolderKanban, Newspaper, Trophy, Briefcase,
   Search, CornerDownLeft, NotebookText, LayoutGrid, Dumbbell, Lock, Sparkles, type LucideIcon,
   Settings, Sun, Moon, Plus, PanelBottom,
 } from "lucide-react";
@@ -36,7 +36,6 @@ const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string 
   { href: "/focus",    label: "Focus",     icon: Timer,           keywords: "pomodoro timer" },
   { href: "/habits",   label: "Habits",    icon: Repeat2,         keywords: "streak routine" },
   { href: "/finance",  label: "Finance",   icon: DollarSign,      keywords: "money wallet crypto" },
-  { href: "/school",   label: "School",    icon: GraduationCap,   keywords: "study classes" },
   { href: "/news",     label: "News",      icon: Newspaper,       keywords: "markets headlines" },
   { href: "/settings", label: "Settings",  icon: Settings,        keywords: "preferences appearance theme navigation" },
 ];

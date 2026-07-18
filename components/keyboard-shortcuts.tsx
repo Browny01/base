@@ -19,7 +19,6 @@ const NAV: { key: string; href: string; label: string }[] = [
   { key: "h", href: "/habits",   label: "Habits" },
   { key: "f", href: "/finance",  label: "Finance" },
   { key: "e", href: "/learn",    label: "Learn" },
-  { key: "u", href: "/school",   label: "School" },
   { key: "r", href: "/news",     label: "News" },
   { key: "s", href: "/settings", label: "Settings" },
 ];

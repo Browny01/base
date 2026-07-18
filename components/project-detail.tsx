@@ -6,11 +6,11 @@ import { useToast } from "@/lib/toast-context";
 import { prepareProjectLogo } from "@/lib/project-logo";
 import { prepareProjectFile } from "@/lib/project-file";
 import { uid, getToday } from "@/lib/utils";
-import type { Task, Priority, TaskTag, ProjectStatus, ProjectColor, MilestoneStatus, ProjectFile } from "@/lib/store";
+import type { Task, Priority, TaskTag, ProjectColor, MilestoneStatus, ProjectFile } from "@/lib/store";
 import {
   ArrowLeft, Plus, Trash2, Link2, FileText, CheckSquare,
   ExternalLink, Pencil, Check, X, Map, Circle, CircleDot, CheckCircle2,
-  RotateCcw, Upload, Download, File as FileIcon,
+  RotateCcw, Upload, Download, File as FileIcon, MoreHorizontal, Archive,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,6 @@ const COLOR_BORDER: Record<ProjectColor, string> = {
 
 const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
 const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
-const STATUSES: ProjectStatus[] = ["active", "on-hold", "done"];
 
 const MILESTONE_STATUS: { value: MilestoneStatus; label: string; icon: React.ReactNode; color: string }[] = [
   { value: "planned",     label: "Planned",     icon: <Circle className="w-4 h-4" />,      color: "text-[var(--muted)]" },
@@ -66,6 +65,7 @@ export function ProjectDetail({ id }: { id: string }) {
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   // ── Tasks ────────────────────────────────────────────────────────────────────
   const [taskTitle, setTaskTitle] = useState("");
@@ -196,8 +196,11 @@ export function ProjectDetail({ id }: { id: string }) {
       window.alert(err instanceof Error ? err.message : "Could not upload this logo.");
     }
   }
-  function setStatus(status: ProjectStatus) {
-    mutate((d) => ({ ...d, projects: d.projects.map((p) => p.id === id ? { ...p, status } : p) }));
+  function toggleArchiveProject() {
+    const nextArchived = !project!.archived;
+    mutate((d) => ({ ...d, projects: d.projects.map((p) => p.id === id ? { ...p, archived: nextArchived } : p) }));
+    setOptionsOpen(false);
+    if (nextArchived) router.push("/projects");
   }
   function deleteProject() {
     if (!confirm("Delete this project? Tasks will remain but be unlinked.")) return;
@@ -399,12 +402,39 @@ export function ProjectDetail({ id }: { id: string }) {
                 {project.description && <p className="text-sm text-[var(--muted)]">{project.description}</p>}
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <select className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none" value={project.status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
-                {STATUSES.map((s) => <option key={s} value={s}>{s === "on-hold" ? "On Hold" : s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-              </select>
-              <button onClick={startEdit} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors p-1"><Pencil className="w-4 h-4" /></button>
-              <button onClick={deleteProject} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setOptionsOpen((v) => !v)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border-2)] transition-colors"
+                aria-haspopup="menu"
+                aria-expanded={optionsOpen}
+                aria-label="Project options"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+              {optionsOpen && (
+                <div className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-lg">
+                  <button
+                    onClick={() => { setOptionsOpen(false); startEdit(); }}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Edit
+                  </button>
+                  <button
+                    onClick={toggleArchiveProject}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+                  >
+                    {project.archived ? <RotateCcw className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                    {project.archived ? "Restore" : "Archive"}
+                  </button>
+                  <button
+                    onClick={() => { setOptionsOpen(false); deleteProject(); }}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

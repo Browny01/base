@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, ChevronsLeft, Settings,
-  GraduationCap, Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, Sparkles, Lightbulb,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, Lock, Sparkles, Lightbulb,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,7 +53,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/finance", label: "Finance", icon: DollarSign    },
       { href: "/learn",   label: "Learn",   icon: Lightbulb     },
-      { href: "/school",  label: "School",  icon: GraduationCap },
       { href: "/news",    label: "News",    icon: Newspaper     },
     ],
   },
