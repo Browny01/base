@@ -3,16 +3,19 @@
 import { useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
+import { prepareProjectLogo } from "@/lib/project-logo";
+import { prepareProjectFile } from "@/lib/project-file";
 import { uid, getToday } from "@/lib/utils";
-import type { Task, Priority, TaskTag, ProjectStatus, ProjectColor, MilestoneStatus } from "@/lib/store";
+import type { Task, Priority, TaskTag, ProjectStatus, ProjectColor, MilestoneStatus, ProjectFile } from "@/lib/store";
 import {
   ArrowLeft, Plus, Trash2, Link2, FileText, CheckSquare,
   ExternalLink, Pencil, Check, X, Map, Circle, CircleDot, CheckCircle2,
-  RotateCcw,
+  RotateCcw, Upload, Download, File as FileIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { ProjectLogo } from "@/components/project-logo";
 
 const COLOR_TEXT: Record<ProjectColor, string> = {
   indigo: "text-[var(--text)]", cyan: "text-[var(--text)]", emerald: "text-[var(--text)]",
@@ -40,7 +43,15 @@ const MILESTONE_STATUS: { value: MilestoneStatus; label: string; icon: React.Rea
   { value: "done",        label: "Done",        icon: <CheckCircle2 className="w-4 h-4" />, color: "text-[var(--text)]" },
 ];
 
-type Tab = "tasks" | "roadmap" | "docs" | "links";
+type Tab = "tasks" | "roadmap" | "files" | "links";
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb >= 100 ? 0 : 1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
+}
 
 export function ProjectDetail({ id }: { id: string }) {
   const { data, mutate } = useBridge();
@@ -54,6 +65,7 @@ export function ProjectDetail({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
 
   // ── Tasks ────────────────────────────────────────────────────────────────────
   const [taskTitle, setTaskTitle] = useState("");
@@ -66,6 +78,9 @@ export function ProjectDetail({ id }: { id: string }) {
   const projectDocs = (data.projectDocuments ?? [])
     .filter((d) => d.projectId === id)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const projectFiles = (data.projectFiles ?? [])
+    .filter((file) => file.projectId === id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [docContent, setDocContent] = useState("");
@@ -103,7 +118,7 @@ export function ProjectDetail({ id }: { id: string }) {
 
   // Migrate existing single-note to a document (runs once per project when docs tab first opened)
   useEffect(() => {
-    if (tab !== "docs") return;
+    if (tab !== "files") return;
     if (projectDocs.length > 0) return;
     const oldNote = data.projectNotes.find((n) => n.projectId === id && n.content.trim());
     if (!oldNote) return;
@@ -163,10 +178,23 @@ export function ProjectDetail({ id }: { id: string }) {
   const today = getToday();
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
-  function startEdit() { setEditName(project!.name); setEditDesc(project!.description); setEditing(true); }
+  function startEdit() {
+    setEditName(project!.name);
+    setEditDesc(project!.description);
+    setEditLogoUrl(project!.logoUrl ?? null);
+    setEditing(true);
+  }
   function saveEdit() {
-    mutate((d) => ({ ...d, projects: d.projects.map((p) => p.id === id ? { ...p, name: editName.trim() || p.name, description: editDesc } : p) }));
+    mutate((d) => ({ ...d, projects: d.projects.map((p) => p.id === id ? { ...p, name: editName.trim() || p.name, description: editDesc, logoUrl: editLogoUrl } : p) }));
     setEditing(false);
+  }
+  async function setProjectLogo(file: File | undefined) {
+    if (!file) return;
+    try {
+      setEditLogoUrl(await prepareProjectLogo(file));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Could not upload this logo.");
+    }
   }
   function setStatus(status: ProjectStatus) {
     mutate((d) => ({ ...d, projects: d.projects.map((p) => p.id === id ? { ...p, status } : p) }));
@@ -178,6 +206,7 @@ export function ProjectDetail({ id }: { id: string }) {
       project: data.projects.find((p) => p.id === id),
       notes: data.projectNotes.filter((n) => n.projectId === id),
       docs: (data.projectDocuments ?? []).filter((doc) => doc.projectId === id),
+      files: (data.projectFiles ?? []).filter((file) => file.projectId === id),
       links: data.projectLinks.filter((l) => l.projectId === id),
       milestones: (data.milestones ?? []).filter((m) => m.projectId === id),
       taskIds: data.tasks.filter((t) => t.projectId === id).map((t) => t.id),
@@ -188,6 +217,7 @@ export function ProjectDetail({ id }: { id: string }) {
       tasks: d.tasks.map((t) => t.projectId === id ? { ...t, projectId: undefined } : t),
       projectNotes: d.projectNotes.filter((n) => n.projectId !== id),
       projectDocuments: (d.projectDocuments ?? []).filter((doc) => doc.projectId !== id),
+      projectFiles: (d.projectFiles ?? []).filter((file) => file.projectId !== id),
       projectLinks: d.projectLinks.filter((l) => l.projectId !== id),
       milestones: (d.milestones ?? []).filter((m) => m.projectId !== id),
     }));
@@ -197,6 +227,7 @@ export function ProjectDetail({ id }: { id: string }) {
       projects: [...d.projects, snap.project!],
       projectNotes: [...d.projectNotes, ...snap.notes],
       projectDocuments: [...(d.projectDocuments ?? []), ...snap.docs],
+      projectFiles: [...(d.projectFiles ?? []), ...snap.files],
       projectLinks: [...d.projectLinks, ...snap.links],
       milestones: [...(d.milestones ?? []), ...snap.milestones],
       tasks: d.tasks.map((t) => snap.taskIds.includes(t.id) ? { ...t, projectId: id } : t),
@@ -254,7 +285,26 @@ export function ProjectDetail({ id }: { id: string }) {
     mutate((d) => ({ ...d, milestones: (d.milestones ?? []).filter((m) => m.id !== milestoneId) }));
   }
 
-  // ── Document handlers ─────────────────────────────────────────────────────────
+  // ── File/document handlers ───────────────────────────────────────────────────
+  async function uploadFiles(files: FileList | null) {
+    if (!files?.length) return;
+    try {
+      const prepared = await Promise.all(Array.from(files).map(prepareProjectFile));
+      const now = new Date().toISOString();
+      mutate((d) => ({
+        ...d,
+        projectFiles: [
+          ...(d.projectFiles ?? []),
+          ...prepared.map((file) => ({ id: uid(), projectId: id, createdAt: now, ...file })),
+        ],
+      }));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Could not upload one of those files.");
+    }
+  }
+  function deleteFile(fileId: string) {
+    mutate((d) => ({ ...d, projectFiles: (d.projectFiles ?? []).filter((file) => file.id !== fileId) }));
+  }
   function createDoc() {
     const newDoc = {
       id: uid(), projectId: id, title: "Untitled",
@@ -307,9 +357,34 @@ export function ProjectDetail({ id }: { id: string }) {
       {/* Project header */}
       <div className={cn("rounded-xl p-5 mb-6 border", COLOR_BG[project.color], COLOR_BORDER[project.color])}>
         {editing ? (
-          <div className="space-y-2">
-            <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-lg font-bold text-[var(--text)] focus:outline-none" value={editName} onChange={(e) => setEditName(e.target.value)} />
-            <input className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none" placeholder="Description..." value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <ProjectLogo src={editLogoUrl} color={project.color} name={editName || project.name} size="lg" />
+              <div className="flex-1 space-y-2">
+                <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-lg font-bold text-[var(--text)] focus:outline-none" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                <input className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none" placeholder="Description..." value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] transition-colors cursor-pointer">
+                <Upload className="w-3.5 h-3.5" />
+                Upload Logo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    void setProjectLogo(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {editLogoUrl && (
+                <button onClick={() => setEditLogoUrl(null)} className="flex items-center gap-1 px-3 py-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+                  <X className="w-3.5 h-3.5" /> Remove
+                </button>
+              )}
+            </div>
             <div className="flex gap-2">
               <button onClick={saveEdit} className="flex items-center gap-1 text-xs text-[var(--text)] hover:text-[var(--text)]"><Check className="w-3.5 h-3.5" /> Save</button>
               <button onClick={() => setEditing(false)} className="flex items-center gap-1 text-xs text-[var(--muted)] hover:text-[var(--text)]"><X className="w-3.5 h-3.5" /> Cancel</button>
@@ -317,9 +392,12 @@ export function ProjectDetail({ id }: { id: string }) {
           </div>
         ) : (
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className={cn("text-2xl font-bold tracking-tight mb-1", COLOR_TEXT[project.color])}>{project.name}</h1>
-              {project.description && <p className="text-sm text-[var(--muted)]">{project.description}</p>}
+            <div className="flex items-start gap-3 min-w-0">
+              <ProjectLogo src={project.logoUrl} color={project.color} name={project.name} size="lg" />
+              <div className="min-w-0">
+                <h1 className={cn("text-2xl font-bold tracking-tight mb-1 truncate", COLOR_TEXT[project.color])}>{project.name}</h1>
+                {project.description && <p className="text-sm text-[var(--muted)]">{project.description}</p>}
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <select className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-xs text-[var(--text)] focus:outline-none" value={project.status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
@@ -335,7 +413,7 @@ export function ProjectDetail({ id }: { id: string }) {
           <span>{doneTasks.length} done</span>
           <span>{milestones.length} milestones</span>
           <span>{projectLinks.length} links</span>
-          <span>{projectDocs.length} docs</span>
+          <span>{projectFiles.length + projectDocs.length} files</span>
         </div>
       </div>
 
@@ -344,7 +422,7 @@ export function ProjectDetail({ id }: { id: string }) {
         {([
           { key: "tasks",   icon: CheckSquare, label: "Tasks" },
           { key: "roadmap", icon: Map,         label: "Roadmap" },
-          { key: "docs",    icon: FileText,    label: "Docs" },
+          { key: "files",   icon: FileText,    label: "Files" },
           { key: "links",   icon: Link2,       label: "Links" },
         ] as const).map(({ key, icon: Icon, label }) => (
           <button key={key} onClick={() => setTab(key)}
@@ -491,9 +569,53 @@ export function ProjectDetail({ id }: { id: string }) {
         </div>
       )}
 
-      {/* ── Documents Tab ────────────────────────────────────────────────────── */}
-      {tab === "docs" && (
-        <div className="flex min-h-[520px]">
+      {/* ── Files Tab ────────────────────────────────────────────────────────── */}
+      {tab === "files" && (
+        <div className="space-y-6">
+          <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-[var(--text)]">Uploaded Files</h2>
+                <p className="text-xs text-[var(--faint)] mt-0.5">Images, PDFs, docs, spreadsheets, zips and more.</p>
+              </div>
+              <label className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors cursor-pointer">
+                <Upload className="w-4 h-4" />
+                Upload Files
+                <input
+                  type="file"
+                  multiple
+                  className="sr-only"
+                  onChange={(e) => {
+                    void uploadFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
+            {projectFiles.length === 0 ? (
+              <div className="border border-dashed border-[var(--border)] rounded-xl py-10 px-4 text-center">
+                <FileIcon className="w-8 h-8 mx-auto mb-3 text-[var(--faint)]" />
+                <p className="text-sm text-[var(--faint)]">No uploaded files yet.</p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {projectFiles.map((file) => (
+                  <ProjectFileCard key={file.id} file={file} onDelete={deleteFile} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-[var(--text)]">Documents</h2>
+                <p className="text-xs text-[var(--faint)] mt-0.5">Keep writing project notes here. They auto-save as before.</p>
+              </div>
+            </div>
+
+            <div className="flex min-h-[520px]">
           {/* Sidebar */}
           <div className="w-52 shrink-0 border-r border-[var(--border)] pr-3 flex flex-col gap-1">
             <button
@@ -592,6 +714,8 @@ export function ProjectDetail({ id }: { id: string }) {
             )}
           </div>
         </div>
+          </section>
+        </div>
       )}
 
       {/* ── Links Tab ────────────────────────────────────────────────────────── */}
@@ -678,6 +802,55 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
         {task.dueDate && <span className={cn("text-xs", task.dueDate < today && !task.done ? "text-[var(--text)]" : "text-[var(--faint)]")}>{task.dueDate}</span>}
         <button onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Pencil className="w-3.5 h-3.5" /></button>
         <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+      </div>
+    </div>
+  );
+}
+
+function ProjectFileCard({ file, onDelete }: { file: ProjectFile; onDelete: (id: string) => void }) {
+  const isImage = file.type.startsWith("image/");
+  const isPdf = file.type === "application/pdf";
+
+  return (
+    <div className="group bg-[var(--surface-2)] border border-[var(--border)] rounded-xl overflow-hidden hover:border-[var(--border-2)] transition-colors">
+      <a href={file.dataUrl} target="_blank" rel="noopener noreferrer" className="block aspect-[4/3] bg-[var(--chip)]">
+        {isImage ? (
+          <img src={file.dataUrl} alt={file.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            {isPdf ? <FileText className="w-10 h-10 text-[var(--faint)]" /> : <FileIcon className="w-10 h-10 text-[var(--faint)]" />}
+          </div>
+        )}
+      </a>
+      <div className="p-3">
+        <p className="text-sm font-medium text-[var(--text)] truncate" title={file.name}>{file.name}</p>
+        <p className="text-xs text-[var(--faint)] mt-0.5">{isPdf ? "PDF" : file.type || "File"} · {formatFileSize(file.size)}</p>
+        <div className="flex items-center gap-2 mt-3">
+          <a
+            href={file.dataUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Open
+          </a>
+          <a
+            href={file.dataUrl}
+            download={file.name}
+            className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download
+          </a>
+          <button
+            onClick={() => onDelete(file.id)}
+            className="ml-auto text-[var(--faint)] hover:text-[var(--text)] transition-colors"
+            title="Delete file"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );
