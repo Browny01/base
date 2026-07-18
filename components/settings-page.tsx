@@ -8,7 +8,7 @@ import { useNavMode } from "@/lib/nav-mode-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAccent, ACCENTS } from "@/lib/accent-context";
 import { useBridge } from "@/lib/hooks";
-import { CHAT_MODELS, DEFAULT_CHAT_SETTINGS, type ChatSettings } from "@/lib/chat-models";
+import { CHAT_MODELS, configuredChatModels, DEFAULT_CHAT_SETTINGS, type ChatSettings } from "@/lib/chat-models";
 import {
   CATEGORY_LABEL,
   DEFAULT_NEWS_PREFS,
@@ -159,8 +159,18 @@ function SourceManager({ prefs, setPrefs }: { prefs: NewsPrefs; setPrefs: (prefs
 
 function ChatModelManager({ settings, setSettings }: { settings: ChatSettings; setSettings: (settings: ChatSettings) => void }) {
   const enabled = new Set(settings.enabledModelIds);
+  const hidden = new Set(settings.hiddenModelIds ?? []);
+  const visible = new Map(configuredChatModels(settings).map((model) => [model.id, model.enabled]));
 
   function toggleModel(id: string) {
+    const model = CHAT_MODELS.find((item) => item.id === id);
+    const automaticallyVisible = model?.provider === "anthropic" || model?.provider === "openai";
+    if (automaticallyVisible) {
+      const nextHidden = new Set(hidden);
+      if (nextHidden.has(id)) nextHidden.delete(id); else nextHidden.add(id);
+      setSettings({ ...settings, hiddenModelIds: [...nextHidden] });
+      return;
+    }
     const next = new Set(enabled);
     if (next.has(id)) {
       if (next.size <= 1) return;
@@ -184,7 +194,7 @@ function ChatModelManager({ settings, setSettings }: { settings: ChatSettings; s
           <p className="mb-3 text-[11px] text-[var(--faint)]">Only enabled models appear in the chat &amp; learning model pickers. Web-search / tools now live on the Chat page.</p>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {CHAT_MODELS.map((model) => {
-              const active = enabled.has(model.id);
+              const active = visible.get(model.id) ?? false;
               return (
                 <button
                   key={model.id}

@@ -2,7 +2,7 @@
 // route calls. Gemini runs on Google's free tier; Claude and Perplexity need
 // their respective API keys before they can respond.
 
-export type ChatProvider = "gemini" | "anthropic" | "perplexity" | "ollama" | "bridge";
+export type ChatProvider = "gemini" | "anthropic" | "openai" | "perplexity" | "ollama" | "bridge";
 export type PerplexityTool = "web_search" | "fetch_url" | "finance_search";
 
 // Local providers stream straight from the browser to a server on the user's own
@@ -26,6 +26,7 @@ export interface ChatModel {
 
 export interface ChatSettings {
   enabledModelIds: string[];
+  hiddenModelIds?: string[]; // lets existing users hide newly added provider models
   perplexityTools: PerplexityTool[];
   ollamaUrl?: string;   // e.g. http://localhost:11434
   bridgeUrl?: string;   // local Codex / Claude-Code bridge, e.g. https://host.ts.net:8443
@@ -47,9 +48,13 @@ export const CHAT_MODELS: ChatModel[] = [
   { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash", provider: "perplexity", enabled: true, note: "Low-cost · $0.50/M" },
   { id: "xai/grok-4.3",          label: "Grok 4.3",              provider: "perplexity", enabled: true, note: "Powerful + cheap · $1.25/M" },
   { id: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5 (Perplexity)", provider: "perplexity", enabled: true, note: "Fast + strong · $1/M" },
-  { id: "claude-sonnet-4-6",     label: "Claude Sonnet 4.6",     provider: "anthropic", enabled: false, note: "Needs API key" },
-  { id: "claude-opus-4-8",       label: "Claude Opus 4.8",       provider: "anthropic", enabled: false, note: "Needs API key" },
-  { id: "claude-haiku-4-5",      label: "Claude Haiku 4.5",      provider: "anthropic", enabled: false, note: "Needs API key" },
+  { id: "claude-sonnet-4-6",     label: "Claude Sonnet 4.6",     provider: "anthropic", enabled: true, note: "Anthropic API key" },
+  { id: "claude-opus-4-8",       label: "Claude Opus 4.8",       provider: "anthropic", enabled: true, note: "Anthropic API key" },
+  { id: "claude-haiku-4-5",      label: "Claude Haiku 4.5",      provider: "anthropic", enabled: true, note: "Anthropic API key" },
+  { id: "gpt-5.4",               label: "GPT-5.4",               provider: "openai",    enabled: true, note: "OpenAI API key" },
+  { id: "gpt-5.4-mini",          label: "GPT-5.4 Mini",          provider: "openai",    enabled: true, note: "OpenAI API key" },
+  { id: "gpt-5-mini",            label: "GPT-5 Mini",            provider: "openai",    enabled: true, note: "OpenAI API key" },
+  { id: "gpt-5.4-nano",          label: "GPT-5.4 Nano",          provider: "openai",    enabled: true, note: "OpenAI API key" },
 ];
 
 export const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -66,7 +71,7 @@ export const providerOf = (id: string): ChatProvider => {
   const local = localProviderOf(id);
   if (local) return local;
   return CHAT_MODELS.find((m) => m.id === id)?.provider
-    ?? (id.startsWith("claude") ? "anthropic" : id.includes("/") ? "perplexity" : "gemini");
+    ?? (id.startsWith("claude") ? "anthropic" : id.startsWith("gpt-") ? "openai" : id.includes("/") ? "perplexity" : "gemini");
 };
 
 export const modelLabel = (id: string): string =>
@@ -75,5 +80,11 @@ export const modelLabel = (id: string): string =>
 
 export const configuredChatModels = (settings?: Partial<ChatSettings>): ChatModel[] => {
   const enabled = new Set(settings?.enabledModelIds ?? DEFAULT_CHAT_SETTINGS.enabledModelIds);
+  // Existing installations have a saved enabledModelIds list from before these
+  // providers existed. Make the new catalog visible without overriding an
+  // explicit hide choice made later in Settings.
+  const hidden = new Set(settings?.hiddenModelIds ?? []);
+  CHAT_MODELS.filter((model) => model.provider === "anthropic" || model.provider === "openai")
+    .forEach((model) => { if (hidden.has(model.id)) enabled.delete(model.id); else enabled.add(model.id); });
   return CHAT_MODELS.map((model) => ({ ...model, enabled: enabled.has(model.id) }));
 };

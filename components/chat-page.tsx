@@ -10,7 +10,7 @@ import { mdToHtml } from "@/lib/markdown";
 import { buildBridgeContext } from "@/lib/bridge-context";
 import { processFile } from "@/lib/chat-files";
 import {
-  Sparkles, Send, Plus, Trash2, ChevronDown, ChevronRight, PanelLeftClose, PanelLeft,
+  MessageCircle, Send, Plus, Trash2, ChevronDown, ChevronRight, PanelLeftClose, PanelLeft,
   Bot, User, Square, MessageSquare, Check, Pin, PinOff, Pencil, Copy, Paperclip, X,
   Folder, FolderOpen, FolderPlus, Search, MoreHorizontal, RotateCcw, FileText, FolderKanban,
   Database, Puzzle, Lock, LockOpen, Link2, Server, Settings2, Globe,
@@ -392,7 +392,7 @@ export function ChatPage() {
         sidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
       )}>
         <div className="flex items-center justify-between h-12 px-3 shrink-0 border-b border-[var(--border)]">
-          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><Sparkles className="w-4 h-4" /> Chat</span>
+          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]"><MessageCircle className="w-4 h-4" /> Chat</span>
           <div className="flex items-center gap-0.5">
             <button onClick={newFolder} title="New folder" className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"><FolderPlus className="w-4 h-4" /></button>
             <button onClick={newChat} title="New chat" className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"><Plus className="w-4 h-4" /></button>
@@ -490,7 +490,7 @@ export function ChatPage() {
         ) : isEmpty ? (
           <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center px-4 py-8">
             <div className="text-center max-w-md mb-6">
-              <span className="flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--chip)] border border-[var(--border)] mx-auto mb-4"><Sparkles className="w-6 h-6 text-[var(--text)]" strokeWidth={1.8} /></span>
+              <span className="flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--chip)] border border-[var(--border)] mx-auto mb-4"><MessageCircle className="w-6 h-6 text-[var(--text)]" strokeWidth={1.8} /></span>
               <p className="text-lg font-bold text-[var(--text)] mb-1">Ask anything</p>
               <p className="text-sm text-[var(--faint)]">Pick a model, attach files, or toggle <b>Bridge data</b> to let the AI read your dashboard.</p>
             </div>

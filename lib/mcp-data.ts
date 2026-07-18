@@ -3,8 +3,9 @@
 
 import { Redis } from "@upstash/redis";
 import type { BridgeData, WikiBlock, WikiPage } from "@/lib/store";
+import { DATA_KEY } from "@/lib/bridge-data";
 
-const KEY = "bridge:data";
+const KEY = DATA_KEY;
 
 export function mcpRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
@@ -19,6 +20,16 @@ export async function readRawData(): Promise<BridgeData | null> {
   let data = await redis.get(KEY);
   if (typeof data === "string") { try { data = JSON.parse(data); } catch { /* leave as-is */ } }
   return (data as BridgeData) ?? null;
+}
+
+// MCP writes deliberately go through the same Redis key as the web app. The
+// route handler keeps the current raw state around while applying a mutation,
+// so protected notes are retained even though they are never returned to MCP.
+export async function writeRawData(data: BridgeData): Promise<boolean> {
+  const redis = mcpRedis();
+  if (!redis) return false;
+  await redis.set(KEY, data);
+  return true;
 }
 
 // A live (non-deleted) notes page counts as "locked & hidden" for the MCP.
