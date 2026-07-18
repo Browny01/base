@@ -5,8 +5,7 @@
 #
 # Run this once to install. After that, the app keeps itself up to date via
 # Sparkle — you only need to re-run this if you ever want to reinstall from
-# source. Web features update automatically (the app loads the live web app);
-# native changes ship through `scripts/release_mac.sh`.
+# source. Future native changes ship through `scripts/release_mac.sh`.
 #
 # Usage:  ./scripts/install_mac.sh
 set -euo pipefail
