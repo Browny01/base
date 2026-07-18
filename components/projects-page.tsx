@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
 import { prepareProjectLogo } from "@/lib/project-logo";
-import type { ProjectColor, ProjectStatus, ProjectCategory } from "@/lib/store";
+import type { ProjectColor, ProjectCategory } from "@/lib/store";
 import { Plus, FolderKanban, ChevronRight, Star, Layers, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -25,18 +25,8 @@ const COLOR_HEX: Record<ProjectColor, string> = {
   pink:    "#ec4899",
 };
 
-const STATUS_LABEL: Record<ProjectStatus, string> = {
-  active: "Active", "on-hold": "On Hold", done: "Done",
-};
-
-const STATUS_COLOR: Record<ProjectStatus, string> = {
-  active: "bg-[var(--chip)] text-[var(--text)]",
-  "on-hold": "bg-[var(--chip)] text-[var(--text)]",
-  done: "bg-[var(--chip)] text-[var(--muted)]",
-};
-
 function ProjectCard({ proj, taskCount, doneCount, linkCount, hasNote }: {
-  proj: { id: string; name: string; description: string; color: ProjectColor; status: ProjectStatus; category: ProjectCategory; logoUrl?: string | null };
+  proj: { id: string; name: string; description: string; color: ProjectColor; category: ProjectCategory; archived?: boolean; logoUrl?: string | null };
   taskCount: number; doneCount: number; linkCount: number; hasNote: boolean;
 }) {
   const hex = COLOR_HEX[proj.color];
@@ -49,9 +39,7 @@ function ProjectCard({ proj, taskCount, doneCount, linkCount, hasNote }: {
       <div className="flex items-start justify-between mb-3">
         <ProjectLogo src={proj.logoUrl} color={proj.color} name={proj.name} />
         <div className="flex items-center gap-2">
-          <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", STATUS_COLOR[proj.status])}>
-            {STATUS_LABEL[proj.status]}
-          </span>
+          {proj.archived && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[var(--chip)] text-[var(--muted)]">Archived</span>}
           <ChevronRight className="w-4 h-4 text-[var(--faint)] group-hover:text-[var(--muted)] transition-colors" />
         </div>
       </div>
@@ -88,11 +76,10 @@ export function ProjectsPage() {
   const [showForm, setShowForm] = useState(false);
   // ⌘K → "New project" opens the form on arrival
   useEffect(() => { try { if (localStorage.getItem("bridge_open_new_project")) { localStorage.removeItem("bridge_open_new_project"); setShowForm(true); } } catch {} }, []);
-  const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [form, setForm] = useState<{
     name: string; description: string; color: ProjectColor;
-    status: ProjectStatus; category: ProjectCategory; logoUrl: string | null;
-  }>({ name: "", description: "", color: "indigo", status: "active", category: "major", logoUrl: null });
+    category: ProjectCategory; logoUrl: string | null;
+  }>({ name: "", description: "", color: "indigo", category: "major", logoUrl: null });
 
   function addProject() {
     if (!form.name.trim()) return;
@@ -103,13 +90,13 @@ export function ProjectsPage() {
         name: form.name.trim(),
         description: form.description.trim(),
         color: form.color,
-        status: form.status,
+        status: "active",
         category: form.category,
         logoUrl: form.logoUrl,
         createdAt: new Date().toISOString(),
       }],
     }));
-    setForm({ name: "", description: "", color: "indigo", status: "active", category: "major", logoUrl: null });
+    setForm({ name: "", description: "", color: "indigo", category: "major", logoUrl: null });
     setShowForm(false);
   }
 
@@ -123,12 +110,10 @@ export function ProjectsPage() {
     }
   }
 
-  const filtered = statusFilter === "all"
-    ? data.projects
-    : data.projects.filter((p) => p.status === statusFilter);
-
-  const major = filtered.filter((p) => p.category === "major");
-  const side  = filtered.filter((p) => p.category === "side");
+  const visibleProjects = data.projects.filter((p) => !p.archived);
+  const major = visibleProjects.filter((p) => p.category === "major");
+  const side  = visibleProjects.filter((p) => p.category === "side");
+  const archived = data.projects.filter((p) => p.archived);
 
   function projectStats(id: string) {
     return {
@@ -236,25 +221,8 @@ export function ProjectsPage() {
               </div>
             </div>
 
-            {/* Status */}
-            <div>
-              <label className="text-xs text-[var(--muted)] uppercase tracking-widest font-semibold mb-2 block">Status</label>
-              <div className="flex gap-1.5">
-                {(["active", "on-hold", "done"] as ProjectStatus[]).map((s) => (
-                  <button key={s} onClick={() => setForm((f) => ({ ...f, status: s }))}
-                    className={cn(
-                      "flex-1 py-2 text-xs rounded-lg transition-colors font-medium",
-                      form.status === s ? STATUS_COLOR[s] : "bg-[var(--surface-2)] text-[var(--muted)] hover:bg-[var(--chip)]"
-                    )}
-                  >
-                    {STATUS_LABEL[s]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Color */}
-            <div className="md:col-span-2">
+            <div>
               <label className="text-xs text-[var(--muted)] uppercase tracking-widest font-semibold mb-2 block">Color</label>
               <div className="flex gap-2 flex-wrap">
                 {COLORS.map((c) => (
@@ -278,22 +246,8 @@ export function ProjectsPage() {
         </div>
       )}
 
-      {/* Status filter */}
-      <div className="flex gap-1 mb-8 bg-[var(--surface)] p-1 rounded-lg w-fit border border-[var(--border)]">
-        {(["all", "active", "on-hold", "done"] as const).map((f) => (
-          <button key={f} onClick={() => setStatusFilter(f)}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize",
-              statusFilter === f ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]"
-            )}
-          >
-            {f === "all" ? "All" : STATUS_LABEL[f as ProjectStatus]}
-          </button>
-        ))}
-      </div>
-
       {/* Empty state */}
-      {major.length === 0 && side.length === 0 && (
+      {major.length === 0 && side.length === 0 && archived.length === 0 && (
         <div className="text-center py-20 text-[var(--faint)]">
           <FolderKanban className="w-10 h-10 mx-auto mb-3 opacity-20" />
           <p className="text-sm">No projects yet. Create one to get started!</p>
@@ -318,6 +272,17 @@ export function ProjectsPage() {
           <SectionHeader icon={<Layers className="w-4 h-4" />} label="Side Projects" count={side.length} />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {side.map((proj) => (
+              <ProjectCard key={proj.id} proj={proj} {...projectStats(proj.id)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {archived.length > 0 && (
+        <section className="mt-10">
+          <SectionHeader icon={<FolderKanban className="w-4 h-4" />} label="Archived Projects" count={archived.length} />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 opacity-75">
+            {archived.map((proj) => (
               <ProjectCard key={proj.id} proj={proj} {...projectStats(proj.id)} />
             ))}
           </div>

@@ -2,9 +2,9 @@
 
 import { useId, useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
-import { uid, formatAUD, formatCurrency, formatDate, getToday, calcStreak } from "@/lib/utils";
+import { uid, formatCurrency, formatDate, getToday, calcStreak } from "@/lib/utils";
 import type { Priority, Task, TaskTag } from "@/lib/store";
-import { Repeat2, TrendingUp, Flame, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Repeat2, Flame, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
@@ -68,16 +68,6 @@ export function Dashboard() {
     data.incomeEntries.filter((e) => e.date === d && e.type === "income").reduce((s, e) => s + e.amount, 0),
   );
 
-  // ── Portfolio ────────────────────────────────────────────────────────────────
-  const snapshots = data.portfolioSnapshots ?? [];
-  const last14 = snapshots.slice(-14);
-  const portfolioSeries = last14.map((s) => s.totalAud);
-  const currentPortfolio = snapshots[snapshots.length - 1]?.totalAud ?? null;
-  const portfolioUp = last14.length >= 2 ? last14[last14.length - 1].totalAud >= last14[0].totalAud : true;
-  const portfolioPct = last14.length >= 2 && last14[0].totalAud > 0
-    ? ((last14[last14.length - 1].totalAud - last14[0].totalAud) / last14[0].totalAud) * 100
-    : null;
-
   function addQuickTask() {
     if (!quickTitle.trim()) return;
     mutate((d) => ({
@@ -104,7 +94,7 @@ export function Dashboard() {
   }
 
   const greetText = greeting(now);
-  const activeProjects = data.projects.filter((p) => p.status === "active");
+  const overviewProjects = data.projects.filter((p) => !p.archived);
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
@@ -128,7 +118,7 @@ export function Dashboard() {
       </div>
 
       {/* ── Metric cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <MetricCard
           icon={<CheckSquare style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor="var(--muted)"
           label="Tasks Left" value={todayTasks.length.toString()} sub={`${doneTodayCount} done today`}
@@ -143,13 +133,6 @@ export function Dashboard() {
           icon={<Flame style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor="var(--c-purple)"
           label="Streak" value={`${overallStreak}d`} sub="best in a row"
           series={habitsSeries} seriesColor="var(--c-purple)" href="/habits"
-        />
-        <MetricCard
-          icon={<TrendingUp style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor={portfolioUp ? "var(--c-emerald)" : "var(--c-rose)"}
-          label="Portfolio" value={currentPortfolio !== null ? formatAUD(currentPortfolio) : "—"}
-          sub={portfolioPct == null ? "add wallets" : undefined}
-          delta={portfolioPct == null ? undefined : { pct: portfolioPct, up: portfolioUp, note: "14d" }}
-          series={portfolioSeries} seriesColor={portfolioUp ? "var(--c-emerald)" : "var(--c-rose)"} href="/finance"
         />
         <MetricCard
           icon={<Wallet style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor="var(--c-emerald)"
@@ -259,13 +242,13 @@ export function Dashboard() {
         </section>
       </div>
 
-      {/* ── Active Projects ── */}
+      {/* ── Projects ── */}
       <div className="flex items-center justify-between mb-3">
-        <SectionTitle icon={<FolderKanban style={{ width: 15, height: 15 }} strokeWidth={1.9} />}>Active Projects</SectionTitle>
+        <SectionTitle icon={<FolderKanban style={{ width: 15, height: 15 }} strokeWidth={1.9} />}>Projects</SectionTitle>
         <Link href="/projects" className="text-xs text-[var(--faint)] hover:text-[var(--text)] transition-colors font-medium inline-flex items-center gap-1">All <ArrowRight className="w-3 h-3" /></Link>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {activeProjects.slice(0, 7).map((proj) => {
+        {overviewProjects.slice(0, 7).map((proj) => {
           const taskCount = data.tasks.filter((t) => t.projectId === proj.id && !t.done).length;
           return (
             <Link key={proj.id} href={`/projects/${proj.id}`} className="group card card-hover p-4 flex flex-col gap-3.5">
@@ -277,7 +260,7 @@ export function Dashboard() {
                 <p className="text-sm font-semibold text-[var(--text)] tracking-tight truncate">{proj.name}</p>
                 <p className="text-[11px] text-[var(--muted)] mt-1 font-medium capitalize flex items-center gap-1.5">
                   <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", COLOR_DOT[proj.color] ?? "bg-[var(--c-indigo)]")} />
-                  {proj.category} · {proj.status}
+                  {proj.category}
                 </p>
               </div>
             </Link>
