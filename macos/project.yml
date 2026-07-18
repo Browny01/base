@@ -19,8 +19,8 @@ packages:
 
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "6"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "8"
     SWIFT_VERSION: "5.0"
     # Ad-hoc sign so the app has a stable identity and runs on this Mac without a
     # paid Developer ID. Sparkle secures updates with EdDSA, independent of this.

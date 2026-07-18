@@ -59,9 +59,12 @@ ZIP="$STAGE/Bridge-$VERSION.zip"
 # Release notes as HTML alongside the zip → Sparkle shows them in the update dialog.
 printf '<h2>Bridge %s</h2>\n<p>%s</p>\n' "$VERSION" "$NOTES" > "$STAGE/Bridge-$VERSION.html"
 
-# generate_appcast reads the EdDSA private key from the keychain, signs the zip,
-# reads the version from the app inside it, and writes the feed.
-"$SPARKLE_BIN/generate_appcast" "$STAGE" --download-url-prefix "$DL_PREFIX" >/dev/null
+# Read the EdDSA key through the security CLI so headless release runs do not
+# stall waiting for Sparkle's binary to receive Keychain UI approval.
+/usr/bin/security find-generic-password \
+  -a ed25519 -s "https://sparkle-project.org" -w \
+  | "$SPARKLE_BIN/generate_appcast" "$STAGE" \
+      --ed-key-file - --download-url-prefix "$DL_PREFIX" >/dev/null
 [ -f "$STAGE/appcast.xml" ] || { echo "❌ appcast.xml not generated"; exit 1; }
 
 echo "▸ Publishing to $RELEASES_REPO ($TAG)…"
