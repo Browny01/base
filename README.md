@@ -44,9 +44,9 @@ queue edits without a connection, and merge those edits when the internet return
 - **Native iPhone support** - SwiftUI dashboard, tasks, projects, notes, habits,
   focus, finance, cached news, offline mutation queue, and WidgetKit home-screen
   widget.
-- **Native Mac support** - the same offline-first SwiftUI workspace, a reliable
-  `Control+Option+Space` global shortcut, Spotlight/Dock install flow, and Sparkle
-  update support.
+- **Mac support** - the complete live Bridge interface in a native window, a
+  SwiftUI offline fallback, a reliable `Control+Option+Space` global shortcut,
+  Spotlight/Dock install flow, and Sparkle updates.
 - **Backend integrations** - Upstash Redis/KV persistence, Vercel Blob uploads,
   Gemini, Perplexity, Stripe, Cal.com, wallet/token APIs, cron snapshots, and an
   OAuth-capable MCP server.
@@ -56,8 +56,8 @@ queue edits without a connection, and merge those edits when the internet return
 - **Framework:** Next.js 16 App Router, React 19, TypeScript
 - **Styling:** Tailwind CSS v4 with custom monochrome/liquid-glass tokens
 - **Storage:** Upstash Redis/KV for app state, Vercel Blob for uploads
-- **Native:** shared SwiftUI core for iOS and macOS, Network framework for
-  reconnect detection, WidgetKit for widgets, Sparkle for Mac updates
+- **Native:** SwiftUI and WidgetKit for iPhone, SwiftUI/WebKit hybrid for Mac,
+  Network framework reconnect detection, Sparkle for Mac updates
 - **AI/search:** Gemini, Perplexity, optional local Ollama relay
 - **Deployment:** Vercel with daily cron snapshots
 
@@ -77,7 +77,7 @@ lib/                     Store, contexts, sessions, AI context, utilities
 public/                  Brand assets and PWA manifest
 native/BridgeCore/       Shared native models, offline store, sync queue, and views
 ios/                     Native SwiftUI iOS project and Bridge Widget extension
-macos/                   Native SwiftUI macOS app and Sparkle configuration
+macos/                   macOS WebKit host, offline fallback, and Sparkle config
 scripts/                 Native install/release helpers and maintenance scripts
 docs/                    iOS/macOS app notes
 ```
@@ -152,11 +152,13 @@ Choose the `App` scheme and your signing team in Xcode, then run on a simulator 
 connected iPhone. The project also includes the `BridgeWidget` WidgetKit extension.
 See `docs/ios-app.md` for signing, offline behavior, and installation details.
 
-## Native macOS App
+## macOS App
 
-The macOS app uses the same native SwiftUI views and offline store as iOS. Press
-`Control+Option+Space` from any app to bring Bridge forward; tapping Fn/Globe is
-also retained as a convenience shortcut. Sparkle distributes native app updates.
+The macOS app renders the production Bridge website directly, so it has the same
+layout, routes, and functionality as Bridge in a browser. If the website cannot
+be reached, it switches to the shared native workspace; offline edits are queued
+and synchronized after reconnecting. Press `Control+Option+Space` from any app to
+bring Bridge forward. Sparkle distributes Mac app updates.
 
 Useful commands:
 
