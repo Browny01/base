@@ -6,8 +6,8 @@
 #   1. Bumps the app version, builds Release, zips the .app.
 #   2. Signs the zip with the Sparkle EdDSA private key (in your login keychain).
 #   3. Generates/updates appcast.xml (the update feed Sparkle reads).
-#   4. Uploads the zip + appcast.xml to the "latest" GitHub Release of the PUBLIC
-#      repo `bridge-mac-releases`, replacing the previous assets.
+#   4. Uploads the zip + appcast.xml to a versioned GitHub Release in the PUBLIC
+#      repo `bridge-mac-releases` and marks that release as latest.
 #
 # Installed copies check that feed and prompt to update. Run this whenever shared
 # native SwiftUI code, BridgeApp.swift, or native configuration changes.
@@ -25,7 +25,7 @@ MAC_DIR="$REPO_ROOT/macos"
 DD="$MAC_DIR/.build/dd"
 STAGE="$MAC_DIR/.build/release"      # holds the zip(s) + appcast.xml
 RELEASES_REPO="Browny01/bridge-mac-releases"
-TAG="latest"
+TAG="v$VERSION"
 DL_PREFIX="https://github.com/$RELEASES_REPO/releases/latest/download/"
 
 command -v xcodegen >/dev/null || { echo "❌ brew install xcodegen"; exit 1; }
@@ -59,15 +59,18 @@ ZIP="$STAGE/Bridge-$VERSION.zip"
 # Release notes as HTML alongside the zip → Sparkle shows them in the update dialog.
 printf '<h2>Bridge %s</h2>\n<p>%s</p>\n' "$VERSION" "$NOTES" > "$STAGE/Bridge-$VERSION.html"
 
-# generate_appcast reads the EdDSA private key from the keychain, signs the zip,
-# reads the version from the app inside it, and writes the feed.
-"$SPARKLE_BIN/generate_appcast" "$STAGE" --download-url-prefix "$DL_PREFIX" >/dev/null
+# Read the EdDSA key through the security CLI so headless release runs do not
+# stall waiting for Sparkle's binary to receive Keychain UI approval.
+/usr/bin/security find-generic-password \
+  -a ed25519 -s "https://sparkle-project.org" -w \
+  | "$SPARKLE_BIN/generate_appcast" "$STAGE" \
+      --ed-key-file - --download-url-prefix "$DL_PREFIX" >/dev/null
 [ -f "$STAGE/appcast.xml" ] || { echo "❌ appcast.xml not generated"; exit 1; }
 
 echo "▸ Publishing to $RELEASES_REPO ($TAG)…"
 if gh release view "$TAG" --repo "$RELEASES_REPO" >/dev/null 2>&1; then
   gh release upload "$TAG" "$ZIP" "$STAGE/appcast.xml" --repo "$RELEASES_REPO" --clobber
-  gh release edit "$TAG" --repo "$RELEASES_REPO" --title "Bridge $VERSION" --notes "$NOTES"
+  gh release edit "$TAG" --repo "$RELEASES_REPO" --title "Bridge $VERSION" --notes "$NOTES" --latest
 else
   gh release create "$TAG" "$ZIP" "$STAGE/appcast.xml" \
     --repo "$RELEASES_REPO" --title "Bridge $VERSION" --notes "$NOTES" --latest

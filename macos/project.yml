@@ -3,7 +3,8 @@
 # Regenerate the Xcode project after editing this file (or after a fresh clone):
 #   cd macos && xcodegen generate && open Bridge.xcodeproj
 #
-# The app uses shared native SwiftUI screens and an offline-first local store.
+# The app renders the full Bridge website and falls back to the shared native
+# offline workspace when the website cannot be reached.
 # Native-code changes ship via Sparkle auto-update (see scripts/release_mac.sh).
 name: Bridge
 options:
@@ -19,8 +20,8 @@ packages:
 
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "6"
+    MARKETING_VERSION: "0.2.1"
+    CURRENT_PROJECT_VERSION: "11"
     SWIFT_VERSION: "5.0"
     # Ad-hoc sign so the app has a stable identity and runs on this Mac without a
     # paid Developer ID. Sparkle secures updates with EdDSA, independent of this.
