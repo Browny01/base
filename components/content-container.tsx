@@ -8,7 +8,7 @@ export function ContentContainer({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const fullBleed = pathname === "/" || pathname === "/vision" || pathname === "/notes" || pathname === "/player" || pathname === "/chat" || pathname === "/news" || pathname === "/finance" || pathname === "/learn" || pathname === "/gym";
   return (
-    <div key={pathname} className={`nx-page-enter ${fullBleed ? "w-full h-full" : "mx-auto w-full max-w-[1180px]"}`}>
+    <div key={pathname} className={`nx-page-shell nx-page-enter ${fullBleed ? "w-full h-full" : "mx-auto w-full max-w-[1180px]"}`}>
       {children}
     </div>
   );
