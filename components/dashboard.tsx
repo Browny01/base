@@ -4,7 +4,7 @@ import { useId, useState, useEffect, useRef } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday, calcStreak } from "@/lib/utils";
 import type { Priority, Task, TaskTag } from "@/lib/store";
-import { Repeat2, Flame, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, Grip, SlidersHorizontal, RotateCcw, X, Check } from "lucide-react";
+import { Repeat2, Flame, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, Grip, SlidersHorizontal, RotateCcw, X, Check, Timer, Target, NotebookText, CreditCard, Dumbbell, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
@@ -18,7 +18,7 @@ const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
 const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
 
 type DashboardBreakpoint = "lg" | "md" | "sm" | "xs" | "xxs";
-type WidgetId = "tasks-metric" | "habits-metric" | "streak-metric" | "revenue-metric" | "news" | "tasks" | "habits" | "projects";
+type WidgetId = "tasks-metric" | "habits-metric" | "streak-metric" | "revenue-metric" | "news" | "tasks" | "habits" | "projects" | "focus" | "goals" | "notes" | "payments" | "workout" | "learning";
 
 const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "tasks-metric", label: "Tasks left" },
@@ -29,7 +29,15 @@ const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "tasks", label: "Today's tasks" },
   { id: "habits", label: "Today's habits" },
   { id: "projects", label: "Projects" },
+  { id: "focus", label: "Focus today" },
+  { id: "goals", label: "Active goals" },
+  { id: "notes", label: "Recent notes" },
+  { id: "payments", label: "Upcoming payments" },
+  { id: "workout", label: "Latest workout" },
+  { id: "learning", label: "Learning progress" },
 ];
+
+const DEFAULT_WIDGET_IDS: WidgetId[] = ["tasks-metric", "habits-metric", "streak-metric", "revenue-metric", "news", "tasks", "habits", "projects"];
 
 const BREAKPOINTS: Record<DashboardBreakpoint, number> = { lg: 1180, md: 900, sm: 680, xs: 420, xxs: 0 };
 const GRID_COLUMNS: Record<DashboardBreakpoint, number> = { lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 };
@@ -45,6 +53,12 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
     { i: "tasks", x: 0, y: 10, w: 6, h: 11, minW: 3, minH: 6 },
     { i: "habits", x: 6, y: 10, w: 6, h: 11, minW: 3, minH: 6 },
     { i: "projects", x: 0, y: 21, w: 12, h: 9, minW: 4, minH: 6 },
+    { i: "focus", x: 0, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "goals", x: 4, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "notes", x: 8, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "payments", x: 0, y: 38, w: 6, h: 8, minW: 3, minH: 6 },
+    { i: "workout", x: 6, y: 38, w: 6, h: 8, minW: 3, minH: 6 },
+    { i: "learning", x: 0, y: 46, w: 12, h: 8, minW: 4, minH: 6 },
   ],
   md: [
     { i: "tasks-metric", x: 0, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
@@ -55,6 +69,12 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
     { i: "tasks", x: 0, y: 10, w: 4, h: 11, minW: 3, minH: 6 },
     { i: "habits", x: 4, y: 10, w: 4, h: 11, minW: 3, minH: 6 },
     { i: "projects", x: 0, y: 21, w: 8, h: 9, minW: 4, minH: 6 },
+    { i: "focus", x: 0, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "goals", x: 4, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "notes", x: 0, y: 38, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "payments", x: 4, y: 38, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "workout", x: 0, y: 46, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "learning", x: 4, y: 46, w: 4, h: 8, minW: 3, minH: 6 },
   ],
   sm: [], xs: [], xxs: [],
 };
@@ -63,21 +83,19 @@ function stackedLayout(cols: number): Layout {
   const metricWidth = cols >= 4 ? Math.floor(cols / 2) : cols;
   const metricsPerRow = Math.max(1, Math.floor(cols / metricWidth));
   const contentStart = Math.ceil(4 / metricsPerRow) * 4;
-  const contentY: Partial<Record<WidgetId, number>> = {
-    news: contentStart,
-    tasks: contentStart + 6,
-    habits: contentStart + 17,
-    projects: contentStart + 28,
-  };
+  let contentY = contentStart;
   return WIDGETS.map(({ id }, index) => {
     const isMetric = id.endsWith("metric");
     const metricIndex = WIDGETS.slice(0, index).filter((widget) => widget.id.endsWith("metric")).length;
+    const height = isMetric ? 4 : id === "news" ? 6 : id === "tasks" || id === "habits" ? 11 : id === "projects" ? 10 : 8;
+    const y = isMetric ? Math.floor(metricIndex / metricsPerRow) * 4 : contentY;
+    if (!isMetric) contentY += height;
     return {
       i: id,
       x: isMetric ? (metricIndex % metricsPerRow) * metricWidth : 0,
-      y: isMetric ? Math.floor(metricIndex / metricsPerRow) * 4 : contentY[id] ?? contentStart,
+      y,
       w: isMetric ? metricWidth : cols,
-      h: isMetric ? 4 : id === "news" ? 6 : id === "projects" ? 10 : 11,
+      h: height,
       minW: isMetric ? Math.min(2, cols) : Math.min(3, cols),
       minH: isMetric ? 4 : 6,
     };
@@ -121,7 +139,7 @@ export function Dashboard() {
   const [showQuickForm, setShowQuickForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [layouts, setLayouts] = useState<ResponsiveLayouts<DashboardBreakpoint>>(DEFAULT_LAYOUTS);
-  const [visibleWidgets, setVisibleWidgets] = useState<WidgetId[]>(WIDGETS.map((widget) => widget.id));
+  const [visibleWidgets, setVisibleWidgets] = useState<WidgetId[]>(DEFAULT_WIDGET_IDS);
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const layoutLoaded = useRef(false);
   const { width: gridWidth, containerRef: gridContainerRef, mounted: gridMounted } = useContainerWidth({ measureBeforeMount: true });
@@ -189,7 +207,7 @@ export function Dashboard() {
   }
 
   function resetDashboard() {
-    const nextVisible = WIDGETS.map((widget) => widget.id);
+    const nextVisible = DEFAULT_WIDGET_IDS;
     setLayouts(DEFAULT_LAYOUTS);
     setVisibleWidgets(nextVisible);
     persistDashboard(DEFAULT_LAYOUTS, nextVisible);
@@ -244,6 +262,13 @@ export function Dashboard() {
 
   const greetText = greeting(now);
   const overviewProjects = data.projects.filter((p) => !p.archived);
+  const todayFocusSessions = data.focusSessions.filter((session) => session.date === today);
+  const todayFocusMinutes = todayFocusSessions.reduce((sum, session) => sum + session.durationMins, 0);
+  const activeGoals = data.goals.filter((goal) => !goal.done);
+  const recentNotes = (data.wikiPages ?? []).filter((page) => !page.deletedAt).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const upcomingPayments = data.subscriptions.filter((subscription) => subscription.active).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const latestWorkout = [...data.workouts].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const readyCourses = data.courses.filter((course) => course.status === "ready");
 
   function renderWidget(id: WidgetId) {
     switch (id) {
@@ -348,6 +373,55 @@ export function Dashboard() {
             </div>
           </section>
         );
+      case "focus":
+        return (
+          <WidgetPanel title="Focus today" icon={<Timer className="w-[15px] h-[15px]" />} href="/focus">
+            <div className="flex items-end gap-2 mb-4"><span className="text-3xl font-bold text-[var(--text)] tabular leading-none">{todayFocusMinutes}</span><span className="text-xs font-medium text-[var(--faint)] pb-0.5">minutes</span></div>
+            {todayFocusSessions.length === 0 ? <WidgetEmpty>No focus sessions logged today.</WidgetEmpty> : (
+              <div className="space-y-2">{todayFocusSessions.slice(-5).reverse().map((session) => <div key={session.id} className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs"><span className="text-[var(--muted)] truncate pr-3">{session.notes || session.tag}</span><span className="font-semibold text-[var(--text)] tabular shrink-0">{session.durationMins}m</span></div>)}</div>
+            )}
+          </WidgetPanel>
+        );
+      case "goals":
+        return (
+          <WidgetPanel title="Active goals" icon={<Target className="w-[15px] h-[15px]" />} href="/player">
+            {activeGoals.length === 0 ? <WidgetEmpty>No open goals right now.</WidgetEmpty> : (
+              <div className="space-y-1">{activeGoals.slice(0, 7).map((goal) => <button key={goal.id} onClick={() => mutate((current) => ({ ...current, goals: current.goals.map((item) => item.id === goal.id ? { ...item, done: true } : item) }))} className="w-full flex items-start gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-[var(--surface-2)]"><span className="mt-0.5 w-4 h-4 rounded-full border border-[var(--border-2)] shrink-0" /><span className="flex-1 min-w-0 text-[13px] text-[var(--text)] leading-snug">{goal.text}</span><span className="text-[10px] uppercase tracking-wide text-[var(--faint)] shrink-0 mt-0.5">{goal.period}</span></button>)}</div>
+            )}
+          </WidgetPanel>
+        );
+      case "notes":
+        return (
+          <WidgetPanel title="Recent notes" icon={<NotebookText className="w-[15px] h-[15px]" />} href="/notes">
+            {recentNotes.length === 0 ? <WidgetEmpty>Your recently edited notes will appear here.</WidgetEmpty> : (
+              <div className="space-y-1">{recentNotes.slice(0, 7).map((page) => <Link key={page.id} href="/notes" onClick={() => localStorage.setItem("bridge_wiki_active", page.id)} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><span className="text-base shrink-0">{page.icon || "📄"}</span><span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text)] truncate">{page.title || "Untitled"}</span><span className="text-[10.5px] text-[var(--faint)] shrink-0">{new Date(page.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></Link>)}</div>
+            )}
+          </WidgetPanel>
+        );
+      case "payments":
+        return (
+          <WidgetPanel title="Upcoming payments" icon={<CreditCard className="w-[15px] h-[15px]" />} href="/money">
+            {upcomingPayments.length === 0 ? <WidgetEmpty>No active subscriptions.</WidgetEmpty> : (
+              <div className="space-y-1">{upcomingPayments.slice(0, 7).map((payment) => <div key={payment.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex items-center justify-center text-[var(--muted)] shrink-0"><CreditCard className="w-3.5 h-3.5" /></div><div className="flex-1 min-w-0"><p className="text-[13px] font-medium text-[var(--text)] truncate">{payment.name}</p><p className="text-[10.5px] text-[var(--faint)]">Due {new Date(`${payment.dueDate}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p></div><span className="text-xs font-semibold text-[var(--text)] tabular shrink-0">{formatCurrency(payment.amount)}</span></div>)}</div>
+            )}
+          </WidgetPanel>
+        );
+      case "workout":
+        return (
+          <WidgetPanel title="Latest workout" icon={<Dumbbell className="w-[15px] h-[15px]" />} href="/gym">
+            {!latestWorkout ? <WidgetEmpty>Your latest workout will appear here.</WidgetEmpty> : (
+              <div><div className="mb-4"><p className="text-xl font-bold text-[var(--text)]">{latestWorkout.name}</p><p className="text-[11.5px] text-[var(--faint)] mt-1">{new Date(`${latestWorkout.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}{latestWorkout.durationMins ? ` · ${latestWorkout.durationMins} min` : ""}</p></div><div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-[var(--surface-2)] p-3"><p className="text-lg font-bold text-[var(--text)] tabular">{latestWorkout.exercises.length}</p><p className="text-[10.5px] text-[var(--faint)]">Exercises</p></div><div className="rounded-lg bg-[var(--surface-2)] p-3"><p className="text-lg font-bold text-[var(--text)] tabular">{latestWorkout.exercises.reduce((sum, exercise) => sum + exercise.sets.filter((set) => set.done).length, 0)}</p><p className="text-[10.5px] text-[var(--faint)]">Sets completed</p></div></div></div>
+            )}
+          </WidgetPanel>
+        );
+      case "learning":
+        return (
+          <WidgetPanel title="Learning progress" icon={<GraduationCap className="w-[15px] h-[15px]" />} href="/learn">
+            {readyCourses.length === 0 ? <WidgetEmpty>Start a course to track learning progress here.</WidgetEmpty> : (
+              <div className="space-y-3">{readyCourses.slice(0, 5).map((course) => { const lessons = course.modules.flatMap((module) => module.lessons); const completed = lessons.filter((lesson) => lesson.done).length; const percent = lessons.length ? Math.round((completed / lessons.length) * 100) : 0; return <Link key={course.id} href="/learn" className="block rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><div className="flex items-center justify-between gap-3 mb-2"><span className="text-[13px] font-medium text-[var(--text)] truncate">{course.topic}</span><span className="text-[10.5px] text-[var(--faint)] tabular shrink-0">{completed}/{lessons.length}</span></div><div className="h-1.5 rounded-full bg-[var(--chip)] overflow-hidden"><div className="h-full rounded-full bg-[var(--text)]" style={{ width: `${percent}%` }} /></div></Link>; })}</div>
+            )}
+          </WidgetPanel>
+        );
     }
   }
 
@@ -407,13 +481,14 @@ export function Dashboard() {
             })}
           </Responsive>
         )}
+        {editing && <div className="dashboard-edit-runway" aria-hidden="true"><span>Keep resizing — the canvas extends with you</span></div>}
       </div>
 
-      <div className="relative mt-8 mb-4 flex justify-center">
+      <div className={cn("dashboard-editor-toolbar relative mt-8 mb-4 flex justify-center", editing && "is-editing")}>
         {editing && showWidgetPicker && (
-          <div className="absolute bottom-full mb-3 w-[min(440px,calc(100vw-2rem))] elevated card p-4 nx-pop z-40">
+          <div className="absolute bottom-full mb-3 w-[min(440px,calc(100vw-2rem))] max-h-[min(70vh,560px)] overflow-y-auto elevated card p-4 nx-pop z-40">
             <div className="flex items-center justify-between mb-3">
-              <div><p className="text-sm font-semibold text-[var(--text)]">Widget library</p><p className="text-[11.5px] text-[var(--faint)] mt-0.5">Add anything you removed back to the canvas.</p></div>
+              <div><p className="text-sm font-semibold text-[var(--text)]">Widget library</p><p className="text-[11.5px] text-[var(--faint)] mt-0.5">Build the dashboard around what matters today.</p></div>
               <button onClick={() => setShowWidgetPicker(false)} className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]"><X className="w-4 h-4" /></button>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -445,6 +520,22 @@ function SectionTitle({ icon, children }: { icon: React.ReactNode; children: Rea
       {children}
     </h2>
   );
+}
+
+function WidgetPanel({ title, icon, href, children }: { title: string; icon: React.ReactNode; href: string; children: React.ReactNode }) {
+  return (
+    <section className="card h-full p-5 overflow-auto">
+      <div className="flex items-center justify-between mb-4">
+        <SectionTitle icon={icon}>{title}</SectionTitle>
+        <Link href={href} className="text-xs text-[var(--faint)] hover:text-[var(--text)] transition-colors font-medium inline-flex items-center gap-1">Open <ArrowRight className="w-3 h-3" /></Link>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function WidgetEmpty({ children }: { children: React.ReactNode }) {
+  return <div className="h-[calc(100%-2rem)] min-h-20 flex items-center justify-center rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 text-center text-xs text-[var(--faint)]">{children}</div>;
 }
 
 function PriorityBadge({ priority }: { priority: Priority }) {
