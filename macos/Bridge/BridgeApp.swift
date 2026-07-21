@@ -101,8 +101,12 @@ struct WindowConfigurator: NSViewRepresentable {
         let view = NSView()
         DispatchQueue.main.async {
             guard let window = view.window else { return }
+            window.styleMask.insert(.fullSizeContentView)
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
+            window.titlebarSeparatorStyle = .none
+            window.toolbar = nil
+            window.isMovableByWindowBackground = true
             window.backgroundColor = NSColor(red: 0.039, green: 0.039, blue: 0.043, alpha: 1)
         }
         return view
