@@ -31,8 +31,16 @@ DL_PREFIX="https://github.com/$RELEASES_REPO/releases/latest/download/"
 command -v xcodegen >/dev/null || { echo "❌ brew install xcodegen"; exit 1; }
 command -v gh >/dev/null || { echo "❌ gh CLI not found"; exit 1; }
 
-# CFBundleVersion must be a monotonically increasing build number; commit count is.
-BUILD="$(git -C "$REPO_ROOT" rev-list --count HEAD)"
+# CFBundleVersion must be monotonically increasing. Worktrees can have a shorter
+# first-parent history than the previously published build, so never rely on the
+# commit count alone.
+COMMIT_BUILD="$(git -C "$REPO_ROOT" rev-list --count HEAD)"
+CURRENT_BUILD="$(/usr/bin/awk -F'"' '/CURRENT_PROJECT_VERSION:/ { print $2; exit }' "$MAC_DIR/project.yml")"
+if [ "$COMMIT_BUILD" -gt "$CURRENT_BUILD" ]; then
+  BUILD="$COMMIT_BUILD"
+else
+  BUILD="$((CURRENT_BUILD + 1))"
+fi
 
 echo "▸ Bumping to $VERSION (build $BUILD)…"
 /usr/bin/sed -i '' -E "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"$VERSION\"/" "$MAC_DIR/project.yml"
