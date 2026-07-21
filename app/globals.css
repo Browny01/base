@@ -154,6 +154,90 @@ html.dark .card { box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
 .card-hover { transition: border-color .18s ease, background-color .18s ease, transform .18s ease; }
 .card-hover:hover { border-color: var(--border-2); }
 
+/* ── dashboard canvas ─────────────────────────────────────────────────── */
+.dashboard-grid .react-grid-layout { transition: height .2s ease; }
+.dashboard-widget { overflow: visible; }
+.dashboard-widget-content { width: 100%; height: 100%; transition: opacity .16s ease, filter .16s ease; }
+.dashboard-grid.is-editing .dashboard-widget-content {
+  pointer-events: none;
+  user-select: none;
+  opacity: .78;
+  filter: saturate(.8);
+}
+.dashboard-grid.is-editing .dashboard-widget::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px dashed color-mix(in srgb, var(--text) 32%, transparent);
+  border-radius: calc(var(--radius-lg) + 3px);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bg) 78%, transparent);
+}
+.dashboard-widget-controls {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.dashboard-drag-handle,
+.dashboard-remove-widget {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--text) 13%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--muted);
+  box-shadow: 0 4px 14px rgba(0,0,0,.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.dashboard-drag-handle {
+  gap: 6px;
+  max-width: calc(100% - 38px);
+  padding: 0 10px;
+  border-radius: 999px;
+  cursor: grab;
+  font-size: 10.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dashboard-drag-handle span { overflow: hidden; text-overflow: ellipsis; }
+.dashboard-drag-handle:active { cursor: grabbing; }
+.dashboard-remove-widget { width: 28px; border-radius: 50%; }
+.dashboard-remove-widget:hover { color: var(--c-rose); border-color: color-mix(in srgb, var(--c-rose) 45%, transparent); }
+.dashboard-grid .react-grid-item.react-grid-placeholder {
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--text) 38%, transparent);
+  opacity: 1;
+}
+.dashboard-grid .react-resizable-handle { z-index: 10; opacity: 0; }
+.dashboard-grid.is-editing .react-resizable-handle { opacity: 1; }
+.dashboard-grid .react-resizable-handle::after {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+}
+.dashboard-grid .react-resizable-handle-n,
+.dashboard-grid .react-resizable-handle-s { left: 18px; right: 18px; width: auto; margin: 0; }
+.dashboard-grid .react-resizable-handle-e,
+.dashboard-grid .react-resizable-handle-w { top: 18px; bottom: 18px; height: auto; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-grid .react-grid-item,
+  .dashboard-grid .react-grid-layout { transition: none !important; }
+}
+
 /* elevated overlay (command palette, modals) — soft, monochrome */
 .elevated {
   box-shadow:

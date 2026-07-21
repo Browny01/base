@@ -102,29 +102,19 @@ export function Sidebar() {
         collapsed ? "w-[64px]" : "w-[252px]"
       )}
     >
-      {/* Brand */}
+      {/* On macOS this clear header is occupied by the native traffic lights. */}
       <div className={cn(
         "flex items-center h-14 shrink-0",
-        collapsed ? "justify-center" : "px-4 gap-2.5"
+        collapsed ? "justify-center" : "px-3"
       )}>
-        <img
-          src="/bridge-mark.png"
-          alt="Bridge"
-          className="w-[26px] h-[26px] object-contain shrink-0"
-        />
         {!collapsed && (
-          <>
-            <span className="text-[15px] font-semibold text-[var(--text)] tracking-tight">
-              Bridge
-            </span>
-            <button
-              onClick={toggle}
-              className="ml-auto p-1.5 -mr-1 rounded-md text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
-              title="Collapse sidebar"
-            >
-              <ChevronsLeft className="w-4 h-4" />
-            </button>
-          </>
+          <button
+            onClick={toggle}
+            className="ml-auto p-1.5 rounded-md text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
+            title="Collapse sidebar"
+          >
+            <ChevronsLeft className="w-4 h-4" />
+          </button>
         )}
       </div>
 
