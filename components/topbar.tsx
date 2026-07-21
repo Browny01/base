@@ -10,17 +10,6 @@ export function TopBar() {
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <div className="h-14 flex items-center gap-3 px-3 sm:px-4">
-        {/* Brand mark — mobile always; desktop only in dock mode (sidebar carries it otherwise) */}
-        <Link href="/" className="flex md:hidden items-center gap-2 shrink-0">
-          <img src="/bridge-mark.png" alt="Bridge" className="w-[26px] h-[26px] object-contain" />
-        </Link>
-        <Link href="/" className="nx-desktop-dock shrink-0">
-          <span className="flex items-center gap-2">
-            <img src="/bridge-mark.png" alt="Bridge" className="w-[26px] h-[26px] object-contain" />
-            <span className="text-[15px] font-semibold text-[var(--text)] tracking-tight">Bridge</span>
-          </span>
-        </Link>
-
         {/* Centered command / search trigger */}
         <div className="flex-1 flex justify-center">
           <CommandBar />
