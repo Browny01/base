@@ -15,6 +15,8 @@
 		A10000000000000000000011 /* BridgeData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* BridgeData.swift */; };
 		A10000000000000000000012 /* BridgeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* BridgeStore.swift */; };
 		A10000000000000000000013 /* BridgeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* BridgeViews.swift */; };
+		A10000000000000000000014 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* libsqlite3.tbd */; };
+		A10000000000000000000015 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* Security.framework */; };
 		EA841DB8E09EF713CF51FBB6 /* BridgeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 93797444408492BB94C7A2E3 /* BridgeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -55,6 +57,8 @@
 		A10000000000000000000001 /* BridgeData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeData.swift; sourceTree = "<group>"; };
 		A10000000000000000000002 /* BridgeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeStore.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* BridgeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeViews.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.text-based-dylib-definition; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		A10000000000000000000005 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +66,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000014 /* libsqlite3.tbd in Frameworks */,
+				A10000000000000000000015 /* Security.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -128,6 +134,8 @@
 			isa = PBXGroup;
 			children = (
 				74AF4CCE00CE3575EF9F6285 /* Foundation.framework */,
+				A10000000000000000000004 /* libsqlite3.tbd */,
+				A10000000000000000000005 /* Security.framework */,
 			);
 			name = iOS;
 			sourceTree = "<group>";

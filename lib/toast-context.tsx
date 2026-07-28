@@ -1,16 +1,20 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 interface ToastAction { label: string; onClick: () => void }
 interface Toast { id: string; message: string; action?: ToastAction; }
 
 const Ctx = createContext<{ toast: (message: string, opts?: { action?: ToastAction; duration?: number }) => void }>({ toast: () => {} });
+const subscribeHydration = () => () => {};
+const clientHydrated = () => true;
+const serverHydrated = () => false;
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const hydrated = useSyncExternalStore(subscribeHydration, clientHydrated, serverHydrated);
 
   const dismiss = useCallback((id: string) => {
     setToasts((t) => t.filter((x) => x.id !== id));
@@ -27,7 +31,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{ toast }}>
       {children}
-      {typeof document !== "undefined" && createPortal(
+      {hydrated && createPortal(
         <div className="fixed inset-x-0 z-[120] flex flex-col items-center gap-2 px-4 pointer-events-none bottom-24 md:bottom-6">
           {toasts.map((t) => (
             <div key={t.id} className="pointer-events-auto flex items-center gap-3 max-w-[92vw] rounded-xl border border-[var(--border)] bg-[var(--surface)] elevated px-3.5 py-2.5 nx-slide-up">

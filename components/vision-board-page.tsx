@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useReducer, type ReactNode } from "react";
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useBridge } from "@/lib/hooks";
 import { getData } from "@/lib/store";
 import { uid, cn } from "@/lib/utils";
-import type { BoardItem, BoardDrawing, NoteColor, DrawTool, BridgeData } from "@/lib/store";
+import type { BoardItem, BoardDrawing, NoteColor, DrawTool, BridgeData, WikiPage } from "@/lib/store";
 import {
   ImagePlus, StickyNote, Trash2, Pencil, Check, Sparkles, ChevronDown,
   Plus, X, Brush, MousePointer2, Pen, Minus, ArrowUpRight, Square, Circle, Eraser,
-  Undo2, Redo2, Music,
+  Undo2, Redo2, Music, ZoomIn, ZoomOut, LocateFixed, Link2, FileText, Search,
 } from "lucide-react";
 
 // Slice of state the Vision Board undo/redo history snapshots.
 type BoardSnap = Pick<BridgeData, "boards" | "boardItems" | "boardDrawings">;
 
-// Canvas dimensions — a generous 2D space you can scroll around like a corkboard.
-const CANVAS_W = 2600;
-const CANVAS_H = 1800;
+// The board uses world coordinates and a camera transform instead of a finite
+// scroll container, so items can live at any positive or negative position.
+const MIN_ZOOM = 0.05;
+const MAX_ZOOM = 8;
+const GRID_SIZE = 22;
 
 type Tool = "select" | DrawTool | "eraser";
 
@@ -51,7 +54,9 @@ function fileToImage(file: File): Promise<{ blob: Blob | null; dataUrl: string; 
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const MAX = 1100;
+        // Keep enough source detail for deep zooming after an item has been made
+        // very small on the board.
+        const MAX = 2400;
         const scale = Math.min(1, MAX / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
@@ -61,8 +66,8 @@ function fileToImage(file: File): Promise<{ blob: Blob | null; dataUrl: string; 
         const ctx = canvas.getContext("2d");
         if (!ctx) return reject(new Error("no ctx"));
         ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-        canvas.toBlob((blob) => resolve({ blob, dataUrl, w, h }), "image/jpeg", 0.82);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        canvas.toBlob((blob) => resolve({ blob, dataUrl, w, h }), "image/jpeg", 0.92);
       };
       img.onerror = reject;
       img.src = reader.result as string;
@@ -106,14 +111,27 @@ type DragState = {
   id: string; mode: "move" | "resize";
   startX: number; startY: number;
   origX: number; origY: number; origW: number; origH: number;
+  zoom: number;
   moved: boolean;
+};
+
+type Camera = { x: number; y: number; zoom: number };
+
+type PanState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  origX: number;
+  origY: number;
 };
 
 export function VisionBoardPage() {
   const { data, mutate } = useBridge();
+  const router = useRouter();
   const boards = data.boards ?? [];
+  const notePages = (data.wikiPages ?? []).filter((page) => !page.deletedAt);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -144,6 +162,12 @@ export function VisionBoardPage() {
   const [tool, setTool] = useState<Tool>("select");
   const [drawColor, setDrawColor] = useState(DRAW_COLORS[0]);
   const [drawWidth, setDrawWidth] = useState(4);
+  const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, zoom: 1 });
+  const cameraRef = useRef<Camera>(camera);
+  const panRef = useRef<PanState | null>(null);
+  const spaceDownRef = useRef(false);
+  const [panning, setPanning] = useState(false);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<BoardItem | null>(null); // live item position/size
@@ -156,7 +180,7 @@ export function VisionBoardPage() {
 
   // Selecting / moving an existing drawing (works across sessions, unlike undo).
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
-  const drawDragRef = useRef<{ id: string; startX: number; startY: number; moved: boolean } | null>(null);
+  const drawDragRef = useRef<{ id: string; startX: number; startY: number; zoom: number; moved: boolean } | null>(null);
   const [drawOffset, setDrawOffset] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const drawOffsetRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
   useEffect(() => { drawOffsetRef.current = drawOffset; }, [drawOffset]);
@@ -164,7 +188,7 @@ export function VisionBoardPage() {
   // ── Undo / redo history ──────────────────────────────────────────────────────
   const past = useRef<BoardSnap[]>([]);
   const future = useRef<BoardSnap[]>([]);
-  const [, forceHist] = useReducer((n: number) => n + 1, 0); // re-render for button enabled state
+  const [historyCounts, setHistoryCounts] = useState({ past: 0, future: 0 });
 
   const snapshot = useCallback((): BoardSnap => {
     const d = getData();
@@ -176,7 +200,7 @@ export function VisionBoardPage() {
     past.current.push(snapshot());
     if (past.current.length > 80) past.current.shift();
     future.current = [];
-    forceHist();
+    setHistoryCounts({ past: past.current.length, future: 0 });
     mutate(updater);
   }, [mutate, snapshot]);
 
@@ -184,7 +208,7 @@ export function VisionBoardPage() {
     if (!past.current.length) return;
     const prev = past.current.pop()!;
     future.current.push(snapshot());
-    forceHist();
+    setHistoryCounts({ past: past.current.length, future: future.current.length });
     mutate((d) => ({ ...d, ...prev }));
   }, [mutate, snapshot]);
 
@@ -192,24 +216,173 @@ export function VisionBoardPage() {
     if (!future.current.length) return;
     const next = future.current.pop()!;
     past.current.push(snapshot());
-    forceHist();
+    setHistoryCounts({ past: past.current.length, future: future.current.length });
     mutate((d) => ({ ...d, ...next }));
   }, [mutate, snapshot]);
 
-  const canUndo = past.current.length > 0;
-  const canRedo = future.current.length > 0;
+  const canUndo = historyCounts.past > 0;
+  const canRedo = historyCounts.future > 0;
 
   const items = (data.boardItems ?? []).filter((it) => it.boardId === activeId);
   const drawings = (data.boardDrawings ?? []).filter((d) => d.boardId === activeId);
   const maxZ = items.reduce((m, it) => Math.max(m, it.z), 0);
 
-  // Escape resets to the select tool and closes menus.
+  const applyCamera = useCallback((next: Camera | ((current: Camera) => Camera)) => {
+    const value = typeof next === "function" ? next(cameraRef.current) : next;
+    const safe = { ...value, zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value.zoom)) };
+    cameraRef.current = safe;
+    setCamera(safe);
+    if (activeId) {
+      try { localStorage.setItem(`bridge_vision_camera_${activeId}`, JSON.stringify(safe)); } catch {}
+    }
+  }, [activeId]);
+
+  // Each board remembers its own camera so content placed at negative or very
+  // distant coordinates is never lost when switching boards or reloading.
   useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setTool("select"); setDrawMenuOpen(false); setBoardMenuOpen(false); }
+    let next: Camera = { x: 0, y: 0, zoom: 1 };
+    try {
+      const raw = localStorage.getItem(`bridge_vision_camera_${activeId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<Camera>;
+        if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y) && Number.isFinite(parsed.zoom)) {
+          next = {
+            x: parsed.x as number,
+            y: parsed.y as number,
+            zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, parsed.zoom as number)),
+          };
+        }
+      }
+    } catch {}
+    cameraRef.current = next;
+    const frame = requestAnimationFrame(() => {
+      setCamera(next);
+      setEditingId(null);
+      setSelectedDrawingId(null);
+      setLinkingId(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeId]);
+
+  const zoomAt = useCallback((nextZoom: number, screenX: number, screenY: number) => {
+    applyCamera((current) => {
+      const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+      const worldX = (screenX - current.x) / current.zoom;
+      const worldY = (screenY - current.y) / current.zoom;
+      return {
+        x: screenX - worldX * zoom,
+        y: screenY - worldY * zoom,
+        zoom,
+      };
+    });
+  }, [applyCamera]);
+
+  const zoomBy = useCallback((factor: number) => {
+    const el = viewportRef.current;
+    if (!el) return;
+    zoomAt(cameraRef.current.zoom * factor, el.clientWidth / 2, el.clientHeight / 2);
+  }, [zoomAt]);
+
+  const fitBoard = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const boxes = [
+      ...items.map((item) => ({ x: item.x, y: item.y, w: item.width, h: item.height })),
+      ...drawings.map(drawingBBox),
+    ];
+    if (!boxes.length) {
+      applyCamera({ x: 0, y: 0, zoom: 1 });
+      return;
+    }
+    const minX = Math.min(...boxes.map((box) => box.x));
+    const minY = Math.min(...boxes.map((box) => box.y));
+    const maxX = Math.max(...boxes.map((box) => box.x + Math.max(box.w, 1)));
+    const maxY = Math.max(...boxes.map((box) => box.y + Math.max(box.h, 1)));
+    const padding = 96;
+    const zoom = Math.max(
+      MIN_ZOOM,
+      Math.min(MAX_ZOOM, Math.min((el.clientWidth - padding * 2) / Math.max(maxX - minX, 1), (el.clientHeight - padding * 2) / Math.max(maxY - minY, 1))),
+    );
+    applyCamera({
+      x: (el.clientWidth - (maxX - minX) * zoom) / 2 - minX * zoom,
+      y: (el.clientHeight - (maxY - minY) * zoom) / 2 - minY * zoom,
+      zoom,
+    });
+  }, [applyCamera, drawings, items]);
+
+  function startPan(e: React.PointerEvent) {
+    if (tool !== "select" || (e.button !== 0 && e.button !== 1)) return;
+    e.preventDefault();
+    panRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: cameraRef.current.x,
+      origY: cameraRef.current.y,
     };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    setPanning(true);
+    viewportRef.current?.setPointerCapture(e.pointerId);
+  }
+
+  function movePan(e: React.PointerEvent) {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== e.pointerId) return;
+    applyCamera({
+      ...cameraRef.current,
+      x: pan.origX + e.clientX - pan.startX,
+      y: pan.origY + e.clientY - pan.startY,
+    });
+  }
+
+  function endPan(e: React.PointerEvent) {
+    if (panRef.current?.pointerId !== e.pointerId) return;
+    panRef.current = null;
+    setPanning(false);
+    viewportRef.current?.releasePointerCapture(e.pointerId);
+  }
+
+  // Two-finger scrolling pans; pinch / Ctrl-scroll zooms around the cursor.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      if (e.ctrlKey || e.metaKey) {
+        zoomAt(cameraRef.current.zoom * Math.exp(-e.deltaY * 0.0025), e.clientX - rect.left, e.clientY - rect.top);
+      } else {
+        applyCamera((current) => ({ ...current, x: current.x - e.deltaX, y: current.y - e.deltaY }));
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [applyCamera, zoomAt]);
+
+  // Escape resets to the select tool and closes menus. Holding Space lets the
+  // cursor pan from anywhere, including over an item.
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setTool("select");
+        setDrawMenuOpen(false);
+        setBoardMenuOpen(false);
+        setLinkingId(null);
+      }
+      if (e.code === "Space") {
+        const target = e.target as HTMLElement | null;
+        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+        spaceDownRef.current = true;
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDownRef.current = false;
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
   }, []);
 
   // ⌘Z / ⌘⇧Z (and Ctrl+Y) undo/redo — ignored while editing text.
@@ -256,12 +429,13 @@ export function VisionBoardPage() {
 
   // ── Item helpers ───────────────────────────────────────────────────────────
   const dropPoint = useCallback(() => {
-    const el = scrollRef.current;
+    const el = viewportRef.current;
     if (!el) return { x: 200, y: 160 };
     const jitter = () => Math.round((Math.random() - 0.5) * 80);
+    const view = cameraRef.current;
     return {
-      x: Math.min(CANVAS_W - 280, el.scrollLeft + el.clientWidth / 2 - 120 + jitter()),
-      y: Math.min(CANVAS_H - 220, el.scrollTop + el.clientHeight / 2 - 90 + jitter()),
+      x: (el.clientWidth / 2 - view.x) / view.zoom - 120 + jitter(),
+      y: (el.clientHeight / 2 - view.y) / view.zoom - 90 + jitter(),
     };
   }, []);
 
@@ -288,6 +462,22 @@ export function VisionBoardPage() {
     };
     commit((d) => ({ ...d, boardItems: [...(d.boardItems ?? []), note] }));
     setEditingId(note.id);
+  }
+  function addLink() {
+    if (!activeId) return;
+    const { x, y } = dropPoint();
+    const link: BoardItem = {
+      id: uid(), boardId: activeId, type: "link", x, y, width: 184, height: 48,
+      z: maxZ + 1, rotation: 0, text: "Open page", linkLabel: "Open page",
+      createdAt: new Date().toISOString(),
+    };
+    commit((d) => ({ ...d, boardItems: [...(d.boardItems ?? []), link] }));
+    setLinkingId(link.id);
+  }
+  function openPage(pageId: string) {
+    try { localStorage.setItem("bridge_wiki_active", pageId); } catch {}
+    window.dispatchEvent(new CustomEvent("bridge:open-wiki", { detail: pageId }));
+    router.push("/notes");
   }
   async function onFiles(files: FileList | null) {
     if (!files || !files.length || !activeId) return;
@@ -333,11 +523,18 @@ export function VisionBoardPage() {
   // ── Item dragging / resizing ───────────────────────────────────────────────
   function startDrag(e: React.PointerEvent, item: BoardItem, mode: "move" | "resize") {
     if (tool !== "select" || editingId === item.id) return;
+    if (spaceDownRef.current || e.button === 1) {
+      e.stopPropagation();
+      startPan(e);
+      return;
+    }
+    if (e.button !== 0) return;
     e.stopPropagation();
     if (item.z < maxZ) bumpToFront(item.id, maxZ + 1);
     dragRef.current = {
       id: item.id, mode, startX: e.clientX, startY: e.clientY,
-      origX: item.x, origY: item.y, origW: item.width, origH: item.height, moved: false,
+      origX: item.x, origY: item.y, origW: item.width, origH: item.height,
+      zoom: cameraRef.current.zoom, moved: false,
     };
     setDraft({ ...item, z: maxZ + 1 });
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -347,21 +544,23 @@ export function VisionBoardPage() {
     function onMove(e: PointerEvent) {
       const d = dragRef.current;
       if (!d) return;
-      const dx = e.clientX - d.startX;
-      const dy = e.clientY - d.startY;
+      const dx = (e.clientX - d.startX) / d.zoom;
+      const dy = (e.clientY - d.startY) / d.zoom;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) d.moved = true;
       setDraft((prev) => {
         if (!prev || prev.id !== d.id) return prev;
         if (d.mode === "move") {
-          return {
-            ...prev,
-            x: Math.max(0, Math.min(CANVAS_W - prev.width, d.origX + dx)),
-            y: Math.max(0, Math.min(CANVAS_H - prev.height, d.origY + dy)),
-          };
+          return { ...prev, x: d.origX + dx, y: d.origY + dy };
         }
         const ratio = d.origH / d.origW;
-        const w = Math.max(120, Math.min(640, d.origW + dx));
-        return { ...prev, width: w, height: prev.type === "photo" ? Math.round(w * ratio) : Math.max(prev.type === "music" ? 96 : 120, d.origH + dy) };
+        const minW = prev.type === "photo" ? 16 : prev.type === "link" ? 48 : prev.type === "music" ? 72 : 32;
+        const minH = prev.type === "link" ? 24 : prev.type === "music" ? 48 : 32;
+        const w = Math.max(minW, Math.min(4000, d.origW + dx));
+        return {
+          ...prev,
+          width: w,
+          height: prev.type === "photo" ? Math.round(w * ratio) : Math.max(minH, Math.min(4000, d.origH + dy)),
+        };
       });
     }
     function onUp() {
@@ -386,8 +585,12 @@ export function VisionBoardPage() {
 
   // ── Drawing ────────────────────────────────────────────────────────────────
   function coords(e: React.PointerEvent) {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    return { x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0) };
+    const rect = viewportRef.current?.getBoundingClientRect();
+    const view = cameraRef.current;
+    return {
+      x: (e.clientX - (rect?.left ?? 0) - view.x) / view.zoom,
+      y: (e.clientY - (rect?.top ?? 0) - view.y) / view.zoom,
+    };
   }
   function startDraw(e: React.PointerEvent) {
     if (tool === "select" || tool === "eraser") return;
@@ -431,7 +634,7 @@ export function VisionBoardPage() {
   function startDrawingDrag(e: React.PointerEvent, d: BoardDrawing) {
     e.stopPropagation();
     setSelectedDrawingId(d.id);
-    drawDragRef.current = { id: d.id, startX: e.clientX, startY: e.clientY, moved: false };
+    drawDragRef.current = { id: d.id, startX: e.clientX, startY: e.clientY, zoom: cameraRef.current.zoom, moved: false };
     setDrawOffset({ id: d.id, dx: 0, dy: 0 });
   }
 
@@ -439,7 +642,7 @@ export function VisionBoardPage() {
     function onMove(e: PointerEvent) {
       const dd = drawDragRef.current;
       if (!dd) return;
-      const dx = e.clientX - dd.startX, dy = e.clientY - dd.startY;
+      const dx = (e.clientX - dd.startX) / dd.zoom, dy = (e.clientY - dd.startY) / dd.zoom;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dd.moved = true;
       const off = { id: dd.id, dx, dy };
       drawOffsetRef.current = off;
@@ -484,34 +687,60 @@ export function VisionBoardPage() {
   const drawing = tool !== "select";
   const isDrawTool = tool !== "select" && tool !== "eraser";
   const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) ?? null;
+  const selectedDrawingBox = selectedDrawing ? drawingBBox(selectedDrawing) : null;
+  const selectedDrawingOffset = selectedDrawing && drawOffset?.id === selectedDrawing.id
+    ? drawOffset
+    : { dx: 0, dy: 0 };
 
   return (
     <div className="relative w-full h-[calc(100dvh-3.5rem)] overflow-hidden bg-[var(--surface-2)]">
-      {/* Canvas viewport */}
+      {/* Infinite canvas viewport */}
       <div
-        ref={scrollRef}
-        className="absolute inset-0 isolate overflow-auto"
+        ref={viewportRef}
+        data-testid="vision-viewport"
+        className={cn(
+          "absolute inset-0 isolate overflow-hidden touch-none select-none",
+          tool === "select" && (panning ? "cursor-grabbing" : "cursor-grab"),
+          isDrawTool && "cursor-crosshair",
+          tool === "eraser" && "cursor-cell",
+        )}
         style={{
           backgroundImage: "radial-gradient(circle, var(--border) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
+          backgroundSize: `${GRID_SIZE * camera.zoom}px ${GRID_SIZE * camera.zoom}px`,
+          backgroundPosition: `${camera.x}px ${camera.y}px`,
         }}
+        onPointerDown={(e) => {
+          if (tool === "select") {
+            setSelectedDrawingId(null);
+            startPan(e);
+          }
+        }}
+        onPointerMove={movePan}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
       >
+        {items.length === 0 && drawings.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center text-[var(--faint)]">
+              <Sparkles className="w-8 h-8 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">This board is empty.</p>
+              <p className="text-xs mt-1">Add something, then drag the canvas in any direction.</p>
+            </div>
+          </div>
+        )}
+
+        {/* World-space items. The one-pixel origin intentionally has visible
+            overflow; the camera transform provides the unbounded plane. */}
         <div
           ref={canvasRef}
-          className="relative"
-          style={{ width: CANVAS_W, height: CANVAS_H }}
-          onPointerDown={() => { if (tool === "select") setSelectedDrawingId(null); }}
+          className="absolute left-0 top-0 w-px h-px overflow-visible"
+          style={{
+            zIndex: 30,
+            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})`,
+            transformOrigin: "0 0",
+            pointerEvents: isDrawTool || tool === "eraser" ? "none" : "auto",
+          }}
         >
-          {items.length === 0 && drawings.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="text-center text-[var(--faint)]">
-                <Sparkles className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">This board is empty.</p>
-                <p className="text-xs mt-1">Add a photo or note, draw on it, then drag things anywhere.</p>
-              </div>
-            </div>
-          )}
-
           {items.map((raw) => {
             const it = renderItem(raw);
             const isEditing = editingId === it.id;
@@ -527,7 +756,7 @@ export function VisionBoardPage() {
                 )}
                 style={{
                   left: it.x, top: it.y, width: it.width,
-                  height: it.type === "note" || it.type === "music" ? it.height : undefined,
+                  height: it.type === "photo" ? undefined : it.height,
                   zIndex: dragging ? 9999 : it.z,
                   transform: `rotate(${it.rotation}deg)`,
                   transition: dragging ? "none" : "transform .12s ease",
@@ -538,39 +767,79 @@ export function VisionBoardPage() {
                       onEdit={() => setEditingId(it.id)} onDone={() => setEditingId(null)}
                       onCaption={(caption) => patchItem(it.id, { caption })}
                       onDelete={() => removeItem(it.id)}
+                      uiScale={1 / camera.zoom}
                       onResizeStart={(e) => startDrag(e, it, "resize")} />
                   : it.type === "music"
                   ? <MusicCard item={it} editing={isEditing}
                       onEdit={() => setEditingId(it.id)} onDone={() => setEditingId(null)}
                       onPatch={(patch) => patchItem(it.id, patch)}
                       onDelete={() => removeItem(it.id)}
+                      uiScale={1 / camera.zoom}
                       onResizeStart={(e) => startDrag(e, it, "resize")} />
+                  : it.type === "link"
+                  ? <LinkCard
+                      item={it}
+                      editing={isEditing}
+                      target={notePages.find((page) => page.id === it.pageId)}
+                      onEdit={() => setEditingId(it.id)}
+                      onDone={() => setEditingId(null)}
+                      onLabel={(linkLabel) => patchItem(it.id, { linkLabel, text: linkLabel })}
+                      onChoosePage={() => setLinkingId(it.id)}
+                      onOpen={() => it.pageId && openPage(it.pageId)}
+                      onDelete={() => removeItem(it.id)}
+                      uiScale={1 / camera.zoom}
+                      onResizeStart={(e) => startDrag(e, it, "resize")}
+                    />
                   : <NoteCard item={it} editing={isEditing}
+                      target={notePages.find((page) => page.id === it.pageId)}
                       onEdit={() => setEditingId(it.id)} onDone={() => setEditingId(null)}
                       onText={(text) => patchItem(it.id, { text })}
                       onColor={(color) => patchItem(it.id, { color })}
+                      onChoosePage={() => setLinkingId(it.id)}
+                      onOpenLink={() => it.pageId && openPage(it.pageId)}
                       onDelete={() => removeItem(it.id)}
+                      uiScale={1 / camera.zoom}
                       onResizeStart={(e) => startDrag(e, it, "resize")} />}
               </div>
             );
           })}
 
-          {/* Drawing layer — always on top; only captures pointers while a tool is active. */}
-          <svg
-            ref={svgRef}
-            width={CANVAS_W}
-            height={CANVAS_H}
-            className="absolute inset-0"
-            style={{
-              zIndex: 99998,
-              pointerEvents: isDrawTool ? "auto" : "none",
-              cursor: tool === "eraser" ? "cell" : isDrawTool ? "crosshair" : "default",
-              touchAction: "none",
-            }}
-            onPointerDown={startDraw}
-            onPointerMove={moveDraw}
-            onPointerUp={endDraw}
-          >
+          {/* Delete button for the selected drawing */}
+          {tool === "select" && selectedDrawing && selectedDrawingBox && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => eraseDrawing(selectedDrawing.id)}
+              title="Delete drawing"
+              className="absolute flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-md text-[var(--muted)] hover:text-red-500 hover:border-[var(--border-2)] transition-colors"
+              style={{
+                left: selectedDrawingBox.x + selectedDrawingBox.w + 8 + selectedDrawingOffset.dx,
+                top: selectedDrawingBox.y - 4 + selectedDrawingOffset.dy,
+                zIndex: 99999,
+                transform: `scale(${1 / camera.zoom})`,
+                transformOrigin: "0 0",
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Vector drawing layer remains crisp at every zoom level. */}
+        <svg
+          ref={svgRef}
+          className="absolute inset-0 w-full h-full overflow-visible"
+          style={{
+            zIndex: isDrawTool || tool === "eraser" ? 40 : 35,
+            pointerEvents: isDrawTool || tool === "eraser" ? "auto" : "none",
+            cursor: tool === "eraser" ? "cell" : isDrawTool ? "crosshair" : "default",
+            touchAction: "none",
+          }}
+          onPointerDown={startDraw}
+          onPointerMove={moveDraw}
+          onPointerUp={endDraw}
+          onPointerCancel={endDraw}
+        >
+          <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.zoom})`}>
             {drawings.map((d) => (
               <DrawShape
                 key={d.id}
@@ -583,27 +852,21 @@ export function VisionBoardPage() {
               />
             ))}
             {draftDrawing && <DrawShape d={draftDrawing} mode="none" />}
-          </svg>
-
-          {/* Delete button for the selected drawing */}
-          {tool === "select" && selectedDrawing && (() => {
-            const bb = drawingBBox(selectedDrawing);
-            const ox = drawOffset?.id === selectedDrawing.id ? drawOffset.dx : 0;
-            const oy = drawOffset?.id === selectedDrawing.id ? drawOffset.dy : 0;
-            return (
-              <button
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => eraseDrawing(selectedDrawing.id)}
-                title="Delete drawing"
-                className="absolute flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-md text-[var(--muted)] hover:text-red-500 hover:border-[var(--border-2)] transition-colors"
-                style={{ left: bb.x + bb.w + 8 + ox, top: Math.max(0, bb.y - 4 + oy), zIndex: 99999 }}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            );
-          })()}
-        </div>
+          </g>
+        </svg>
       </div>
+
+      {linkingId && (
+        <PageLinkPicker
+          pages={notePages}
+          item={items.find((item) => item.id === linkingId)}
+          onClose={() => setLinkingId(null)}
+          onSelect={(pageId, linkLabel) => {
+            patchItem(linkingId, { pageId, linkLabel, text: linkLabel });
+            setLinkingId(null);
+          }}
+        />
+      )}
 
       {/* ── Floating: board selector (top-left) ─────────────────────────────── */}
       {(boardMenuOpen || drawMenuOpen) && (
@@ -720,6 +983,14 @@ export function VisionBoardPage() {
           <StickyNote className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Add Note</span>
         </button>
 
+        <button
+          onClick={addLink}
+          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--border-2)] text-[var(--text)] text-xs font-medium rounded-xl shadow-sm transition-colors"
+          title="Add a button linked to a Notes page"
+        >
+          <Link2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Add Link</span>
+        </button>
+
         <input ref={musicRef} type="file" accept="audio/*,.mp3" className="hidden" onChange={(e) => addMusic(e.target.files)} />
         <button
           onClick={() => musicRef.current?.click()}
@@ -810,6 +1081,50 @@ export function VisionBoardPage() {
           )}
         </div>
       </div>
+
+      {/* ── Floating: camera controls (bottom-right) ─────────────────────────── */}
+      <div className="absolute bottom-4 right-4 z-50 flex items-center gap-2">
+        <div className="hidden lg:flex items-center px-3 h-9 rounded-xl bg-[var(--surface)]/90 border border-[var(--border)] shadow-sm text-[11px] text-[var(--faint)] backdrop-blur">
+          Drag to pan · Scroll to move · Pinch or Ctrl-scroll to zoom
+        </div>
+        <div className="flex items-center h-9 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-md overflow-hidden">
+          <button
+            type="button"
+            onClick={() => zoomBy(1 / 1.25)}
+            className="h-full px-2.5 text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
+            title="Zoom out"
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomAt(1, (viewportRef.current?.clientWidth ?? 0) / 2, (viewportRef.current?.clientHeight ?? 0) / 2)}
+            className="h-full min-w-[58px] px-2 border-x border-[var(--border)] text-[11px] font-semibold tabular-nums text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
+            title="Reset zoom to 100%"
+          >
+            {Math.round(camera.zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            onClick={() => zoomBy(1.25)}
+            className="h-full px-2.5 text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
+            title="Zoom in"
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={fitBoard}
+            className="h-full px-2.5 border-l border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
+            title="Fit all board content"
+            aria-label="Fit all board content"
+          >
+            <LocateFixed className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -897,12 +1212,13 @@ function DrawShape({ d, mode, selected, transform, onErase, onSelectDown }: {
 
 // ── Photo ─────────────────────────────────────────────────────────────────────
 function PhotoCard({
-  item, editing, onEdit, onDone, onCaption, onDelete, onResizeStart,
+  item, editing, onEdit, onDone, onCaption, onDelete, onResizeStart, uiScale,
 }: {
   item: BoardItem; editing: boolean;
   onEdit: () => void; onDone: () => void;
   onCaption: (c: string) => void; onDelete: () => void;
   onResizeStart: (e: React.PointerEvent) => void;
+  uiScale: number;
 }) {
   return (
     <div className="relative w-full h-full">
@@ -932,11 +1248,12 @@ function PhotoCard({
         )}
       </div>
 
-      <Controls editing={editing} onEdit={onEdit} onDone={onDone} onDelete={onDelete} />
+      <Controls editing={editing} onEdit={onEdit} onDone={onDone} onDelete={onDelete} uiScale={uiScale} />
 
       <div
         onPointerDown={onResizeStart}
         className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--text)] border-2 border-white shadow cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ transform: `scale(${uiScale})`, transformOrigin: "center" }}
         title="Drag to resize"
       />
     </div>
@@ -945,12 +1262,13 @@ function PhotoCard({
 
 // ── Music player ────────────────────────────────────────────────────────────────
 function MusicCard({
-  item, editing, onEdit, onDone, onPatch, onDelete, onResizeStart,
+  item, editing, onEdit, onDone, onPatch, onDelete, onResizeStart, uiScale,
 }: {
   item: BoardItem; editing: boolean;
   onEdit: () => void; onDone: () => void;
   onPatch: (patch: Partial<BoardItem>) => void; onDelete: () => void;
   onResizeStart: (e: React.PointerEvent) => void;
+  uiScale: number;
 }) {
   const coverRef = useRef<HTMLInputElement>(null);
   const stop = (e: React.PointerEvent) => e.stopPropagation();
@@ -996,10 +1314,11 @@ function MusicCard({
 
       <audio controls src={item.audioSrc} onPointerDown={stop} className="w-full h-9 px-1.5 pb-1.5" style={{ touchAction: "auto" }} />
 
-      <Controls editing={editing} onEdit={onEdit} onDone={onDone} onDelete={onDelete} />
+      <Controls editing={editing} onEdit={onEdit} onDone={onDone} onDelete={onDelete} uiScale={uiScale} />
       <div
         onPointerDown={onResizeStart}
         className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--text)] border-2 border-white shadow cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ transform: `scale(${uiScale})`, transformOrigin: "center" }}
         title="Drag to resize"
       />
     </div>
@@ -1008,19 +1327,22 @@ function MusicCard({
 
 // ── Sticky note ─────────────────────────────────────────────────────────────────
 function NoteCard({
-  item, editing, onEdit, onDone, onText, onColor, onDelete, onResizeStart,
+  item, editing, target, onEdit, onDone, onText, onColor, onChoosePage, onOpenLink, onDelete, onResizeStart, uiScale,
 }: {
   item: BoardItem; editing: boolean;
+  target?: WikiPage;
   onEdit: () => void; onDone: () => void;
   onText: (t: string) => void; onColor: (c: NoteColor) => void; onDelete: () => void;
+  onChoosePage: () => void; onOpenLink: () => void;
   onResizeStart: (e: React.PointerEvent) => void;
+  uiScale: number;
 }) {
   const c = NOTE_COLORS[item.color ?? "yellow"];
   return (
     <div className="relative w-full h-full rounded-[3px] shadow-[0_6px_18px_rgba(0,0,0,0.16)]" style={{ background: c.bg, border: `1px solid ${c.border}` }}>
       <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-12 h-4 bg-white/50 border border-black/5 rounded-[1px] rotate-[-2deg]" />
 
-      <div className="w-full h-full p-3 pt-4">
+      <div className="w-full h-full p-3 pt-4 flex flex-col">
         {editing ? (
           <textarea
             autoFocus
@@ -1028,38 +1350,221 @@ function NoteCard({
             placeholder="Write something…"
             onPointerDown={(e) => e.stopPropagation()}
             onBlur={(e) => { if (e.target.value !== (item.text ?? "")) onText(e.target.value); onDone(); }}
-            className="w-full h-full resize-none bg-transparent text-[14px] leading-snug focus:outline-none placeholder:opacity-40"
+            className="w-full flex-1 min-h-0 resize-none bg-transparent text-[14px] leading-snug focus:outline-none placeholder:opacity-40"
             style={{ color: c.text }}
           />
         ) : (
           <p
             onDoubleClick={onEdit}
-            className="w-full h-full overflow-hidden text-[14px] leading-snug whitespace-pre-wrap break-words"
+            className="w-full flex-1 min-h-0 overflow-hidden text-[14px] leading-snug whitespace-pre-wrap break-words"
             style={{ color: c.text }}
           >
             {item.text || <span className="opacity-40">Double-click to edit…</span>}
           </p>
         )}
+        {target && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={onOpenLink}
+            className="mt-2 min-w-0 self-start inline-flex items-center gap-1.5 rounded-md border border-black/10 bg-white/45 px-2 py-1 text-[11px] font-semibold hover:bg-white/70 transition-colors"
+            style={{ color: c.text }}
+            title={`Open ${target.title || "Untitled"}`}
+          >
+            <span className="shrink-0">{target.icon || "📄"}</span>
+            <span className="truncate">{item.linkLabel || target.title || "Untitled"}</span>
+            <ArrowUpRight className="w-3 h-3 shrink-0 opacity-60" />
+          </button>
+        )}
       </div>
 
-      <Controls editing={editing} onEdit={onEdit} onDone={onDone} onDelete={onDelete} colors={{ active: item.color ?? "yellow", onColor }} />
+      <Controls
+        editing={editing}
+        onEdit={onEdit}
+        onDone={onDone}
+        onDelete={onDelete}
+        onLink={onChoosePage}
+        uiScale={uiScale}
+        colors={{ active: item.color ?? "yellow", onColor }}
+      />
 
       <div
         onPointerDown={onResizeStart}
         className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black/60 border-2 border-white shadow cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ transform: `scale(${uiScale})`, transformOrigin: "center" }}
         title="Drag to resize"
       />
     </div>
   );
 }
 
+// ── Notes-page link button ───────────────────────────────────────────────────────
+function LinkCard({
+  item, editing, target, onEdit, onDone, onLabel, onChoosePage, onOpen, onDelete, onResizeStart, uiScale,
+}: {
+  item: BoardItem;
+  editing: boolean;
+  target?: WikiPage;
+  onEdit: () => void;
+  onDone: () => void;
+  onLabel: (label: string) => void;
+  onChoosePage: () => void;
+  onOpen: () => void;
+  onDelete: () => void;
+  onResizeStart: (e: React.PointerEvent) => void;
+  uiScale: number;
+}) {
+  const stop = (e: React.PointerEvent) => e.stopPropagation();
+  return (
+    <div className="relative w-full h-full">
+      <div className="w-full h-full rounded-xl bg-[var(--text)] text-[var(--bg)] shadow-[0_7px_20px_rgba(0,0,0,0.22)] border border-black/10 overflow-hidden">
+        {editing ? (
+          <input
+            autoFocus
+            defaultValue={item.linkLabel || item.text || ""}
+            placeholder="Button label"
+            onPointerDown={stop}
+            onBlur={(e) => {
+              const label = e.target.value.trim() || target?.title || "Open page";
+              onLabel(label);
+              onDone();
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            className="w-full h-full bg-transparent px-3 text-center text-[13px] font-semibold text-[var(--bg)] placeholder:text-[var(--bg)]/45 focus:outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onPointerDown={stop}
+            onClick={target ? onOpen : onChoosePage}
+            onDoubleClick={onEdit}
+            className="w-full h-full min-w-0 flex items-center justify-center gap-2 px-3 text-[13px] font-semibold hover:opacity-85 transition-opacity"
+            title={target ? `Open ${target.title || "Untitled"}` : "Choose a Notes page"}
+          >
+            <span className="shrink-0">{target?.icon || <Link2 className="w-4 h-4" />}</span>
+            <span className="truncate">{item.linkLabel || item.text || target?.title || "Choose page"}</span>
+            <ArrowUpRight className="w-3.5 h-3.5 shrink-0 opacity-65" />
+          </button>
+        )}
+      </div>
+
+      <Controls
+        editing={editing}
+        onEdit={onEdit}
+        onDone={onDone}
+        onDelete={onDelete}
+        onLink={onChoosePage}
+        uiScale={uiScale}
+      />
+      <div
+        onPointerDown={onResizeStart}
+        className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--text)] border-2 border-white shadow cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ transform: `scale(${uiScale})`, transformOrigin: "center" }}
+        title="Drag to resize"
+      />
+    </div>
+  );
+}
+
+function PageLinkPicker({
+  pages, item, onClose, onSelect,
+}: {
+  pages: WikiPage[];
+  item?: BoardItem;
+  onClose: () => void;
+  onSelect: (pageId: string, label: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [label, setLabel] = useState(item?.linkLabel || item?.text || "");
+  const list = pages.filter((page) =>
+    (page.title || "Untitled").toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  return (
+    <div
+      className="absolute inset-0 z-[120] flex items-center justify-center bg-black/25 backdrop-blur-[2px] p-4"
+      onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Link to a Notes page"
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl nx-pop"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 border-b border-[var(--border)] px-4 py-3">
+          <div className="flex w-9 h-9 shrink-0 items-center justify-center rounded-xl bg-[var(--chip)] text-[var(--text)]">
+            <Link2 className="w-4 h-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-[var(--text)]">Link to a Notes page</p>
+            <p className="text-[11.5px] text-[var(--faint)]">The board button will open the page directly.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)]" aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-3 space-y-2.5">
+          <label className="block">
+            <span className="block px-1 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--faint)]">Button text</span>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Use the page title"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]"
+            />
+          </label>
+          <label className="relative block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--faint)]" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search Notes pages…"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] py-2 pl-9 pr-3 text-[13px] text-[var(--text)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]"
+            />
+          </label>
+
+          <div className="max-h-64 overflow-y-auto rounded-xl border border-[var(--border)] p-1">
+            {list.length ? list.map((page) => (
+              <button
+                key={page.id}
+                type="button"
+                onClick={() => onSelect(page.id, label.trim() || page.title || "Untitled")}
+                className={cn(
+                  "w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors",
+                  page.id === item?.pageId ? "bg-[var(--chip)]" : "hover:bg-[var(--surface-2)]",
+                )}
+              >
+                <span className="text-base shrink-0">{page.icon || "📄"}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text)]">{page.title || "Untitled"}</span>
+                {page.id === item?.pageId && <Check className="w-4 h-4 shrink-0 text-[var(--muted)]" />}
+              </button>
+            )) : (
+              <div className="px-3 py-8 text-center">
+                <FileText className="w-5 h-5 mx-auto mb-2 text-[var(--faint)]" />
+                <p className="text-[12.5px] text-[var(--faint)]">
+                  {pages.length ? "No pages match that search." : "Create a Notes page first, then link it here."}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Shared hover controls ───────────────────────────────────────────────────────
 function Controls({
-  editing, onEdit, onDone, onDelete, colors,
+  editing, onEdit, onDone, onDelete, onLink, colors, uiScale,
 }: {
   editing: boolean;
   onEdit: () => void; onDone: () => void; onDelete: () => void;
+  onLink?: () => void;
   colors?: { active: NoteColor; onColor: (c: NoteColor) => void };
+  uiScale: number;
 }) {
   const stop = (e: React.PointerEvent) => e.stopPropagation();
   return (
@@ -1069,6 +1574,7 @@ function Controls({
         "absolute -top-3 right-1 flex items-center gap-1 px-1 py-1 rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-md transition-opacity",
         editing ? "opacity-100" : "opacity-0 group-hover:opacity-100",
       )}
+      style={{ transform: `scale(${uiScale})`, transformOrigin: "top right" }}
     >
       {colors && !editing && (
         <div className="flex items-center gap-0.5 pr-1 mr-0.5 border-r border-[var(--border)]">
@@ -1090,6 +1596,11 @@ function Controls({
       ) : (
         <button onClick={onEdit} className="p-1 rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)]" title="Edit">
           <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {onLink && (
+        <button onClick={onLink} className="p-1 rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)]" title="Link to Notes page">
+          <Link2 className="w-3.5 h-3.5" />
         </button>
       )}
       <button onClick={onDelete} className="p-1 rounded-md text-[var(--muted)] hover:text-red-500 hover:bg-[var(--chip)]" title="Delete">

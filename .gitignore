@@ -53,3 +53,4 @@ next-env.d.ts
 /ios/.build/
 *.xcuserstate
 xcuserdata/
+.env*.local

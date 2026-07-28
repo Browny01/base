@@ -40,6 +40,8 @@ targets:
         name: BridgeCore
     dependencies:
       - package: Sparkle
+      - sdk: libsqlite3.tbd
+      - sdk: Security.framework
     settings:
       base:
         PRODUCT_NAME: Bridge

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { DATA_KEY as KEY, readCurrentData } from "@/lib/bridge-data";
+import { markFullSnapshotChange } from "@/lib/sync-server";
 
 const HISTORY = "bridge:data:history";   // rolling backups (newest first)
 
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     await redis.set(KEY, body);
+    await markFullSnapshotChange(redis);
     return NextResponse.json({ ok: true, configured: true });
   } catch (err) {
     console.error("[bridge/data POST]", err);

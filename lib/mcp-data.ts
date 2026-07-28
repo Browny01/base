@@ -4,6 +4,7 @@
 import { Redis } from "@upstash/redis";
 import type { BridgeData, WikiBlock, WikiPage } from "@/lib/store";
 import { DATA_KEY } from "@/lib/bridge-data";
+import { markFullSnapshotChange } from "@/lib/sync-server";
 
 const KEY = DATA_KEY;
 
@@ -29,6 +30,7 @@ export async function writeRawData(data: BridgeData): Promise<boolean> {
   const redis = mcpRedis();
   if (!redis) return false;
   await redis.set(KEY, data);
+  await markFullSnapshotChange(redis);
   return true;
 }
 

@@ -79,13 +79,56 @@ struct BridgeRecord: Identifiable, Equatable {
 }
 
 struct NativeOperation: Codable, Identifiable {
-    enum Action: String, Codable { case upsert, delete }
+    enum Action: String, Codable { case upsert, patch, delete, set }
 
     let id: String
+    let deviceId: String
     let collection: String
     let action: Action
     let recordId: String
-    let value: [String: JSONValue]?
+    let value: JSONValue?
+    var baseRevision: Int
+    let clientUpdatedAt: Double
+
+    init(
+        id: String,
+        deviceId: String,
+        collection: String,
+        action: Action,
+        recordId: String,
+        value: JSONValue?,
+        baseRevision: Int,
+        clientUpdatedAt: Double = Date().timeIntervalSince1970 * 1000
+    ) {
+        self.id = id
+        self.deviceId = deviceId
+        self.collection = collection
+        self.action = action
+        self.recordId = recordId
+        self.value = value
+        self.baseRevision = baseRevision
+        self.clientUpdatedAt = clientUpdatedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, deviceId, collection, action, recordId, value, baseRevision, clientUpdatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        deviceId = try values.decodeIfPresent(String.self, forKey: .deviceId) ?? "legacy-native"
+        collection = try values.decode(String.self, forKey: .collection)
+        action = try values.decode(Action.self, forKey: .action)
+        recordId = try values.decode(String.self, forKey: .recordId)
+        if let object = try? values.decode([String: JSONValue].self, forKey: .value) {
+            value = .object(object)
+        } else {
+            value = try values.decodeIfPresent(JSONValue.self, forKey: .value)
+        }
+        baseRevision = try values.decodeIfPresent(Int.self, forKey: .baseRevision) ?? 0
+        clientUpdatedAt = try values.decodeIfPresent(Double.self, forKey: .clientUpdatedAt) ?? Date().timeIntervalSince1970 * 1000
+    }
 }
 
 struct LocalSnapshot: Codable {
@@ -97,6 +140,28 @@ struct LocalSnapshot: Codable {
 struct SyncEnvelope: Decodable {
     let data: JSONValue?
     let configured: Bool?
+    let full: Bool?
+    let revision: Int?
+    let recordRevisions: [String: Int]?
+    let applied: [String]?
+    let conflicts: [NativeConflict]?
+    let changes: [NativeChange]?
+    let updatedAt: Double?
+    let error: String?
+}
+
+struct NativeChange: Codable {
+    let revision: Int
+    let operation: NativeOperation
+    let merged: Bool?
+}
+
+struct NativeConflict: Codable, Identifiable {
+    let id: String
+    let operation: NativeOperation
+    let serverRevision: Int
+    let serverValue: JSONValue?
+    let createdAt: Double
 }
 
 enum BridgeDate {

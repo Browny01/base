@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Check, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
+import { Bot, Check, Eye, EyeOff, LayoutGrid, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNavMode } from "@/lib/nav-mode-context";
@@ -17,6 +17,96 @@ import {
   type NewsPrefs,
   type YoutubeChannel,
 } from "@/lib/news-prefs";
+import { TOGGLEABLE_PAGES } from "@/lib/page-visibility";
+import { OfflineSettings } from "@/components/offline-settings";
+
+function PageVisibilityManager({
+  hiddenPages,
+  setHiddenPages,
+}: {
+  hiddenPages: string[];
+  setHiddenPages: (pages: string[]) => void;
+}) {
+  const hidden = new Set(hiddenPages);
+  const visibleCount = TOGGLEABLE_PAGES.length - hidden.size;
+
+  function togglePage(href: string) {
+    setHiddenPages(
+      hidden.has(href)
+        ? hiddenPages.filter((page) => page !== href)
+        : [...hiddenPages, href],
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 lg:col-span-2">
+      <div className="mb-1 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <LayoutGrid className="h-4 w-4 text-[var(--text)]" strokeWidth={1.9} />
+          <h2 className="text-sm font-bold text-[var(--text)]">Visible pages</h2>
+        </div>
+        <button
+          onClick={() => setHiddenPages([])}
+          disabled={hiddenPages.length === 0}
+          className="h-8 rounded-lg border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-35"
+        >
+          Show all
+        </button>
+      </div>
+      <p className="mb-4 text-xs text-[var(--muted)]">
+        Choose which pages appear in the sidebar, dock, mobile menu, and command search. Dashboard and Settings always stay visible.
+      </p>
+      <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-[var(--faint)]">
+        <span>{visibleCount} visible</span>
+        <span aria-hidden="true">·</span>
+        <span>{hiddenPages.length} hidden</span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {TOGGLEABLE_PAGES.map((page) => {
+          const visible = !hidden.has(page.href);
+          return (
+            <button
+              key={page.href}
+              type="button"
+              role="switch"
+              aria-checked={visible}
+              onClick={() => togglePage(page.href)}
+              className={cn(
+                "flex items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                visible
+                  ? "border-[var(--border-2)] bg-[var(--bg)]"
+                  : "border-[var(--border)] bg-[var(--surface-2)] opacity-65 hover:opacity-100",
+              )}
+            >
+              <span className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                visible ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--chip)] text-[var(--faint)]",
+              )}>
+                {visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-[var(--text)]">{page.label}</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">{page.group}</span>
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] text-[var(--muted)]">{page.description}</span>
+              </span>
+              <span className={cn(
+                "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+                visible ? "bg-[var(--text)]" : "bg-[var(--border-2)]",
+              )}>
+                <span className={cn(
+                  "absolute top-0.5 h-4 w-4 rounded-full bg-[var(--bg)] transition-transform",
+                  visible ? "translate-x-[18px]" : "translate-x-0.5",
+                )} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 function SourceManager({ prefs, setPrefs }: { prefs: NewsPrefs; setPrefs: (prefs: NewsPrefs) => void }) {
   const [youtubeName, setYoutubeName] = useState("");
@@ -245,6 +335,7 @@ export function SettingsPage() {
   const chatSettings = data.chatSettings ?? DEFAULT_CHAT_SETTINGS;
   const setNewsPrefs = (prefs: NewsPrefs) => mutate((d) => ({ ...d, newsPrefs: prefs }));
   const setChatSettings = (settings: ChatSettings) => mutate((d) => ({ ...d, chatSettings: settings }));
+  const setHiddenPages = (hiddenPages: string[]) => mutate((d) => ({ ...d, hiddenPages }));
 
   return (
     <div className="p-4 sm:p-6">
@@ -368,6 +459,8 @@ export function SettingsPage() {
           )}
         </section>
 
+        <PageVisibilityManager hiddenPages={data.hiddenPages ?? []} setHiddenPages={setHiddenPages} />
+        <OfflineSettings />
         <SourceManager prefs={newsPrefs} setPrefs={setNewsPrefs} />
         <ChatModelManager settings={chatSettings} setSettings={setChatSettings} />
       </div>

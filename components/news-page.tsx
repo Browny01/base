@@ -20,6 +20,7 @@ import type { AssetData } from "@/app/api/market/charts/route";
 import type { LiveStatusItem } from "@/app/api/live-status/route";
 import type { NewsArticle } from "@/app/api/news/route";
 import type { SocialFeedItem } from "@/app/api/social-feed/route";
+import { MarketDetailModal } from "@/components/market-detail-modal";
 import {
   CATEGORY_LABEL,
   DEFAULT_NEWS_PREFS,
@@ -51,10 +52,12 @@ function MarketTile({ asset, active, onClick }: { asset: AssetData; active: bool
 
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-label={`Open ${asset.name} market analysis`}
       className={cn(
-        "rounded-lg border bg-[var(--surface)] px-3 py-2 text-left transition-colors",
-        active ? "border-[var(--border-2)] bg-[var(--chip)]" : "border-[var(--border)] hover:bg-[var(--surface-2)]"
+        "group rounded-lg border bg-[var(--surface)] px-3 py-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm",
+        active ? "border-[var(--border-2)] bg-[var(--chip)]" : "border-[var(--border)] hover:border-[var(--border-2)] hover:bg-[var(--surface-2)]"
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -68,7 +71,7 @@ function MarketTile({ asset, active, onClick }: { asset: AssetData; active: bool
       </div>
       <div className="mt-1 flex items-end justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-[12px] font-semibold text-[var(--text)]">{asset.name}</p>
+          <p className="truncate text-[12px] font-semibold text-[var(--text)] group-hover:underline group-hover:underline-offset-2">{asset.name}</p>
           {asset.price === null && asset.note ? (
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)]">{asset.note}</p>
           ) : (
@@ -426,14 +429,24 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
 }
 function NewsBriefing() {
   const [state, setState] = useState<{ loading: boolean; summary?: string; generatedAt?: string; error?: string }>({ loading: true });
-  const load = () => {
-    setState((s) => ({ ...s, loading: true }));
+  const requestBriefing = () =>
     fetch("/api/news/summary")
       .then((r) => r.json())
-      .then((j) => setState(j.ok ? { loading: false, summary: j.summary, generatedAt: j.generatedAt } : { loading: false, error: j.error || "Couldn't load the briefing." }))
-      .catch((e) => setState({ loading: false, error: String(e) }));
+      .then((j) => j.ok
+        ? { loading: false, summary: j.summary, generatedAt: j.generatedAt }
+        : { loading: false, error: j.error || "Couldn't load the briefing." })
+      .catch((e) => ({ loading: false, error: String(e) }));
+  const load = () => {
+    setState((s) => ({ ...s, loading: true }));
+    void requestBriefing().then(setState);
   };
-  useEffect(load, []);
+  useEffect(() => {
+    let active = true;
+    void requestBriefing().then((next) => {
+      if (active) setState(next);
+    });
+    return () => { active = false; };
+  }, []);
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -460,6 +473,7 @@ export function NewsPage() {
   const [chartsLoading, setChartsLoading] = useState(true);
   const [newsLoading, setNewsLoading] = useState(true);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [detailAssetId, setDetailAssetId] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [mktPage, setMktPage] = useState(0);
   const [cols, setCols] = useState(4);
@@ -467,6 +481,7 @@ export function NewsPage() {
   const prefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
 
   const selectedAsset = assets.find((asset) => asset.id === selectedAssetId) ?? assets[3] ?? assets[0] ?? null;
+  const detailAsset = assets.find((asset) => asset.id === detailAssetId) ?? null;
 
   // Market widgets are capped at 3 rows and paged with arrows. Column count is
   // responsive so "3 rows" stays accurate across breakpoints.
@@ -539,6 +554,7 @@ export function NewsPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--faint)]">Feeds / Markets / Creators</p>
           <h1 className="mt-1 text-2xl font-bold text-[var(--text)]">News</h1>
+          <p className="mt-1 text-xs text-[var(--muted)]">Select any market for a full TradingView chart, market drivers, scenarios, and related headlines.</p>
         </div>
         <div className="flex items-center gap-3">
           {lastRefreshed && <span className="text-xs text-[var(--muted)]">Updated {lastRefreshed.toLocaleTimeString()}</span>}
@@ -557,7 +573,15 @@ export function NewsPage() {
             <>
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
                 {visibleAssets.map((asset) => (
-                  <MarketTile key={asset.id} asset={asset} active={selectedAsset?.id === asset.id} onClick={() => setSelectedAssetId(asset.id)} />
+                  <MarketTile
+                    key={asset.id}
+                    asset={asset}
+                    active={selectedAsset?.id === asset.id}
+                    onClick={() => {
+                      setSelectedAssetId(asset.id);
+                      setDetailAssetId(asset.id);
+                    }}
+                  />
                 ))}
               </div>
               {pageCount > 1 && (
@@ -592,6 +616,8 @@ export function NewsPage() {
           </div>
         </div>
       </div>
+
+      <MarketDetailModal asset={detailAsset} articles={news} onClose={() => setDetailAssetId(null)} />
     </div>
   );
 }

@@ -41,10 +41,15 @@ including the normal website navigation, settings, uploads, AI tools, and browse
 session. External links open in the default browser, while Bridge links stay in
 the app.
 
-If initial navigation fails, `ContentView` displays native screens for Today,
+The website registers an offline service worker and keeps its working data in
+IndexedDB, so previously visited routes can keep using the full web interface
+through short outages. If initial navigation still fails, `ContentView` displays native screens for Today,
 Tasks, Projects, Notes, Habits, Focus, Finance, and cached News. Edits are saved
-locally and queued by `native/BridgeCore/BridgeStore.swift`. Network.framework
+to SQLite and queued by `native/BridgeCore/BridgeStore.swift`. Network.framework
 retries the website and synchronizes native changes after connectivity returns.
+The native fallback uses the same revisioned, idempotent protocol as iPhone and
+the web app. Pair it once from **Offline & Sync** using a token generated in the
+website’s Settings page; the credential remains in Keychain.
 
 Cloud-generated features still require internet. News displays the last cached
 briefing while offline.
@@ -54,7 +59,7 @@ briefing while offline.
 ```text
 native/BridgeCore/
   BridgeData.swift       JSON-preserving record model
-  BridgeStore.swift      local snapshot, queue, reachability, sync
+  BridgeStore.swift      SQLite store, queue, revisions, reachability, sync
   BridgeViews.swift      shared iPhone/Mac SwiftUI screens
 macos/
   project.yml            XcodeGen source of truth
