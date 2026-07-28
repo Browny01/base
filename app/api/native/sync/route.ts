@@ -170,15 +170,16 @@ if #applied > 0 then data.updatedAt = timestamp end
 local encoded = cjson.encode(data)
 redis.call("SET", KEYS[1], encoded)
 redis.call("SET", KEYS[3], revision)
-return cjson.encode({
+local batchResult = cjson.encode({
   ok = true,
-  data = data,
   revision = revision,
   applied = applied,
   conflicts = conflicts,
   changes = emitted,
   updatedAt = data.updatedAt
 })
+redis.call("SET", KEYS[9], batchResult, "EX", 60)
+return batchResult
 `;
 
 async function fullEnvelope(redis: Redis) {
@@ -262,7 +263,8 @@ export async function POST(request: Request) {
 
     await readCurrentData(redis);
     if (body.operations.length === 0) return Response.json(await fullEnvelope(redis));
-    const result = await redis.eval<unknown[], string>(
+    const batchResultKey = `bridge:sync:batch:${crypto.randomUUID()}`;
+    const result = await redis.eval<unknown[], unknown>(
       APPLY_OPERATIONS,
       [
         DATA_KEY,
@@ -273,13 +275,23 @@ export async function POST(request: Request) {
         APPLIED_INDEX_KEY,
         TOMBSTONES_KEY,
         CHANGES_KEY,
+        batchResultKey,
       ],
       [JSON.stringify(body.operations), String(Date.now()), String(MAX_CHANGE_LOG)],
     );
-    const envelope = unwrap<Record<string, unknown>>(result);
-    const currentRecordRevisions = await redis.hgetall<Record<string, number>>(RECORD_REVISIONS_KEY);
+    const [storedResult, currentRecordRevisions, currentData] = await Promise.all([
+      redis.get<unknown>(batchResultKey),
+      redis.hgetall<Record<string, number>>(RECORD_REVISIONS_KEY),
+      readCurrentData(redis),
+    ]);
+    await redis.del(batchResultKey);
+    const envelope = unwrap<Record<string, unknown>>(storedResult ?? result);
+    if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) {
+      throw new Error("The sync transaction did not return an acknowledgement.");
+    }
     return Response.json({
       ...envelope,
+      data: unwrap<Record<string, unknown>>(currentData),
       configured: true,
       protocol: SYNC_PROTOCOL_VERSION,
       full: true,
