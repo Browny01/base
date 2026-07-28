@@ -25,6 +25,7 @@ function recordFail(ip: string) {
 
 // Length-independent constant-time compare, so response time can't leak the password.
 function safeEqual(a: string, b: string): boolean {
+  if (b.length === 0) return false;
   let diff = a.length ^ b.length;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i % b.length);
   return diff === 0;

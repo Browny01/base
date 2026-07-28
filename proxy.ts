@@ -52,6 +52,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/mcp") ||   // MCP server does its own Bearer-token auth
     pathname.startsWith("/api/widget") || // iOS widget summary — does its own token auth
+    pathname.startsWith("/api/native") || // native sync routes perform cookie/device-token auth
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/wallet") ||
     pathname.startsWith("/api/fx") ||

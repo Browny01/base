@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
+import { pageIsVisible } from "@/lib/page-visibility";
+import { useHiddenPages } from "@/lib/use-page-visibility";
 
 type Item = { href: string; label: string; icon: LucideIcon };
 
@@ -46,8 +48,6 @@ const isActive = (pathname: string, href: string) =>
 
 // A tab that isn't one of the fixed five is still "active" when its page is open,
 // which we surface by lighting up the More button.
-const TAB_HREFS = new Set(TABS.map((t) => t.href));
-
 function Tab({ item, active }: { item: Item; active: boolean }) {
   const Icon = item.icon;
   return (
@@ -69,9 +69,13 @@ export function BottomNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { theme, toggle: toggleTheme } = useTheme();
+  const hiddenPages = useHiddenPages();
   const isDark = theme === "dark";
+  const tabs = TABS.filter((item) => pageIsVisible(hiddenPages, item.href));
+  const allItems = ALL.filter((item) => pageIsVisible(hiddenPages, item.href));
+  const tabHrefs = new Set(tabs.map((tab) => tab.href));
 
-  const onOtherPage = !TAB_HREFS.has(pathname) && ![...TAB_HREFS].some((h) => h !== "/" && pathname.startsWith(h + "/")) && pathname !== "/";
+  const onOtherPage = !tabHrefs.has(pathname) && ![...tabHrefs].some((h) => h !== "/" && pathname.startsWith(h + "/")) && pathname !== "/";
   const moreActive = open || onOtherPage;
 
   return (
@@ -93,7 +97,7 @@ export function BottomNav() {
                 </button>
               </div>
               <div className="grid grid-cols-4 gap-1.5">
-                {ALL.map(({ href, label, icon: Icon }, i) => {
+                {allItems.map(({ href, label, icon: Icon }, i) => {
                   const active = isActive(pathname, href);
                   return (
                     <Link key={href} href={href} onClick={() => setOpen(false)}
@@ -122,7 +126,7 @@ export function BottomNav() {
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
       >
         <div className="pointer-events-auto glass glass-edge border border-[var(--border)] rounded-[24px] px-1.5 py-1.5 flex items-center gap-0.5">
-          {TABS.map((item) => (
+          {tabs.map((item) => (
             <Tab key={item.href} item={item} active={isActive(pathname, item.href)} />
           ))}
           <button

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum BridgeSection: String, CaseIterable, Identifiable {
-    case today, tasks, projects, notes, habits, focus, finance, news
+    case today, tasks, projects, notes, habits, focus, finance, news, settings
 
     var id: String { rawValue }
     var title: String { rawValue.capitalized }
@@ -16,6 +16,7 @@ enum BridgeSection: String, CaseIterable, Identifiable {
         case .focus: return "timer"
         case .finance: return "dollarsign.circle"
         case .news: return "newspaper"
+        case .settings: return "gearshape"
         }
     }
 }
@@ -105,6 +106,7 @@ private func sectionView(_ section: BridgeSection) -> some View {
     case .focus: FocusView()
     case .finance: FinanceView()
     case .news: NewsBriefingView()
+    case .settings: SyncSettingsView()
     }
 }
 
@@ -138,6 +140,10 @@ private struct SyncStatusView: View {
                     Text("\(store.pendingCount) queued")
                         .font(.caption2)
                         .foregroundColor(.secondary)
+                } else if store.conflictCount > 0 {
+                    Text("\(store.conflictCount) conflicts")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
                 }
             }
         }
@@ -184,10 +190,93 @@ private struct MoreView: View {
                     }
                 }
             }
-            Section { SyncStatusView(store: store) }
+            Section {
+                NavigationLink(destination: SyncSettingsView().environmentObject(store)) {
+                    Label("Offline & Sync", systemImage: BridgeSection.settings.icon)
+                }
+                SyncStatusView(store: store)
+            }
         }
         .navigationTitle("More")
         .toolbar { SyncToolbar(store: store) }
+    }
+}
+
+private struct SyncSettingsView: View {
+    @EnvironmentObject private var store: BridgeStore
+    @State private var token = ""
+
+    var body: some View {
+        Form {
+            Section {
+                HStack {
+                    SyncStatusView(store: store)
+                    Spacer()
+                    Button("Sync now") { Task { await store.sync() } }
+                        .disabled(!store.hasSyncCredential || store.syncState == .syncing)
+                }
+                if let lastSync = store.lastSync {
+                    SyncMetricRow(label: "Last synced", value: lastSync.formatted(date: .abbreviated, time: .shortened))
+                }
+                SyncMetricRow(label: "Queued changes", value: "\(store.pendingCount)")
+                SyncMetricRow(label: "Conflicts", value: "\(store.conflictCount)")
+            } header: {
+                Text("Local-first workspace")
+            } footer: {
+                Text("Bridge writes to this device first, then pushes queued edits on launch, foreground, reconnect, and periodic refresh.")
+            }
+
+            Section {
+                SecureField("Paste pairing token", text: $token)
+                    .textContentType(.password)
+                Button(store.hasSyncCredential ? "Replace pairing token" : "Pair this device") {
+                    store.setSyncToken(token)
+                    token = ""
+                }
+                .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if store.hasSyncCredential {
+                    Button("Remove pairing", role: .destructive) { store.setSyncToken("") }
+                }
+            } header: {
+                Text("Secure cloud connection")
+            } footer: {
+                Text("Generate a token in Bridge → Settings → Offline & sync. It stays in this device’s Keychain.")
+            }
+
+            if !store.conflicts.isEmpty {
+                Section("Concurrent edits") {
+                    ForEach(store.conflicts) { conflict in
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("\(conflict.operation.collection) · \(conflict.operation.recordId)")
+                                .font(.headline)
+                            Text("Another device changed this after the local copy was downloaded.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack {
+                                Button("Use cloud") { store.resolveConflict(id: conflict.id, keepLocal: false) }
+                                Button("Keep mine") { store.resolveConflict(id: conflict.id, keepLocal: true) }
+                                    .buttonStyle(.borderedProminent)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+        .navigationTitle("Offline & Sync")
+    }
+}
+
+private struct SyncMetricRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value).foregroundColor(.secondary)
+        }
     }
 }
 

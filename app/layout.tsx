@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AccentProvider } from "@/lib/accent-context";
+import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="h-full antialiased">
+        <ServiceWorkerRegistration />
         <ThemeProvider><AccentProvider>{children}</AccentProvider></ThemeProvider>
       </body>
     </html>

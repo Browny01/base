@@ -366,7 +366,7 @@ export interface Workout {
 
 // ── Vision Board ──────────────────────────────────────────────────────────────
 
-export type BoardItemType = "photo" | "note" | "music";
+export type BoardItemType = "photo" | "note" | "music" | "link";
 export type NoteColor = "yellow" | "pink" | "blue" | "green" | "purple" | "gray";
 
 export interface BoardItem {
@@ -389,6 +389,9 @@ export interface BoardItem {
   audioSrc?: string;    // hosted mp3 URL
   title?: string;       // song title
   artist?: string;      // song artist
+  // link button
+  pageId?: string;      // target Notes page
+  linkLabel?: string;   // custom button label
   createdAt: string;
 }
 
@@ -505,6 +508,24 @@ export interface BodyMetrics {
   photos?: ProgressPhoto[];
 }
 
+export interface DashboardLayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  maxW?: number;
+  minH?: number;
+  maxH?: number;
+  static?: boolean;
+}
+
+export interface DashboardPreferences {
+  layouts: Record<string, DashboardLayoutItem[]>;
+  visibleWidgets: string[];
+}
+
 export interface BridgeData {
   tasks: Task[];
   focusSessions: FocusSession[];
@@ -541,6 +562,8 @@ export interface BridgeData {
   chatSettings: ChatSettings;
   courses: Course[];
   newsPrefs: NewsPrefs;
+  hiddenPages: string[];
+  dashboardPreferences: DashboardPreferences | null;
   updatedAt?: number;
 }
 
@@ -595,6 +618,8 @@ export const DEFAULT: BridgeData = {
   chatSettings: DEFAULT_CHAT_SETTINGS,
   courses: [],
   newsPrefs: DEFAULT_NEWS_PREFS,
+  hiddenPages: [],
+  dashboardPreferences: null,
 };
 
 function migrateIncomeTypes(data: BridgeData): BridgeData {
@@ -689,7 +714,14 @@ function load(): BridgeData {
 
 function save(data: BridgeData) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("bridge_data", JSON.stringify(data));
+  try {
+    // localStorage is the tiny, synchronous hot cache that makes route changes
+    // instant. IndexedDB is the durable store and is written by the sync layer.
+    localStorage.setItem("bridge_data", JSON.stringify(data));
+  } catch {
+    // Large attachments can exhaust localStorage. The IndexedDB write remains
+    // authoritative, so failing this performance cache must never break edits.
+  }
 }
 
 export function getData(): BridgeData {
@@ -700,6 +732,15 @@ export function updateData(updater: (d: BridgeData) => BridgeData) {
   const next = updater(load());
   save(next);
   window.dispatchEvent(new Event("bridge_update"));
+  return next;
+}
+
+export function replaceData(data: BridgeData, notify = true): BridgeData {
+  const next = purgeOldTrash(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes({ ...DEFAULT, ...data })))));
+  save(next);
+  if (notify && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("bridge_update"));
+  }
   return next;
 }
 

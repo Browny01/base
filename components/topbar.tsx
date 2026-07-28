@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { CommandBar } from "@/components/command-bar";
+import { SyncStatusButton } from "@/components/sync-status";
 
 export function TopBar() {
   return (
@@ -15,8 +16,9 @@ export function TopBar() {
           <CommandBar />
         </div>
 
-        {/* Right: account */}
-        <div className="flex items-center shrink-0">
+        {/* Right: local/cloud state + account */}
+        <div className="flex items-center gap-2 shrink-0">
+          <SyncStatusButton />
           <Link
             href="/settings"
             title="Settings"

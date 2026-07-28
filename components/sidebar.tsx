@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useTheme } from "@/lib/theme-context";
+import { pageIsVisible } from "@/lib/page-visibility";
+import { useHiddenPages } from "@/lib/use-page-visibility";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, ChevronsLeft, Settings,
@@ -92,7 +94,11 @@ export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
+  const hiddenPages = useHiddenPages();
   const isDark = theme === "dark";
+  const visibleSections = NAV_SECTIONS
+    .map((section) => ({ ...section, items: section.items.filter((item) => pageIsVisible(hiddenPages, item.href)) }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside
@@ -120,7 +126,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2.5 py-2 flex flex-col gap-3 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.label} className="flex flex-col gap-0.5">
             {!collapsed ? (
               <p className="px-2.5 pt-1 pb-1.5 text-[10.5px] font-semibold text-[var(--faint)] tracking-[0.14em] uppercase">

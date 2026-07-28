@@ -3,7 +3,7 @@
 import { useId, useState, useEffect, useRef } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday, calcStreak } from "@/lib/utils";
-import type { Priority, Task, TaskTag } from "@/lib/store";
+import type { DashboardPreferences, Priority, Task, TaskTag } from "@/lib/store";
 import { Repeat2, Flame, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, Grip, SlidersHorizontal, RotateCcw, X, Check, Timer, Target, NotebookText, CreditCard, Dumbbell, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -106,6 +106,56 @@ DEFAULT_LAYOUTS.sm = stackedLayout(GRID_COLUMNS.sm);
 DEFAULT_LAYOUTS.xs = stackedLayout(GRID_COLUMNS.xs);
 DEFAULT_LAYOUTS.xxs = stackedLayout(GRID_COLUMNS.xxs);
 
+function cloneLayouts(source: ResponsiveLayouts<DashboardBreakpoint>): ResponsiveLayouts<DashboardBreakpoint> {
+  return Object.fromEntries(
+    (Object.keys(GRID_COLUMNS) as DashboardBreakpoint[]).map((breakpoint) => [
+      breakpoint,
+      (source[breakpoint] ?? []).map((item) => ({ ...item })),
+    ]),
+  ) as ResponsiveLayouts<DashboardBreakpoint>;
+}
+
+function normalizeLayouts(source?: DashboardPreferences["layouts"]): ResponsiveLayouts<DashboardBreakpoint> {
+  return Object.fromEntries(
+    (Object.keys(GRID_COLUMNS) as DashboardBreakpoint[]).map((breakpoint) => {
+      const saved = source?.[breakpoint];
+      const layout = Array.isArray(saved) && saved.length > 0
+        ? saved.filter((item) => WIDGETS.some((widget) => widget.id === item.i)).map((item) => ({ ...item }))
+        : (DEFAULT_LAYOUTS[breakpoint] ?? []).map((item) => ({ ...item }));
+      return [breakpoint, layout];
+    }),
+  ) as ResponsiveLayouts<DashboardBreakpoint>;
+}
+
+function validVisibleWidgets(source?: string[]): WidgetId[] {
+  if (!Array.isArray(source)) return [...DEFAULT_WIDGET_IDS];
+  return source.filter((id): id is WidgetId => WIDGETS.some((widget) => widget.id === id));
+}
+
+function readLegacyDashboardPreferences(): DashboardPreferences | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(DASHBOARD_LAYOUT_KEY) || "null") as DashboardPreferences | null;
+    return saved && typeof saved === "object" ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function toDashboardPreferences(
+  layouts: ResponsiveLayouts<DashboardBreakpoint>,
+  visibleWidgets: WidgetId[],
+): DashboardPreferences {
+  return {
+    layouts: Object.fromEntries(
+      (Object.keys(GRID_COLUMNS) as DashboardBreakpoint[]).map((breakpoint) => [
+        breakpoint,
+        (layouts[breakpoint] ?? []).map((item) => ({ ...item })),
+      ]),
+    ),
+    visibleWidgets: [...visibleWidgets],
+  };
+}
+
 const COLOR_DOT: Record<string, string> = {
   indigo: "bg-[var(--c-indigo)]", cyan: "bg-[var(--c-cyan)]", emerald: "bg-[var(--c-emerald)]",
   yellow: "bg-[var(--c-amber)]",  red: "bg-[var(--c-rose)]",  purple: "bg-[var(--c-purple)]",
@@ -129,7 +179,7 @@ function lastNDays(n: number): string[] {
 }
 
 export function Dashboard() {
-  const { data, mutate } = useBridge();
+  const { data, mutate, loaded } = useBridge();
   const now = new Date();
   const today = getToday();
 
@@ -138,31 +188,35 @@ export function Dashboard() {
   const [quickTag, setQuickTag] = useState<TaskTag>("@work");
   const [showQuickForm, setShowQuickForm] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [layouts, setLayouts] = useState<ResponsiveLayouts<DashboardBreakpoint>>(DEFAULT_LAYOUTS);
+  const [layouts, setLayouts] = useState<ResponsiveLayouts<DashboardBreakpoint>>(() => cloneLayouts(DEFAULT_LAYOUTS));
   const [visibleWidgets, setVisibleWidgets] = useState<WidgetId[]>(DEFAULT_WIDGET_IDS);
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
-  const layoutLoaded = useRef(false);
+  const [preferencesReady, setPreferencesReady] = useState(false);
+  const preferencesHydrated = useRef(false);
+  const latestLayouts = useRef<ResponsiveLayouts<DashboardBreakpoint>>(cloneLayouts(DEFAULT_LAYOUTS));
+  const latestVisibleWidgets = useRef<WidgetId[]>(DEFAULT_WIDGET_IDS);
   const { width: gridWidth, containerRef: gridContainerRef, mounted: gridMounted } = useContainerWidth({ measureBeforeMount: true });
 
   useEffect(() => {
+    if (!loaded || preferencesHydrated.current) return;
     const timer = window.setTimeout(() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem(DASHBOARD_LAYOUT_KEY) || "null") as {
-          layouts?: ResponsiveLayouts<DashboardBreakpoint>;
-          visibleWidgets?: WidgetId[];
-        } | null;
-        if (saved?.layouts) setLayouts(saved.layouts);
-        if (saved?.visibleWidgets) {
-          const valid = saved.visibleWidgets.filter((id) => WIDGETS.some((widget) => widget.id === id));
-          setVisibleWidgets(valid);
-        }
-      } catch {
-        // Ignore malformed local preferences and use the polished default layout.
+      const legacy = readLegacyDashboardPreferences();
+      const saved = data.dashboardPreferences ?? legacy;
+      const nextLayouts = normalizeLayouts(saved?.layouts);
+      const nextVisibleWidgets = validVisibleWidgets(saved?.visibleWidgets);
+      latestLayouts.current = nextLayouts;
+      latestVisibleWidgets.current = nextVisibleWidgets;
+      setLayouts(nextLayouts);
+      setVisibleWidgets(nextVisibleWidgets);
+      preferencesHydrated.current = true;
+      setPreferencesReady(true);
+
+      if (!data.dashboardPreferences && legacy) {
+        mutate((current) => ({ ...current, dashboardPreferences: toDashboardPreferences(nextLayouts, nextVisibleWidgets) }));
       }
-      layoutLoaded.current = true;
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [data.dashboardPreferences, loaded, mutate]);
 
   useEffect(() => {
     if (!editing) return;
@@ -176,15 +230,28 @@ export function Dashboard() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [editing]);
 
-  function persistDashboard(nextLayouts: ResponsiveLayouts<DashboardBreakpoint>, nextVisible = visibleWidgets) {
-    if (!layoutLoaded.current) return;
-    localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify({ layouts: nextLayouts, visibleWidgets: nextVisible }));
+  function persistDashboard(
+    nextLayouts: ResponsiveLayouts<DashboardBreakpoint>,
+    nextVisible: WidgetId[],
+    syncBridge: boolean,
+  ) {
+    if (!preferencesHydrated.current) return;
+    const preferences = toDashboardPreferences(nextLayouts, nextVisible);
+    try {
+      localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(preferences));
+    } catch {
+      // Bridge sync below remains the durable fallback if browser storage is unavailable.
+    }
+    if (syncBridge) {
+      mutate((current) => ({ ...current, dashboardPreferences: preferences }));
+    }
   }
 
   function removeWidget(id: WidgetId) {
     const nextVisible = visibleWidgets.filter((widgetId) => widgetId !== id);
+    latestVisibleWidgets.current = nextVisible;
     setVisibleWidgets(nextVisible);
-    persistDashboard(layouts, nextVisible);
+    persistDashboard(latestLayouts.current, nextVisible, true);
   }
 
   function addWidget(id: WidgetId) {
@@ -201,16 +268,36 @@ export function Dashboard() {
         return [breakpoint, existing];
       }),
     ) as ResponsiveLayouts<DashboardBreakpoint>;
+    latestVisibleWidgets.current = nextVisible;
+    latestLayouts.current = nextLayouts;
     setVisibleWidgets(nextVisible);
     setLayouts(nextLayouts);
-    persistDashboard(nextLayouts, nextVisible);
+    persistDashboard(nextLayouts, nextVisible, true);
   }
 
   function resetDashboard() {
-    const nextVisible = DEFAULT_WIDGET_IDS;
-    setLayouts(DEFAULT_LAYOUTS);
+    const nextLayouts = cloneLayouts(DEFAULT_LAYOUTS);
+    const nextVisible = [...DEFAULT_WIDGET_IDS];
+    latestLayouts.current = nextLayouts;
+    latestVisibleWidgets.current = nextVisible;
+    setLayouts(nextLayouts);
     setVisibleWidgets(nextVisible);
-    persistDashboard(DEFAULT_LAYOUTS, nextVisible);
+    persistDashboard(nextLayouts, nextVisible, true);
+  }
+
+  function finishEditing() {
+    persistDashboard(latestLayouts.current, latestVisibleWidgets.current, true);
+    setEditing(false);
+    setShowWidgetPicker(false);
+  }
+
+  function syncLatestDashboardAfterInteraction() {
+    // react-grid-layout emits its final onLayoutChange immediately after the
+    // drag/resize stop callback. Commit on the next task so Bridge receives
+    // the exact final coordinates rather than the penultimate pointer frame.
+    window.setTimeout(() => {
+      persistDashboard(latestLayouts.current, latestVisibleWidgets.current, true);
+    }, 0);
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
@@ -447,7 +534,7 @@ export function Dashboard() {
       </div>
 
       <div ref={gridContainerRef} className={cn("dashboard-grid -mx-3", editing && "is-editing")}>
-        {gridMounted && (
+        {gridMounted && preferencesReady && (
           <Responsive<DashboardBreakpoint>
             width={gridWidth}
             layouts={layouts}
@@ -461,9 +548,12 @@ export function Dashboard() {
             resizeConfig={{ enabled: editing, handles: ["n", "s", "e", "w", "ne", "nw", "se", "sw"] }}
             onLayoutChange={(_current, nextLayouts) => {
               const normalized = nextLayouts as ResponsiveLayouts<DashboardBreakpoint>;
+              latestLayouts.current = normalized;
               setLayouts(normalized);
-              persistDashboard(normalized);
+              if (editing) persistDashboard(normalized, latestVisibleWidgets.current, false);
             }}
+            onDragStop={syncLatestDashboardAfterInteraction}
+            onResizeStop={syncLatestDashboardAfterInteraction}
           >
             {visibleWidgets.map((id) => {
               const widget = WIDGETS.find((item) => item.id === id)!;
@@ -503,7 +593,7 @@ export function Dashboard() {
         <div className="glass glass-edge flex items-center gap-1.5 rounded-full border border-[var(--border)] p-1.5">
           {editing && <button onClick={() => setShowWidgetPicker((value) => !value)} className="pill h-9 border-0 bg-transparent"><Plus className="w-3.5 h-3.5" /> Add widget</button>}
           {editing && <button onClick={resetDashboard} className="pill h-9 border-0 bg-transparent"><RotateCcw className="w-3.5 h-3.5" /> Reset</button>}
-          <button onClick={() => { setEditing((value) => !value); setShowWidgetPicker(false); }} className={cn("h-9 rounded-full px-4 inline-flex items-center gap-2 text-xs font-semibold transition-colors", editing ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]")}>
+          <button onClick={() => editing ? finishEditing() : setEditing(true)} className={cn("h-9 rounded-full px-4 inline-flex items-center gap-2 text-xs font-semibold transition-colors", editing ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]")}>
             {editing ? <Check className="w-3.5 h-3.5" /> : <SlidersHorizontal className="w-3.5 h-3.5" />}{editing ? "Done" : "Edit dashboard"}
           </button>
         </div>
@@ -609,21 +699,40 @@ function MetricCard({
 
 // Hourly AI news briefing, condensed for the dashboard.
 function DashNewsBriefing() {
+  const cacheKey = "bridge_cached_news_summary";
+  const readCached = () => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null") as { summary?: string } | null;
+      return cached?.summary;
+    } catch {
+      return undefined;
+    }
+  };
   const [state, setState] = useState<{ loading: boolean; summary?: string; error?: string }>({ loading: true });
   const load = () => {
-    setState((s) => ({ ...s, loading: true }));
+    const cached = readCached();
+    setState((s) => ({ ...s, loading: !cached, summary: s.summary || cached, error: undefined }));
     fetch("/api/news/summary")
       .then((r) => r.json())
-      .then((j) => setState(j.ok ? { loading: false, summary: j.summary } : { loading: false, error: j.error || "Couldn't load the briefing." }))
-      .catch((e) => setState({ loading: false, error: String(e) }));
+      .then((j) => {
+        if (!j.ok) throw new Error(j.error || "Couldn't load the briefing.");
+        try { localStorage.setItem(cacheKey, JSON.stringify({ summary: j.summary, savedAt: Date.now() })); } catch {}
+        setState({ loading: false, summary: j.summary });
+      })
+      .catch((e) => {
+        const offlineSummary = readCached();
+        setState(offlineSummary
+          ? { loading: false, summary: offlineSummary }
+          : { loading: false, error: String(e) });
+      });
   };
   useEffect(() => {
     const timer = window.setTimeout(load, 0);
     return () => window.clearTimeout(timer);
   }, []);
   return (
-    <section className="card h-full p-5 overflow-auto">
-      <div className="flex items-center justify-between mb-3">
+    <section className="card flex h-full min-h-0 flex-col overflow-hidden p-5">
+      <div className="mb-3 flex shrink-0 items-center justify-between">
         <SectionTitle icon={<Newspaper style={{ width: 15, height: 15 }} strokeWidth={1.9} />}>News briefing</SectionTitle>
         <div className="flex items-center gap-2">
           <button onClick={load} disabled={state.loading} title="Refresh" className="rounded p-1 text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-40"><RefreshCw className={cn("w-3.5 h-3.5", state.loading && "animate-spin")} /></button>
@@ -631,11 +740,11 @@ function DashNewsBriefing() {
         </div>
       </div>
       {state.loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-[var(--faint)]"><Loader2 className="w-4 h-4 animate-spin" /> Summarising the latest headlines…</div>
+        <div className="flex min-h-0 flex-1 items-start gap-2 overflow-y-auto text-[13px] text-[var(--faint)]"><Loader2 className="w-4 h-4 animate-spin" /> Summarising the latest headlines…</div>
       ) : state.error ? (
-        <p className="text-[13px] text-[var(--faint)]">{state.error}</p>
+        <p className="min-h-0 flex-1 overflow-y-auto text-[13px] text-[var(--faint)]">{state.error}</p>
       ) : (
-        <div className="nx-md text-[13px] max-h-[280px] overflow-y-auto pr-1" dangerouslySetInnerHTML={{ __html: mdToHtml(state.summary || "") }} />
+        <div className="nx-md min-h-0 min-w-0 flex-1 overflow-auto pr-1 text-[13px] [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: mdToHtml(state.summary || "") }} />
       )}
     </section>
   );

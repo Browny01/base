@@ -13,6 +13,8 @@ import {
   Settings, Sun, Moon, PanelBottom,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { pageIsVisible } from "@/lib/page-visibility";
+import { useHiddenPages } from "@/lib/use-page-visibility";
 
 type Item =
   | { kind: "page"; key: string; label: string; icon: LucideIcon; href: string; keywords?: string }
@@ -45,6 +47,7 @@ export function CommandBar() {
   const pathname = usePathname();
   const { theme, toggle: toggleTheme } = useTheme();
   const { mode, setMode } = useNavMode();
+  const hiddenPages = useHiddenPages();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -83,13 +86,13 @@ export function CommandBar() {
     const q = query.trim().toLowerCase();
     const match = (it: Item) => !q || (it.label + " " + ("keywords" in it ? it.keywords ?? "" : "")).toLowerCase().includes(q);
     const acts = q ? actions.filter(match) : actions;   // always show actions, filtered by query
-    const pages = PAGE_ITEMS.filter(match);
+    const pages = PAGE_ITEMS.filter((item) => item.kind !== "page" || pageIsVisible(hiddenPages, item.href)).filter(match);
     const projects = dyn.projects.filter(match);
     const notes = dyn.wiki.filter(match);
     const chats = dyn.chats.filter(match);
     const boards = dyn.boards.filter(match);
     return { acts, pages, projects, notes, chats, boards, results: [...acts, ...pages, ...projects, ...notes, ...chats, ...boards] };
-  }, [query, dyn, actions]);
+  }, [query, dyn, actions, hiddenPages]);
 
   // ⌘K / Ctrl+K toggle
   useEffect(() => {
