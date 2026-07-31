@@ -91,14 +91,11 @@ async function walletTotalAud(w: Wallet, origin: string, rate: number, prices: R
 }
 
 async function run(req: NextRequest) {
-  // Auth: when CRON_SECRET is configured, require Vercel's bearer header.
+  // Fail closed: Vercel Cron sends CRON_SECRET as a Bearer token.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    const key = new URL(req.url).searchParams.get("key");
-    if (auth !== `Bearer ${secret}` && key !== secret) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-    }
+  if (!secret) return NextResponse.json({ ok: false, error: "cron is not configured" }, { status: 503 });
+  if (req.headers.get("authorization") !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const redis = getRedis();

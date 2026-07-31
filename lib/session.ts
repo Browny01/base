@@ -7,9 +7,6 @@ import { bridgeSessionSecret } from "@/lib/env";
 
 const enc = new TextEncoder();
 
-// Prefer a dedicated secret; fall back to the login password, then a constant so
-// the app never hard-locks if env is momentarily missing (login + proxy always
-// derive the SAME key, so no lock-out). Set BRIDGE_SESSION_SECRET for real safety.
 function secretKey(): string {
   return bridgeSessionSecret();
 }
@@ -22,22 +19,61 @@ async function hmac(msg: string): Promise<string> {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// token = "<expiryMs>.<hmac(expiryMs)>"
-export async function signSession(days = 30): Promise<string> {
+function decodeBase64Url(value: string): ArrayBuffer | null {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+    const bytes = new Uint8Array(bin.length);
+    for (let index = 0; index < bin.length; index++) bytes[index] = bin.charCodeAt(index);
+    return bytes.buffer;
+  } catch {
+    return null;
+  }
+}
+
+// token = "v1.<expiryMs>.<random nonce>.<hmac(version.expiry.nonce)>"
+export async function signSession(days = 7): Promise<string> {
   const exp = Date.now() + days * 86_400_000;
-  return `${exp}.${await hmac(String(exp))}`;
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  let nonceBin = "";
+  for (const byte of nonceBytes) nonceBin += String.fromCharCode(byte);
+  const nonce = btoa(nonceBin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const payload = `v1.${exp}.${nonce}`;
+  return `${payload}.${await hmac(payload)}`;
 }
 
 export async function verifySession(token?: string): Promise<boolean> {
-  if (!token || !token.includes(".")) return false;
-  const dot = token.indexOf(".");
-  const expStr = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
+  if (!token) return false;
+  const parts = token.split(".");
+  if (parts.length !== 4 || parts[0] !== "v1") return false;
+  const [version, expStr, nonce, sig] = parts;
   const exp = Number(expStr);
   if (!Number.isFinite(exp) || exp < Date.now()) return false;
-  const expected = await hmac(expStr);
-  if (sig.length !== expected.length) return false;
-  let diff = 0; // constant-time-ish compare
-  for (let i = 0; i < sig.length; i++) diff |= sig.charCodeAt(i) ^ expected.charCodeAt(i);
-  return diff === 0;
+  if (!/^[A-Za-z0-9_-]{20,24}$/.test(nonce)) return false;
+  const signature = decodeBase64Url(sig);
+  if (!signature) return false;
+  const key = await crypto.subtle.importKey("raw", enc.encode(secretKey()), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  return crypto.subtle.verify("HMAC", key, signature, enc.encode(`${version}.${expStr}.${nonce}`));
+}
+
+function sessionCookie(request: Request): string | undefined {
+  const cookieHeader = request.headers.get("cookie") || "";
+  for (const entry of cookieHeader.split(";")) {
+    const [name, ...parts] = entry.trim().split("=");
+    if (name === "bridge_auth") return parts.join("=");
+  }
+  return undefined;
+}
+
+// Sensitive handlers verify again instead of relying solely on Proxy redirects.
+export async function requireBridgeSession(request: Request): Promise<Response | null> {
+  try {
+    if (await verifySession(sessionCookie(request))) return null;
+  } catch (error) {
+    console.error("[bridge/route session]", error);
+  }
+  return Response.json({ error: "Unauthorized" }, {
+    status: 401,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const token = url.searchParams.get("token") || req.headers.get("x-bridge-token") || "";
   const expected = bridgeAgentToken();
-  if (token !== expected) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!expected || token !== expected) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const redis = getRedis();
   if (!redis) return NextResponse.json({ error: "not configured" }, { status: 503 });

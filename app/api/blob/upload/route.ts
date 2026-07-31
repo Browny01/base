@@ -1,10 +1,12 @@
 import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
+import { requireBridgeSession } from "@/lib/session";
 
 // Uploads a (client-downscaled) image to Vercel Blob and returns its public URL.
 // The board stores that URL instead of a base64 data blob, keeping the synced
 // bridge:data payload small.
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
     // No Blob store wired up — caller falls back to an inline data URL.

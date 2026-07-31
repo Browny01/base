@@ -1,5 +1,6 @@
 import { providerOf } from "@/lib/chat-models";
 import { callModel, extractJson } from "@/lib/ai-generate";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -24,6 +25,7 @@ Return ONLY JSON (no markdown fences): {"title": "short widget title", "html": "
 }
 
 export async function POST(req: Request) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   let body: { topic?: string; lessonTitle?: string; lessonContent?: string; idea?: string; model?: string };
   try { body = await req.json(); } catch { return Response.json({ ok: false, error: "Bad request" }, { status: 400 }); }
 
