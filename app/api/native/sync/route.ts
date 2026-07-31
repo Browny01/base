@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { DATA_KEY, readCurrentData } from "@/lib/bridge-data";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -107,7 +108,8 @@ redis.call("SET", KEYS[1], encoded)
 return encoded
 `;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const redis = getRedis();
   if (!redis) return Response.json({ data: null, configured: false });
 
@@ -120,6 +122,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const redis = getRedis();
   if (!redis) return Response.json({ ok: false, configured: false }, { status: 503 });
 

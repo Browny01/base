@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { CreatorPlatform } from "@/lib/news-prefs";
+import { requireBridgeSession } from "@/lib/session";
 
 export interface LiveStatusItem {
   id: string;
@@ -56,6 +57,7 @@ async function kickStatus(handle: string): Promise<Pick<LiveStatusItem, "status"
 }
 
 export async function GET(request: NextRequest) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const creators = request.nextUrl.searchParams.getAll("creator")
     .flatMap((value) => value.split(","))
     .map((value) => value.trim())

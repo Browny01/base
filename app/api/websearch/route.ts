@@ -1,4 +1,5 @@
 import { callModel } from "@/lib/ai-generate";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -8,6 +9,7 @@ export const maxDuration = 60;
 // returns a factual briefing + source URLs, which the client injects into the local
 // model's context. Falls back gracefully if no PERPLEXITY_API_KEY is configured.
 export async function POST(req: Request) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   let query = "";
   try { query = String(((await req.json()) as { query?: string }).query ?? "").trim(); } catch { /* ignore */ }
   if (!query) return Response.json({ ok: false, error: "Empty query." }, { status: 400 });

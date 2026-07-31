@@ -1,4 +1,5 @@
 import { callModel, extractJson } from "@/lib/ai-generate";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -7,6 +8,7 @@ const MODEL = "gemini-2.5-flash";
 
 // Break a task into a short, concrete checklist of subtasks.
 export async function POST(req: Request) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   let title = "";
   try { title = String(((await req.json()) as { title?: string }).title ?? "").trim(); } catch { /* ignore */ }
   if (!title) return Response.json({ ok: false, error: "No task given." }, { status: 400 });

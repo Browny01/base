@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireBridgeSession } from "@/lib/session";
 
 // Cal.com API v1 was decommissioned — this uses API v2.
 // Docs: https://cal.com/docs/api-reference/v2/bookings
@@ -19,7 +20,8 @@ interface V2Booking {
 const startOf = (b: V2Booking) => b.start ?? b.startTime ?? "";
 const endOf = (b: V2Booking) => b.end ?? b.endTime ?? "";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const key = process.env.CALCOM_API_KEY;
   if (!key) return NextResponse.json({ configured: false });
 
