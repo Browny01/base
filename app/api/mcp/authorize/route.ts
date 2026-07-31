@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getClient, saveCode, checkPassword, randId, oauthPassword } from "@/lib/mcp-oauth";
+import { clearLoginFailures, loginLockStatus, recordLoginFailure, requestIp } from "@/lib/login-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,14 @@ function errorPage(msg: string, status = 400) {
   return new Response(page(`<p class="err">${msg}</p>`), { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
 
+function lockedPage(retryAfter: number) {
+  const minutes = Math.max(1, Math.ceil(retryAfter / 60));
+  return new Response(page(`<p class="err">Too many attempts. Try again in about ${minutes} minute${minutes === 1 ? "" : "s"}.</p>`), {
+    status: 429,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Retry-After": String(retryAfter) },
+  });
+}
+
 async function validate(p: Params): Promise<string | null> {
   if (p.response_type !== "code") return "Only response_type=code is supported.";
   if (!p.client_id) return "Missing client_id.";
@@ -31,6 +40,8 @@ async function validate(p: Params): Promise<string | null> {
 // Show the login page.
 export async function GET(req: NextRequest) {
   if (!oauthPassword()) return errorPage("This server has no MCP_PASSWORD / MCP_TOKEN set, so authorization is disabled.", 503);
+  const retryAfter = await loginLockStatus("mcp", requestIp(req));
+  if (retryAfter > 0) return lockedPage(retryAfter);
   const p = read(req.nextUrl.searchParams);
   const bad = await validate(p);
   if (bad) return errorPage(bad);
@@ -39,6 +50,10 @@ export async function GET(req: NextRequest) {
 
 // Handle the password submission → issue a code and redirect back to the client.
 export async function POST(req: NextRequest) {
+  const ip = requestIp(req);
+  const retryAfter = await loginLockStatus("mcp", ip);
+  if (retryAfter > 0) return lockedPage(retryAfter);
+
   const raw = await req.text();
   const sp = new URLSearchParams(raw);
   const p = read(sp);
@@ -48,9 +63,12 @@ export async function POST(req: NextRequest) {
   if (bad) return errorPage(bad);
 
   if (!checkPassword(password)) {
+    const failure = await recordLoginFailure("mcp", ip);
+    if (failure.locked) return lockedPage(failure.retryAfter);
     return new Response(page(form(p, "Incorrect password — try again.")), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 
+  await clearLoginFailures("mcp", ip);
   const code = randId(32);
   await saveCode(code, { client_id: p.client_id, redirect_uri: p.redirect_uri, code_challenge: p.code_challenge || undefined, resource: p.resource || undefined });
 

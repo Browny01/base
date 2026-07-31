@@ -1,4 +1,5 @@
 import { providerOf, SOURCES_SENTINEL, type PerplexityTool } from "@/lib/chat-models";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,6 +25,7 @@ function textResponse(msg: string) {
 }
 
 export async function POST(req: Request) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   let body: unknown;
   try { body = await req.json(); } catch { return new Response("Bad request", { status: 400 }); }
   const b = body as { messages?: Msg[]; model?: string; system?: string; perplexityTools?: PerplexityTool[] };

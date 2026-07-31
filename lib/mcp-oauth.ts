@@ -4,6 +4,7 @@
 
 import { createHash, randomBytes } from "crypto";
 import { mcpRedis } from "@/lib/mcp-data";
+import { constantTimeEqual } from "@/lib/security";
 
 export const CODE_TTL = 300;                    // authorization code: 5 min
 export const ACCESS_TTL = 60 * 60 * 24 * 30;    // access token: 30 days
@@ -20,7 +21,10 @@ export const randId = (n = 32) => randomBytes(n).toString("base64url");
 export const pkceS256 = (verifier: string) => createHash("sha256").update(verifier).digest("base64url");
 
 export const oauthPassword = () => process.env.MCP_PASSWORD || process.env.MCP_TOKEN || "";
-export const checkPassword = (pw: string) => { const p = oauthPassword(); return !!p && pw === p; };
+export const checkPassword = (pw: string) => {
+  const password = oauthPassword();
+  return !!password && constantTimeEqual(pw, password);
+};
 
 async function put(key: string, value: unknown, ttl: number) {
   const r = mcpRedis(); if (!r) return;

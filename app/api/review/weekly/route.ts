@@ -1,10 +1,12 @@
 import { callModel } from "@/lib/ai-generate";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
 
 // Turns a compact weekly-stats object (sent by the client) into a coaching retro.
 export async function POST(req: Request) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   let stats: unknown = {};
   try { stats = (await req.json()).stats ?? {}; } catch { /* ignore */ }
 

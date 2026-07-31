@@ -28,7 +28,9 @@ export default function LoginPage() {
         router.replace("/");
         router.refresh();
       } else {
-        setError("Incorrect password");
+        const body = await res.json().catch(() => ({})) as { error?: string; retryAfter?: number };
+        const retryMinutes = body.retryAfter ? Math.max(1, Math.ceil(body.retryAfter / 60)) : 0;
+        setError(retryMinutes ? `Too many attempts — try again in about ${retryMinutes} minutes` : body.error || "Unable to sign in");
         setPassword("");
       }
     } catch {
@@ -89,7 +91,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-[var(--faint)] mt-6">
-          Session lasts 30 days
+          Session lasts 7 days
         </p>
       </div>
     </div>

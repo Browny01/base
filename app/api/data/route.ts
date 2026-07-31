@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { DATA_KEY as KEY, readCurrentData } from "@/lib/bridge-data";
+import { requireBridgeSession } from "@/lib/session";
 
 const HISTORY = "bridge:data:history";   // rolling backups (newest first)
 
@@ -32,7 +33,8 @@ function emptiedCount(existing: Record<string, unknown>, incoming: Record<string
   return n;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   const redis = getRedis();
   if (!redis) return NextResponse.json({ data: null, configured: false });
   try {
@@ -45,6 +47,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   const redis = getRedis();
   if (!redis) return NextResponse.json({ ok: false, configured: false });
   try {

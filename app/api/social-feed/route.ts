@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Parser from "rss-parser";
+import { requireBridgeSession } from "@/lib/session";
 
 export interface SocialFeedItem {
   id: string;
@@ -14,11 +15,22 @@ export interface SocialFeedItem {
 }
 
 const parser = new Parser({
-  timeout: 8000,
   headers: {
-    "User-Agent": "Bridge/1.0 (+https://vercel.app)",
+    "User-Agent": "Bridge/1.0 (+https://bridge.lucasbrown.xyz)",
   },
 });
+
+async function parseFeed(url: string) {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "Bridge/1.0 (+https://bridge.lucasbrown.xyz)" },
+    next: { revalidate: 180 },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Feed HTTP ${response.status}`);
+  const xml = await response.text();
+  if (xml.length > 2_000_000) throw new Error("Feed is too large");
+  return parser.parseString(xml);
+}
 
 const clean = (value: string) => value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 
@@ -76,6 +88,7 @@ async function fetchXPosts(handle: string): Promise<SocialFeedItem[]> {
 }
 
 export async function GET(request: NextRequest) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const params = request.nextUrl.searchParams;
   const youtube = params.getAll("youtube").flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean).slice(0, 12);
   const reddit = params.getAll("reddit").flatMap((v) => v.split(",")).map((v) => v.trim().replace(/^r\//, "")).filter(Boolean).slice(0, 12);
@@ -87,7 +100,7 @@ export async function GET(request: NextRequest) {
     const [channelId, name = channelId, category = "general"] = raw.split("|").map((part) => part.trim());
     if (!channelId.startsWith("UC")) continue;
     jobs.push(
-      parser.parseURL(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`)
+      parseFeed(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`)
         .then((feed) => feed.items.filter((item) => !(item.link ?? "").includes("/shorts/")).slice(0, 8).map((item) => {
           const videoId = youtubeVideoId(item);
           return {
@@ -108,7 +121,7 @@ export async function GET(request: NextRequest) {
 
   for (const sub of reddit) {
     jobs.push(
-      parser.parseURL(`https://www.reddit.com/r/${encodeURIComponent(sub)}/new/.rss`)
+      parseFeed(`https://www.reddit.com/r/${encodeURIComponent(sub)}/new/.rss`)
         .then((feed) => feed.items.slice(0, 8).map((item) => ({
           id: item.guid ?? item.link ?? `${sub}-${item.title}`,
           title: item.title ?? "Untitled post",

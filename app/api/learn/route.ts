@@ -1,11 +1,13 @@
 import { providerOf } from "@/lib/chat-models";
 import { callModel } from "@/lib/ai-generate";
 import { buildLearnPrompt, extractCourseJson, normalizeCourse, type Level } from "@/lib/learn-gen";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
+  const unauthorized = await requireBridgeSession(req); if (unauthorized) return unauthorized;
   let body: { topic?: string; specifics?: string; level?: Level; model?: string };
   try { body = await req.json(); } catch { return Response.json({ ok: false, error: "Bad request" }, { status: 400 }); }
 

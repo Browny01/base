@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { requireBridgeSession } from "@/lib/session";
 
 const AUD_CODE = "aud";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return NextResponse.json({ configured: false });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
+import { requireBridgeSession } from "@/lib/session";
 
 export interface NewsArticle {
   title: string;
@@ -39,16 +40,27 @@ const FEEDS = [
 ];
 
 const parser = new Parser({
-  timeout: 8000,
   customFields: {
     item: [["media:content", "mediaContent"], ["dc:creator", "creator"]],
   },
 });
 
+async function parseFeed(url: string) {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "Bridge/1.0 (+https://bridge.lucasbrown.xyz)" },
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Feed HTTP ${response.status}`);
+  const xml = await response.text();
+  if (xml.length > 2_000_000) throw new Error("Feed is too large");
+  return parser.parseString(xml);
+}
+
 export async function getArticles(): Promise<NewsArticle[]> {
   const settled = await Promise.allSettled(
     FEEDS.map(async (feed) => {
-      const parsed = await parser.parseURL(feed.url);
+      const parsed = await parseFeed(feed.url);
       return parsed.items.slice(0, 12).map((item) => ({
         title: item.title ?? "",
         link: item.link ?? "",
@@ -74,7 +86,8 @@ export async function getArticles(): Promise<NewsArticle[]> {
   return articles.slice(0, 60);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const articles = await getArticles();
   return NextResponse.json(
     { articles },

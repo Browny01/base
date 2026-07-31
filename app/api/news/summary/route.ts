@@ -1,13 +1,15 @@
 import { getArticles } from "../route";
 import { callModel } from "@/lib/ai-generate";
 import { mcpRedis } from "@/lib/mcp-data";
+import { requireBridgeSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MODEL = "gemini-3.1-flash-lite";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = await requireBridgeSession(request); if (unauthorized) return unauthorized;
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH — one summary per hour
   const key = `bridge:news:summary:v4:${hour}`;
   const redis = mcpRedis();
