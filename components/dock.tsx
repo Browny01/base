@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, MoreHorizontal, X,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ const ALL: Item[] = [
   { href: "/projects", label: "Projects",  icon: FolderKanban  },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid    },
   { href: "/notes",    label: "Notes",     icon: NotebookText  },
+  { href: "/calendar", label: "Calendar",  icon: CalendarDays  },
   { href: "/tasks",    label: "Tasks",     icon: CheckSquare   },
   { href: "/focus",    label: "Focus",     icon: Timer         },
   { href: "/habits",   label: "Habits",    icon: Repeat2       },

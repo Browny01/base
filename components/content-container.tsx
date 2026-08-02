@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 // (fills the whole main area beside the sidebar / under the top bar).
 export function ContentContainer({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const fullBleed = pathname === "/" || pathname === "/vision" || pathname === "/notes" || pathname === "/player" || pathname === "/chat" || pathname === "/news" || pathname === "/finance" || pathname === "/learn" || pathname === "/gym";
+  const fullBleed = pathname === "/" || pathname === "/vision" || pathname === "/notes" || pathname === "/player" || pathname === "/chat" || pathname === "/news" || pathname === "/finance" || pathname === "/learn" || pathname === "/gym" || pathname === "/calendar";
   return (
     <div key={pathname} className={`nx-page-shell nx-page-enter ${fullBleed ? "w-full h-full" : "mx-auto w-full max-w-[1180px]"}`}>
       {children}

@@ -24,6 +24,26 @@ export interface Task {
   subtasks?: SubTask[];
 }
 
+export type CalendarRepeat = "none" | "daily" | "weekly" | "monthly";
+export type CalendarCategory = "work" | "personal" | "money" | "health" | "other";
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  startDate: string;       // YYYY-MM-DD, interpreted in the device's local timezone
+  endDate: string;         // inclusive YYYY-MM-DD
+  allDay: boolean;
+  startTime?: string;      // HH:MM for timed events
+  endTime?: string;        // HH:MM for timed events
+  category: CalendarCategory;
+  color: ProjectColor;
+  location?: string;
+  notes?: string;
+  repeat: CalendarRepeat;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FocusSession {
   id: string;
   durationMins: number;
@@ -507,6 +527,7 @@ export interface BodyMetrics {
 
 export interface BridgeData {
   tasks: Task[];
+  calendarEvents: CalendarEvent[];
   focusSessions: FocusSession[];
   incomeEntries: IncomeEntry[];
   subscriptions: PaymentSubscription[];
@@ -546,6 +567,7 @@ export interface BridgeData {
 
 export const DEFAULT: BridgeData = {
   tasks: [],
+  calendarEvents: [],
   focusSessions: [],
   incomeEntries: [],
   subscriptions: [],
