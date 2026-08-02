@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
 import { DashAskBar } from "@/components/dash-ask-bar";
 import { ProjectLogo } from "@/components/project-logo";
+import { HermesBriefings } from "@/components/hermes-briefings";
 import { Responsive, noCompactor, useContainerWidth, type Layout, type ResponsiveLayouts } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -18,7 +19,7 @@ const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
 const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
 
 type DashboardBreakpoint = "lg" | "md" | "sm" | "xs" | "xxs";
-type WidgetId = "tasks-metric" | "habits-metric" | "streak-metric" | "revenue-metric" | "news" | "tasks" | "habits" | "projects" | "focus" | "goals" | "notes" | "payments" | "workout" | "learning";
+type WidgetId = "tasks-metric" | "habits-metric" | "streak-metric" | "revenue-metric" | "news" | "hermes-briefings" | "tasks" | "habits" | "projects" | "focus" | "goals" | "notes" | "payments" | "workout" | "learning";
 
 const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "tasks-metric", label: "Tasks left" },
@@ -26,6 +27,7 @@ const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "streak-metric", label: "Streak" },
   { id: "revenue-metric", label: "Revenue" },
   { id: "news", label: "News briefing" },
+  { id: "hermes-briefings", label: "Hermes Briefings" },
   { id: "tasks", label: "Today's tasks" },
   { id: "habits", label: "Today's habits" },
   { id: "projects", label: "Projects" },
@@ -37,11 +39,12 @@ const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "learning", label: "Learning progress" },
 ];
 
-const DEFAULT_WIDGET_IDS: WidgetId[] = ["tasks-metric", "habits-metric", "streak-metric", "revenue-metric", "news", "tasks", "habits", "projects"];
+const DEFAULT_WIDGET_IDS: WidgetId[] = ["tasks-metric", "habits-metric", "streak-metric", "revenue-metric", "news", "hermes-briefings", "tasks", "habits", "projects"];
 
 const BREAKPOINTS: Record<DashboardBreakpoint, number> = { lg: 1180, md: 900, sm: 680, xs: 420, xxs: 0 };
 const GRID_COLUMNS: Record<DashboardBreakpoint, number> = { lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 };
 const DASHBOARD_LAYOUT_KEY = "bridge_dashboard_layout_v1";
+const DASHBOARD_LAYOUT_VERSION = 2;
 
 const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
   lg: [
@@ -50,15 +53,16 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
     { i: "streak-metric", x: 6, y: 0, w: 3, h: 4, minW: 2, minH: 4 },
     { i: "revenue-metric", x: 9, y: 0, w: 3, h: 4, minW: 2, minH: 4 },
     { i: "news", x: 0, y: 4, w: 12, h: 6, minW: 4, minH: 4 },
-    { i: "tasks", x: 0, y: 10, w: 6, h: 11, minW: 3, minH: 6 },
-    { i: "habits", x: 6, y: 10, w: 6, h: 11, minW: 3, minH: 6 },
-    { i: "projects", x: 0, y: 21, w: 12, h: 9, minW: 4, minH: 6 },
-    { i: "focus", x: 0, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "goals", x: 4, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "notes", x: 8, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "payments", x: 0, y: 38, w: 6, h: 8, minW: 3, minH: 6 },
-    { i: "workout", x: 6, y: 38, w: 6, h: 8, minW: 3, minH: 6 },
-    { i: "learning", x: 0, y: 46, w: 12, h: 8, minW: 4, minH: 6 },
+    { i: "hermes-briefings", x: 0, y: 10, w: 12, h: 9, minW: 6, minH: 7 },
+    { i: "tasks", x: 0, y: 19, w: 6, h: 11, minW: 3, minH: 6 },
+    { i: "habits", x: 6, y: 19, w: 6, h: 11, minW: 3, minH: 6 },
+    { i: "projects", x: 0, y: 30, w: 12, h: 9, minW: 4, minH: 6 },
+    { i: "focus", x: 0, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "goals", x: 4, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "notes", x: 8, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "payments", x: 0, y: 47, w: 6, h: 8, minW: 3, minH: 6 },
+    { i: "workout", x: 6, y: 47, w: 6, h: 8, minW: 3, minH: 6 },
+    { i: "learning", x: 0, y: 55, w: 12, h: 8, minW: 4, minH: 6 },
   ],
   md: [
     { i: "tasks-metric", x: 0, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
@@ -66,15 +70,16 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
     { i: "streak-metric", x: 4, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
     { i: "revenue-metric", x: 6, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
     { i: "news", x: 0, y: 4, w: 8, h: 6, minW: 4, minH: 4 },
-    { i: "tasks", x: 0, y: 10, w: 4, h: 11, minW: 3, minH: 6 },
-    { i: "habits", x: 4, y: 10, w: 4, h: 11, minW: 3, minH: 6 },
-    { i: "projects", x: 0, y: 21, w: 8, h: 9, minW: 4, minH: 6 },
-    { i: "focus", x: 0, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "goals", x: 4, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "notes", x: 0, y: 38, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "payments", x: 4, y: 38, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "workout", x: 0, y: 46, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "learning", x: 4, y: 46, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "hermes-briefings", x: 0, y: 10, w: 8, h: 9, minW: 6, minH: 7 },
+    { i: "tasks", x: 0, y: 19, w: 4, h: 11, minW: 3, minH: 6 },
+    { i: "habits", x: 4, y: 19, w: 4, h: 11, minW: 3, minH: 6 },
+    { i: "projects", x: 0, y: 30, w: 8, h: 9, minW: 4, minH: 6 },
+    { i: "focus", x: 0, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "goals", x: 4, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "notes", x: 0, y: 47, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "payments", x: 4, y: 47, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "workout", x: 0, y: 55, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "learning", x: 4, y: 55, w: 4, h: 8, minW: 3, minH: 6 },
   ],
   sm: [], xs: [], xxs: [],
 };
@@ -87,7 +92,7 @@ function stackedLayout(cols: number): Layout {
   return WIDGETS.map(({ id }, index) => {
     const isMetric = id.endsWith("metric");
     const metricIndex = WIDGETS.slice(0, index).filter((widget) => widget.id.endsWith("metric")).length;
-    const height = isMetric ? 4 : id === "news" ? 6 : id === "tasks" || id === "habits" ? 11 : id === "projects" ? 10 : 8;
+    const height = isMetric ? 4 : id === "news" ? 6 : id === "hermes-briefings" ? 18 : id === "tasks" || id === "habits" ? 11 : id === "projects" ? 10 : 8;
     const y = isMetric ? Math.floor(metricIndex / metricsPerRow) * 4 : contentY;
     if (!isMetric) contentY += height;
     return {
@@ -105,6 +110,37 @@ function stackedLayout(cols: number): Layout {
 DEFAULT_LAYOUTS.sm = stackedLayout(GRID_COLUMNS.sm);
 DEFAULT_LAYOUTS.xs = stackedLayout(GRID_COLUMNS.xs);
 DEFAULT_LAYOUTS.xxs = stackedLayout(GRID_COLUMNS.xxs);
+
+function migrateDashboardPreferences(saved: {
+  version?: number;
+  layouts?: ResponsiveLayouts<DashboardBreakpoint>;
+  visibleWidgets?: WidgetId[];
+}) {
+  if ((saved.version ?? 1) >= DASHBOARD_LAYOUT_VERSION) return saved;
+
+  const visible = (saved.visibleWidgets ?? DEFAULT_WIDGET_IDS).filter((id) => WIDGETS.some((widget) => widget.id === id));
+  if (!visible.includes("hermes-briefings")) {
+    const newsIndex = visible.indexOf("news");
+    visible.splice(newsIndex >= 0 ? newsIndex + 1 : visible.length, 0, "hermes-briefings");
+  }
+
+  const sourceLayouts = saved.layouts ?? DEFAULT_LAYOUTS;
+  const migratedLayouts = Object.fromEntries(
+    (Object.keys(GRID_COLUMNS) as DashboardBreakpoint[]).map((breakpoint) => {
+      const layout = [...(sourceLayouts[breakpoint] ?? DEFAULT_LAYOUTS[breakpoint] ?? [])];
+      if (layout.some((item) => item.i === "hermes-briefings")) return [breakpoint, layout];
+      const news = layout.find((item) => item.i === "news");
+      const template = DEFAULT_LAYOUTS[breakpoint]?.find((item) => item.i === "hermes-briefings");
+      const insertionY = news ? news.y + news.h : layout.reduce((max, item) => Math.max(max, item.y + item.h), 0);
+      const height = template?.h ?? 9;
+      const shifted = layout.map((item) => item.y >= insertionY ? { ...item, y: item.y + height } : item);
+      shifted.push({ ...(template ?? { i: "hermes-briefings", x: 0, w: GRID_COLUMNS[breakpoint], h: height }), y: insertionY });
+      return [breakpoint, shifted];
+    }),
+  ) as ResponsiveLayouts<DashboardBreakpoint>;
+
+  return { version: DASHBOARD_LAYOUT_VERSION, layouts: migratedLayouts, visibleWidgets: visible };
+}
 
 const COLOR_DOT: Record<string, string> = {
   indigo: "bg-[var(--c-indigo)]", cyan: "bg-[var(--c-cyan)]", emerald: "bg-[var(--c-emerald)]",
@@ -148,13 +184,18 @@ export function Dashboard() {
     const timer = window.setTimeout(() => {
       try {
         const saved = JSON.parse(localStorage.getItem(DASHBOARD_LAYOUT_KEY) || "null") as {
+          version?: number;
           layouts?: ResponsiveLayouts<DashboardBreakpoint>;
           visibleWidgets?: WidgetId[];
         } | null;
-        if (saved?.layouts) setLayouts(saved.layouts);
-        if (saved?.visibleWidgets) {
-          const valid = saved.visibleWidgets.filter((id) => WIDGETS.some((widget) => widget.id === id));
+        const preferences = saved ? migrateDashboardPreferences(saved) : null;
+        if (preferences?.layouts) setLayouts(preferences.layouts);
+        if (preferences?.visibleWidgets) {
+          const valid = preferences.visibleWidgets.filter((id) => WIDGETS.some((widget) => widget.id === id));
           setVisibleWidgets(valid);
+        }
+        if (preferences && preferences.version !== saved?.version) {
+          localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(preferences));
         }
       } catch {
         // Ignore malformed local preferences and use the polished default layout.
@@ -178,7 +219,7 @@ export function Dashboard() {
 
   function persistDashboard(nextLayouts: ResponsiveLayouts<DashboardBreakpoint>, nextVisible = visibleWidgets) {
     if (!layoutLoaded.current) return;
-    localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify({ layouts: nextLayouts, visibleWidgets: nextVisible }));
+    localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify({ version: DASHBOARD_LAYOUT_VERSION, layouts: nextLayouts, visibleWidgets: nextVisible }));
   }
 
   function removeWidget(id: WidgetId) {
@@ -294,6 +335,8 @@ export function Dashboard() {
         );
       case "news":
         return <DashNewsBriefing />;
+      case "hermes-briefings":
+        return <HermesBriefings briefs={data.briefs} />;
       case "tasks":
         return (
           <section className="card h-full p-5 flex flex-col gap-4 overflow-auto">

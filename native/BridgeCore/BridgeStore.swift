@@ -187,7 +187,7 @@ final class BridgeStore: ObservableObject {
         let collections = [
             "tasks", "focusSessions", "incomeEntries", "subscriptions", "habits", "habitLogs",
             "projects", "projectNotes", "projectLinks", "milestones", "projectDocuments",
-            "exams", "schoolNotes", "goals", "workouts", "socialStats", "businessKPIs",
+            "exams", "schoolNotes", "goals", "workouts", "socialStats", "businessKPIs", "briefs",
             "boards", "boardItems", "boardDrawings", "wikiPages", "wikiFolders", "chatThreads",
             "chatFolders", "courses",
         ]
