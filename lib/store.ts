@@ -220,6 +220,25 @@ export interface BusinessKPI {
   lastUpdated: string;
 }
 
+// ── Hermes briefings ─────────────────────────────────────────────────────
+
+export type BriefType = "morning_coo" | "weekly_business_review" | "content_opportunity";
+
+export interface Brief {
+  id: string;
+  type: BriefType;
+  title: string;
+  contentMarkdown: string;
+  generatedAt: string;
+  periodStart?: string;
+  periodEnd?: string;
+  workspace?: string;
+  sourceRunId?: string;
+  status: "published";
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ── Player OS ─────────────────────────────────────────────────────────────────
 
 export type DomainKey = "mental" | "physical" | "sports" | "appearance" | "culture" | "wealth" | "lifestyle";
@@ -551,6 +570,7 @@ export interface BridgeData {
   workouts: Workout[];
   socialStats: SocialStat[];
   businessKPIs: BusinessKPI[];
+  briefs: Brief[];
   boards: VisionBoard[];
   boardItems: BoardItem[];
   boardDrawings: BoardDrawing[];
@@ -603,6 +623,7 @@ export const DEFAULT: BridgeData = {
     { id: "expenses", label: "Monthly Expenses",   value: "0",   color: "red",     icon: "💸", prefix: "$", category: "finance",  lastUpdated: "" },
     { id: "mrr",      label: "MRR",                value: "0",   color: "emerald", icon: "🔄", prefix: "$", category: "finance",  lastUpdated: "" },
   ],
+  briefs: [],
   exams: [],
   timetable: {},
   schoolNotes: [],

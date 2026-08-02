@@ -1,13 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import type { BoardDrawing, BoardItem, BridgeData, DrawTool, WikiPage } from "@/lib/store";
+import { BRIEF_TYPES, isBriefType, newestBriefs, upsertBriefCollection } from "@/lib/briefs";
+import { expandCalendarEvents } from "@/lib/calendar";
+import {
+  CALENDAR_CATEGORIES, CALENDAR_COLORS, CALENDAR_REPEATS, createCalendarEvent,
+  deleteCalendarEvent, updateCalendarEvent, validateCalendarRange,
+} from "@/lib/calendar-events";
 import { readRawData, sanitize, noteToText, writeRawData } from "@/lib/mcp-data";
 import { validateAccessToken } from "@/lib/mcp-oauth";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const SERVER_INFO = { name: "bridge", title: "Bridge — Agent Control", version: "2.0.0" };
+const SERVER_INFO = { name: "bridge", title: "Bridge — Agent Control", version: "2.1.0" };
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -58,6 +64,19 @@ const SETTINGS = ["dailyRevenueTarget", "timetable", "bodyMetrics", "chatSetting
 type Setting = typeof SETTINGS[number];
 const isSetting = (value: unknown): value is Setting => typeof value === "string" && (SETTINGS as readonly string[]).includes(value);
 const DRAW_TOOLS: DrawTool[] = ["pen", "line", "arrow", "rect", "ellipse"];
+const CALENDAR_EVENT_PROPERTIES = {
+  title: { type: "string", minLength: 1, maxLength: 200 },
+  startDate: { type: "string", format: "date" },
+  endDate: { type: "string", format: "date" },
+  allDay: { type: "boolean" },
+  startTime: { type: "string", pattern: "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+  endTime: { type: "string", pattern: "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+  category: { type: "string", enum: CALENDAR_CATEGORIES, default: "work" },
+  color: { type: "string", enum: CALENDAR_COLORS },
+  location: { type: "string", maxLength: 500 },
+  notes: { type: "string", maxLength: 20000 },
+  repeat: { type: "string", enum: CALENDAR_REPEATS, default: "none" },
+};
 
 function recordKey(record: Record<string, unknown>): string | null {
   for (const key of ["id", "platform", "date"]) if (typeof record[key] === "string" && record[key]) return `${key}:${record[key]}`;
@@ -84,9 +103,11 @@ function publicOverview(d: BridgeData) {
     habits: d.habits?.length ?? 0,
     goals: d.goals?.length ?? 0,
     projects: d.projects?.length ?? 0,
+    calendarEvents: d.calendarEvents?.length ?? 0,
     boards: d.boards?.length ?? 0,
     workouts: d.workouts?.length ?? 0,
     chats: d.chatThreads?.length ?? 0,
+    briefs: d.briefs?.length ?? 0,
     notes: { readable: notes.length, locked_hidden: "protected" },
   };
 }
@@ -109,9 +130,108 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_app_data",
-    description: "Read all editable Bridge data in one response. Locked and trashed Notes pages are never included.",
+    description: "Read all standard editable Bridge data in one response. Locked/trashed Notes, Calendar events, and Hermes briefs are excluded; use their dedicated tools instead.",
     inputSchema: obj(),
-    run: (_args, state) => state.data,
+    run: (_args, state) => omit(state.data as unknown as Record<string, unknown>, ["briefs", "calendarEvents"]),
+  },
+  {
+    name: "get_calendar_events",
+    description: "Read Bridge Calendar events. Provide startDate and endDate to expand recurring series into dated occurrences; omit both to list stored series records.",
+    inputSchema: obj({
+      startDate: { type: "string", format: "date" },
+      endDate: { type: "string", format: "date" },
+      limit: { type: "integer", minimum: 1, maximum: 500, default: 100 },
+    }),
+    run: (args, state) => {
+      const range = validateCalendarRange(args.startDate, args.endDate);
+      if (!range.ok) return error(range.error);
+      const limit = args.limit === undefined ? 100 : args.limit;
+      if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 500) return error("limit must be an integer from 1 to 500.");
+      const events = state.data.calendarEvents ?? [];
+      if (!range.startDate || !range.endDate) {
+        const records = [...events]
+          .sort((a, b) => a.startDate.localeCompare(b.startDate) || Number(b.allDay) - Number(a.allDay) || (a.startTime ?? "").localeCompare(b.startTime ?? "") || a.title.localeCompare(b.title))
+          .slice(0, limit);
+        return { events: records, count: records.length };
+      }
+      const occurrences = expandCalendarEvents(events, range.startDate, range.endDate)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate) || Number(b.event.allDay) - Number(a.event.allDay) || (a.event.startTime ?? "").localeCompare(b.event.startTime ?? "") || a.event.title.localeCompare(b.event.title))
+        .slice(0, limit);
+      return { range: { startDate: range.startDate, endDate: range.endDate }, occurrences, count: occurrences.length };
+    },
+  },
+  {
+    name: "create_calendar_event",
+    description: "Create a validated Bridge Calendar event or repeating series. Timed events require HH:MM startTime and endTime; all-day events omit times.",
+    inputSchema: obj(CALENDAR_EVENT_PROPERTIES, ["title", "startDate", "endDate", "allDay"]),
+    run: async (args, state) => {
+      const result = createCalendarEvent(state.raw, args, newId());
+      if (!result.ok) return error(result.error);
+      await state.save(result.data);
+      return { ok: true, action: "created", event: result.event };
+    },
+  },
+  {
+    name: "update_calendar_event",
+    description: "Update a Bridge Calendar event by id. Send only changed fields in patch; changes apply to the entire repeating series.",
+    inputSchema: obj({ id: { type: "string" }, patch: obj(CALENDAR_EVENT_PROPERTIES) }, ["id", "patch"]),
+    run: async (args, state) => {
+      if (typeof args.id !== "string") return error("id is required.");
+      const patch = asObject(args.patch);
+      if (!patch) return error("patch must be an object.");
+      const result = updateCalendarEvent(state.raw, args.id, patch);
+      if (!result.ok) return error(result.error);
+      await state.save(result.data);
+      return { ok: true, action: "updated", event: result.event };
+    },
+  },
+  {
+    name: "delete_calendar_event",
+    description: "Delete a Bridge Calendar event by id. For a repeating event this deletes the entire series.",
+    inputSchema: obj({ id: { type: "string" } }, ["id"]),
+    run: async (args, state) => {
+      if (typeof args.id !== "string") return error("id is required.");
+      const result = deleteCalendarEvent(state.raw, args.id);
+      if (!result.ok) return error(result.error);
+      await state.save(result.data);
+      return { ok: true, deleted: result.event.id, event: result.event };
+    },
+  },
+  {
+    name: "upsert_brief",
+    description: "Publish a Hermes briefing. Retries update the existing brief for the same type and report period, or the same type and generatedAt date when no period is supplied.",
+    inputSchema: obj({
+      type: { type: "string", enum: BRIEF_TYPES },
+      title: { type: "string", minLength: 1, maxLength: 200 },
+      contentMarkdown: { type: "string", minLength: 1, maxLength: 100000 },
+      generatedAt: { type: "string", format: "date-time" },
+      periodStart: { type: "string", format: "date" },
+      periodEnd: { type: "string", format: "date" },
+      workspace: { type: "string", maxLength: 200 },
+      sourceRunId: { type: "string", maxLength: 200 },
+      status: { type: "string", enum: ["published"] },
+    }, ["type", "title", "contentMarkdown", "generatedAt"]),
+    run: async (args, state) => {
+      const result = upsertBriefCollection(state.raw, args);
+      if (!result.ok) return error(result.error);
+      await state.save(result.data);
+      return { ok: true, action: result.created ? "created" : "updated", created: result.created, record: result.record };
+    },
+  },
+  {
+    name: "get_briefs",
+    description: "Read published Hermes briefings newest first, optionally filtered by briefing type.",
+    inputSchema: obj({
+      type: { type: "string", enum: BRIEF_TYPES },
+      limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+    }),
+    run: (args, state) => {
+      if (args.type !== undefined && !isBriefType(args.type)) return error(`type must be one of: ${BRIEF_TYPES.join(", ")}.`);
+      const limit = args.limit === undefined ? 20 : args.limit;
+      if (!Number.isInteger(limit) || typeof limit !== "number" || limit < 1 || limit > 100) return error("limit must be an integer from 1 to 100.");
+      const records = newestBriefs(state.data.briefs, isBriefType(args.type) ? args.type : undefined, limit);
+      return { records, count: records.length };
+    },
   },
   {
     name: "get_collection",
@@ -445,7 +565,7 @@ async function handle(message: RpcReq): Promise<object | null> {
   if (id === undefined || id === null) return null;
   switch (method) {
     case "initialize":
-      return ok(id, { protocolVersion: (params?.protocolVersion as string) || "2025-06-18", capabilities: { tools: {}, resources: {} }, serverInfo: SERVER_INFO, instructions: "Bridge agents can read and edit the workspace, including Vision boards and drawings. Locked Notes pages are private: they are never listed, read, edited, or deleted." });
+      return ok(id, { protocolVersion: (params?.protocolVersion as string) || "2025-06-18", capabilities: { tools: {}, resources: {} }, serverInfo: SERVER_INFO, instructions: "Bridge agents can read and edit the workspace, including Calendar events, Hermes briefings, and Vision boards. Locked Notes pages are private: they are never listed, read, edited, or deleted." });
     case "ping": return ok(id, {});
     case "tools/list": return ok(id, { tools: TOOLS.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })) });
     case "tools/call": {
@@ -487,7 +607,7 @@ export async function POST(req: NextRequest) {
 export function GET(req: NextRequest) {
   if ((req.headers.get("accept") || "").includes("text/event-stream")) return new Response("SSE stream not supported (stateless server).", { status: 405, headers: CORS });
   const configured = process.env.MCP_TOKEN ? "configured" : "NOT configured (set MCP_TOKEN)";
-  return jsonResponse({ name: SERVER_INFO.name, transport: "streamable-http (POST JSON-RPC)", auth: `Bearer token (${configured})`, tools: TOOLS.map((tool) => tool.name), note: "Agents can edit Bridge data. Locked Notes are always excluded and protected." });
+  return jsonResponse({ name: SERVER_INFO.name, transport: "streamable-http (POST JSON-RPC)", auth: `Bearer token (${configured})`, tools: TOOLS.map((tool) => tool.name), note: "Agents can edit Bridge data through validated tools. Locked Notes are always excluded and protected." });
 }
 
 export function OPTIONS() { return new Response(null, { status: 204, headers: CORS }); }

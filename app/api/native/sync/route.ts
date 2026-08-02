@@ -25,6 +25,7 @@ const COLLECTIONS = new Set([
   "workouts",
   "socialStats",
   "businessKPIs",
+  "briefs",
   "boards",
   "boardItems",
   "boardDrawings",
