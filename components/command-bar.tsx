@@ -10,7 +10,7 @@ import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, Trophy, Briefcase,
   Search, CornerDownLeft, NotebookText, LayoutGrid, Dumbbell, MessageCircle, type LucideIcon,
-  Settings, Sun, Moon, PanelBottom,
+  Settings, Sun, Moon, PanelBottom, CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,7 @@ const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string 
   { href: "/projects", label: "Projects",  icon: FolderKanban,    keywords: "roadmap docs kanban" },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid,      keywords: "board collage moodboard" },
   { href: "/notes",    label: "Notes",     icon: NotebookText,    keywords: "wiki docs pages" },
+  { href: "/calendar", label: "Calendar",  icon: CalendarDays,    keywords: "events agenda schedule bookings dates" },
   { href: "/tasks",    label: "Tasks",     icon: CheckSquare,     keywords: "todo kanban" },
   { href: "/focus",    label: "Focus",     icon: Timer,           keywords: "pomodoro timer" },
   { href: "/habits",   label: "Habits",    icon: Repeat2,         keywords: "streak routine" },
@@ -70,6 +71,7 @@ export function CommandBar() {
 
   // Quick actions — commands, not destinations.
   const actions = useMemo<Item[]>(() => [
+    { kind: "action", key: "act:newevent", label: "New event", icon: CalendarDays, keywords: "create add calendar schedule", run: () => { try { localStorage.setItem("bridge_open_new_event", "1"); window.dispatchEvent(new Event("bridge:new-event")); } catch {} router.push("/calendar"); } },
     { kind: "action", key: "act:newtask", label: "New task", icon: CheckSquare, keywords: "create add todo", run: () => { try { localStorage.setItem("bridge_open_new_task", "1"); } catch {} router.push("/tasks"); } },
     { kind: "action", key: "act:newproject", label: "New project", icon: FolderKanban, keywords: "create add", run: () => { try { localStorage.setItem("bridge_open_new_project", "1"); } catch {} router.push("/projects"); } },
     { kind: "action", key: "act:newchat", label: "New chat", icon: MessageCircle, keywords: "ai ask new conversation", run: () => router.push("/chat") },

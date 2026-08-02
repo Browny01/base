@@ -13,6 +13,7 @@ const NAV: { key: string; href: string; label: string }[] = [
   { key: "j", href: "/projects", label: "Projects" },
   { key: "v", href: "/vision",   label: "Vision" },
   { key: "n", href: "/notes",    label: "Notes" },
+  { key: "a", href: "/calendar", label: "Calendar" },
   { key: "t", href: "/tasks",    label: "Tasks" },
   { key: "o", href: "/focus",    label: "Focus" },
   { key: "h", href: "/habits",   label: "Habits" },
