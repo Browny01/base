@@ -1,7 +1,12 @@
 // Lightweight, XSS-safe markdown → HTML for chat replies.
 // Everything is HTML-escaped first, so only the tags we generate are emitted.
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const esc = (s: string) => s
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
 
 // Inline formatting on already-escaped text. Code spans and links are protected
 // with placeholders so bold/italic don't reach inside them.
