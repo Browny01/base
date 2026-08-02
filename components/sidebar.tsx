@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, ChevronsLeft, Settings,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +42,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Systems",
     items: [
+      { href: "/calendar", label: "Calendar", icon: CalendarDays },
       { href: "/tasks",  label: "Tasks",  icon: CheckSquare },
       { href: "/focus",  label: "Focus",  icon: Timer       },
       { href: "/habits", label: "Habits", icon: Repeat2     },

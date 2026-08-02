@@ -15,6 +15,9 @@ queue edits without a connection, and merge those edits when the internet return
   local Ollama relay support, and web/search tools.
 - **Tasks** - priority/tagged tasks, due dates, recurring settings, subtasks, AI
   task breakdowns, completion tracking, and native offline creation.
+- **Calendar** - editable all-day and timed events, recurring series, month and
+  agenda views, plus dated tasks, milestones, payments, exams, workouts, and
+  optional Cal.com bookings in one schedule.
 - **Habits** - button and numeric habits, reminders, daily logs, streak-style
   progress, and history-aware dashboard metrics.
 - **Focus** - deep-work timer with session logging, task tags, notes, and saved
