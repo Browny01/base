@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { DATA_KEY as KEY, readCurrentData } from "@/lib/bridge-data";
+import { readCurrentData } from "@/lib/bridge-data";
+import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
 
 const HISTORY = "bridge:data:history";   // rolling backups (newest first)
 
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       try { await redis.lpush(HISTORY, JSON.stringify(existing)); await redis.ltrim(HISTORY, 0, 24); } catch { /* ignore backup errors */ }
     }
 
-    await redis.set(KEY, body);
+    await safeWriteBridgeData(redis, body, false);
     return NextResponse.json({ ok: true, configured: true });
   } catch (err) {
     console.error("[bridge/data POST]", err);

@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, ChevronsLeft, Settings,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays, Bot,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +21,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/",     label: "Dashboard", icon: LayoutDashboard },
       { href: "/chat", label: "Chat",      icon: MessageCircle   },
+      { href: "/autonomy", label: "Autonomy", icon: Bot },
     ],
   },
   {

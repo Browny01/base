@@ -2,9 +2,10 @@
 
 import { DEFAULT_CHAT_SETTINGS, type ChatSettings } from "@/lib/chat-models";
 import { DEFAULT_NEWS_PREFS, type NewsPrefs } from "@/lib/news-prefs";
+import { DEFAULT_AUTONOMY_SETTINGS, type AutonomySettings, type AutonomyState, type AutonomyTaskClass } from "@/lib/autonomy";
 
 export type Priority = "P1" | "P2" | "P3";
-export type TaskTag = "@work" | "@personal" | "@money" | "@admin";
+export type TaskTag = "@work" | "@personal" | "@money" | "@admin" | "@night-auto" | `@${string}`;
 export type RecurringFreq = "daily" | "weekly" | "monthly" | null;
 export type HabitType = "button" | "input";
 
@@ -22,6 +23,28 @@ export interface Task {
   completedAt?: string | null;
   projectId?: string;
   subtasks?: SubTask[];
+  nightPolicy?: "autonomous-v1" | string;
+  executionState?: AutonomyState;
+  autonomyBrief?: string;
+  executionNote?: string;
+  executionStartedAt?: string;
+  nightExecutedAt?: string;
+  executionAgent?: string;
+  executionId?: string;
+  executionFinishedAt?: string;
+  workerModel?: string;
+  resultNoteId?: string;
+  resultSummary?: string;
+  verifiedAt?: string;
+  verificationStatus?: "pending" | "awaiting_review" | "passed" | "failed" | "verified" | "rejected" | "needs_correction";
+  executionEvidence?: unknown[];
+  correctionAttempts?: number;
+  implementationApproved?: boolean;
+  taskClass?: AutonomyTaskClass;
+  parentTaskId?: string;
+  dependencyIds?: string[];
+  blockedReason?: string;
+  workspace?: string;
 }
 
 export type CalendarRepeat = "none" | "daily" | "weekly" | "monthly";
@@ -545,6 +568,7 @@ export interface BodyMetrics {
 }
 
 export interface BridgeData {
+  dataRevision?: number;
   tasks: Task[];
   calendarEvents: CalendarEvent[];
   focusSessions: FocusSession[];
@@ -582,6 +606,7 @@ export interface BridgeData {
   chatSettings: ChatSettings;
   courses: Course[];
   newsPrefs: NewsPrefs;
+  autonomySettings: AutonomySettings;
   updatedAt?: number;
 }
 
@@ -638,6 +663,7 @@ export const DEFAULT: BridgeData = {
   chatSettings: DEFAULT_CHAT_SETTINGS,
   courses: [],
   newsPrefs: DEFAULT_NEWS_PREFS,
+  autonomySettings: DEFAULT_AUTONOMY_SETTINGS,
 };
 
 function migrateIncomeTypes(data: BridgeData): BridgeData {
