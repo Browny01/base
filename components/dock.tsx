@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
   FolderKanban, Newspaper, MoreHorizontal, X,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays,
+  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays, Bot,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ type Item = { href: string; label: string; icon: LucideIcon };
 const DOCK: Item[] = [
   { href: "/",        label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat",    label: "Chat",      icon: MessageCircle   },
+  { href: "/autonomy",label: "Autonomy",  icon: Bot             },
   { href: "/player",  label: "Personal",  icon: Trophy          },
   { href: "/gym",     label: "Gym",       icon: Dumbbell        },
   { href: "/projects",label: "Projects",  icon: FolderKanban    },
@@ -31,6 +32,7 @@ const DOCK: Item[] = [
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat",     label: "Chat",      icon: MessageCircle },
+  { href: "/autonomy", label: "Autonomy",  icon: Bot           },
   { href: "/player",   label: "Personal",  icon: Trophy        },
   { href: "/gym",      label: "Gym",       icon: Dumbbell      },
   { href: "/business", label: "Business",  icon: Briefcase     },

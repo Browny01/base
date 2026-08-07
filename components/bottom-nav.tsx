@@ -7,7 +7,7 @@ import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Repeat2, Newspaper, X, MoreHorizontal,
   Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays,
-  Settings, type LucideIcon,
+  Settings, Bot, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
@@ -26,6 +26,7 @@ const TABS: Item[] = [
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
   { href: "/chat",     label: "Chat",      icon: MessageCircle },
+  { href: "/autonomy", label: "Autonomy",  icon: Bot           },
   { href: "/player",   label: "Personal",  icon: Trophy        },
   { href: "/gym",      label: "Gym",       icon: Dumbbell      },
   { href: "/business", label: "Business",  icon: Briefcase     },

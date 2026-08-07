@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.mts",
     "ios": "open ios/App/App.xcodeproj",
     "mac:gen": "cd macos && xcodegen generate",
     "mac": "cd macos && xcodegen generate && open Bridge.xcodeproj",

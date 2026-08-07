@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import type { BoardDrawing, BoardItem, BridgeData, DrawTool, WikiPage } from "@/lib/store";
+import { isAutonomyTask, prepareAutonomySuggestion, sanitizeAutonomyAgentPatch, validateAutonomyEvidence } from "@/lib/autonomy";
 import { BRIEF_TYPES, isBriefType, newestBriefs, upsertBriefCollection } from "@/lib/briefs";
 import { expandCalendarEvents } from "@/lib/calendar";
 import {
   CALENDAR_CATEGORIES, CALENDAR_COLORS, CALENDAR_REPEATS, createCalendarEvent,
   deleteCalendarEvent, updateCalendarEvent, validateCalendarRange,
 } from "@/lib/calendar-events";
-import { readRawData, sanitize, noteToText, writeRawData } from "@/lib/mcp-data";
+import { claimAutonomyTask, readRawData, sanitize, noteToText, submitAutonomyResult, writeRawData } from "@/lib/mcp-data";
 import { validateAccessToken } from "@/lib/mcp-oauth";
 
 export const runtime = "nodejs";
@@ -60,7 +61,7 @@ const COLLECTIONS = [
 ] as const;
 type Collection = typeof COLLECTIONS[number];
 const isCollection = (value: unknown): value is Collection => typeof value === "string" && (COLLECTIONS as readonly string[]).includes(value);
-const SETTINGS = ["dailyRevenueTarget", "timetable", "bodyMetrics", "chatSettings", "newsPrefs"] as const;
+const SETTINGS = ["dailyRevenueTarget", "timetable", "bodyMetrics", "chatSettings", "newsPrefs", "autonomySettings"] as const;
 type Setting = typeof SETTINGS[number];
 const isSetting = (value: unknown): value is Setting => typeof value === "string" && (SETTINGS as readonly string[]).includes(value);
 const DRAW_TOOLS: DrawTool[] = ["pen", "line", "arrow", "rect", "ellipse"];
@@ -247,7 +248,8 @@ const TOOLS: Tool[] = [
       if (!isCollection(args.collection)) return error("Unknown collection.");
       const record = asObject(args.record);
       if (!record) return error("record must be an object.");
-      const nextRecord: Record<string, unknown> = { ...record, id: typeof record.id === "string" && record.id ? record.id : newId() };
+      let nextRecord: Record<string, unknown> = { ...record, id: typeof record.id === "string" && record.id ? record.id : newId() };
+      if (args.collection === "tasks") nextRecord = prepareAutonomySuggestion(nextRecord);
       if ("createdAt" in nextRecord === false) nextRecord.createdAt = now();
       const list = Array.isArray(state.raw[args.collection]) ? state.raw[args.collection] : [];
       if (findRecord(list as unknown[], String(nextRecord.id)) >= 0) return error("An item with that id already exists.");
@@ -269,7 +271,8 @@ const TOOLS: Tool[] = [
       const current = index >= 0 ? asObject(list[index]) : null;
       if (!current) return error("Record not found.");
       if (args.collection === "wikiFolders" && isProtectedFolder(state.raw, args.id)) return error("This folder contains a locked or trashed note and cannot be changed by an agent.");
-      const safePatch = omit(patch, ["id", "createdAt"]);
+      let safePatch = omit(patch, ["id", "createdAt"]);
+      if (args.collection === "tasks") safePatch = sanitizeAutonomyAgentPatch(current as unknown as Parameters<typeof sanitizeAutonomyAgentPatch>[0], safePatch);
       const updated = { ...current, ...safePatch };
       const nextList = [...list]; nextList[index] = updated;
       await save(state, { ...state.raw, [args.collection]: nextList } as BridgeData);
@@ -286,22 +289,58 @@ const TOOLS: Tool[] = [
       const index = findRecord(list, args.id);
       if (index < 0) return error("Record not found.");
       if (args.collection === "wikiFolders" && isProtectedFolder(state.raw, args.id)) return error("This folder contains a locked or trashed note and cannot be changed by an agent.");
+      if (args.collection === "tasks" && isAutonomyTask(state.raw.tasks.find((task) => task.id === args.id) ?? { id: args.id, title: "" })) return error("Autonomous tasks cannot be deleted through MCP.");
       await save(state, { ...state.raw, [args.collection]: list.filter((_item, i) => i !== index) } as BridgeData);
       return { ok: true, deleted: args.id, collection: args.collection };
     },
   },
   {
     name: "update_settings",
-    description: "Update a singleton Bridge setting: dailyRevenueTarget, timetable, bodyMetrics, chatSettings, or newsPrefs. Pass replace=true for a complete replacement; otherwise object values are merged.",
+    description: "Update a singleton Bridge setting. Autonomy controls are owner-only and must be changed in the authenticated Bridge UI.",
     inputSchema: obj({ setting: { type: "string", enum: SETTINGS }, value: {}, replace: { type: "boolean" } }, ["setting", "value"]),
     run: async (args, state) => {
       if (!isSetting(args.setting)) return error("Unknown setting.");
+      if (args.setting === "autonomySettings") return error("Autonomy controls are owner-only. Change them in the authenticated Bridge UI.");
       const current = state.raw[args.setting];
       const nextValue = !args.replace && asObject(current) && asObject(args.value)
         ? { ...asObject(current), ...asObject(args.value) }
         : args.value;
       await save(state, { ...state.raw, [args.setting]: nextValue } as BridgeData);
       return { ok: true, setting: args.setting, value: nextValue };
+    },
+  },
+  {
+    name: "claim_autonomy_task",
+    description: "Atomically claim one queued autonomous task. Enforces pause, capacity, daily limits, dependencies, workspace/class allowlists, and implementation approval. Returns a unique runId; workers must use it when submitting results.",
+    inputSchema: obj({
+      taskId: { type: "string", minLength: 1 },
+      agent: { type: "string", minLength: 1, maxLength: 120 },
+      model: { type: "string", minLength: 1, maxLength: 200 },
+    }, ["taskId", "agent", "model"]),
+    run: async (args) => {
+      if (typeof args.taskId !== "string" || typeof args.agent !== "string" || typeof args.model !== "string") return error("taskId, agent, and model are required.");
+      const runId = newId();
+      return claimAutonomyTask(args.taskId, runId, args.agent, args.model, now());
+    },
+  },
+  {
+    name: "submit_autonomy_result",
+    description: "Submit evidence for the exact run that atomically claimed a task. Workers cannot mark their own work verified; results enter review, blocked, or needs-input state.",
+    inputSchema: obj({
+      taskId: { type: "string", minLength: 1 },
+      runId: { type: "string", minLength: 1 },
+      state: { type: "string", enum: ["awaiting_review", "blocked", "needs_input"] },
+      summary: { type: "string", minLength: 1, maxLength: 20000 },
+      evidence: { type: "array", minItems: 1, maxItems: 50, items: {} },
+      resultNoteId: { type: "string", maxLength: 200 },
+      blockedReason: { type: "string", maxLength: 2000 },
+    }, ["taskId", "runId", "state", "summary", "evidence"]),
+    run: async (args) => {
+      if (typeof args.taskId !== "string" || typeof args.runId !== "string" || typeof args.summary !== "string" || !Array.isArray(args.evidence)) return error("taskId, runId, summary, and evidence are required.");
+      if (args.state !== "awaiting_review" && args.state !== "blocked" && args.state !== "needs_input") return error("Invalid result state.");
+      const evidenceError = validateAutonomyEvidence(args.evidence);
+      if (evidenceError) return error(evidenceError);
+      return submitAutonomyResult({ taskId: args.taskId, runId: args.runId, state: args.state, summary: args.summary, evidence: args.evidence, finishedAt: now(), resultNoteId: typeof args.resultNoteId === "string" ? args.resultNoteId : undefined, blockedReason: typeof args.blockedReason === "string" ? args.blockedReason : undefined });
     },
   },
   {
@@ -312,6 +351,7 @@ const TOOLS: Tool[] = [
       if (typeof args.id !== "string" || typeof args.done !== "boolean") return error("id and done are required.");
       const index = (state.raw.tasks ?? []).findIndex((task) => task.id === args.id);
       if (index < 0) return error("Task not found.");
+      if (isAutonomyTask(state.raw.tasks[index])) return error("Autonomous tasks must be reviewed in the owner-authenticated Bridge UI.");
       const tasks = [...state.raw.tasks];
       tasks[index] = { ...tasks[index], done: args.done, completedAt: args.done ? now() : null };
       await save(state, { ...state.raw, tasks });
