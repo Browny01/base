@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import type { BridgeData, Wallet } from "@/lib/store";
+import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
 
 // This route is hit by a Vercel Cron Job once a day. It recomputes the
 // portfolio's total AUD value server-side (no browser needed) and appends a
@@ -133,7 +134,7 @@ async function run(req: NextRequest) {
     portfolioSnapshots: snapshots.slice(-365),
     updatedAt: Date.now(),
   };
-  await redis.set(KEY, next);
+  await safeWriteBridgeData(redis, next, true);
 
   return NextResponse.json({ ok: true, date: today, totalAud: grandTotal, wallets: wallets.length, snapshots: next.portfolioSnapshots.length });
 }

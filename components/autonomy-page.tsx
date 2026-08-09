@@ -14,6 +14,7 @@ import {
   DEFAULT_AUTONOMY_SETTINGS,
   autonomyState,
   buildAutonomySummary,
+  computeAutonomyMetrics,
   eligibleAutonomyTasks,
   isAutonomyTask,
   reviewBucket,
@@ -55,6 +56,7 @@ export function AutonomyPage() {
   const settings = useMemo(() => ({ ...DEFAULT_AUTONOMY_SETTINGS, ...(data.autonomySettings ?? {}) }), [data.autonomySettings]);
   const tasks = useMemo(() => data.tasks.filter(isAutonomyTask), [data.tasks]);
   const summary = useMemo(() => buildAutonomySummary(tasks), [tasks]);
+  const metrics = useMemo(() => computeAutonomyMetrics(tasks), [tasks]);
   const eligible = useMemo(() => eligibleAutonomyTasks(data.tasks, settings), [data.tasks, settings]);
   const projectNames = useMemo(() => new Map(data.projects.map((project) => [project.id, project.name])), [data.projects]);
 
@@ -144,7 +146,7 @@ export function AutonomyPage() {
         ))}
       </nav>
 
-      {tab === "overview" && <Overview tasks={filteredTasks} summary={summary} projects={projectNames} query={query} setQuery={setQuery} onSelect={setSelected} />}
+      {tab === "overview" && <Overview tasks={filteredTasks} summary={summary} metrics={metrics} projects={projectNames} query={query} setQuery={setQuery} onSelect={setSelected} />}
       {tab === "review" && <ReviewInbox tasks={filteredTasks} projects={projectNames} onSelect={setSelected} onReview={reviewTask} />}
       {tab === "activity" && <ActivityFeed tasks={tasks} projects={projectNames} onSelect={setSelected} />}
       {tab === "controls" && <Controls settings={settings} onChange={updateSettings} />}
@@ -158,7 +160,7 @@ function RailStat({ label, value, detail, icon }: { label: string; value: string
   return <div className="p-4 sm:p-5 min-h-28 flex flex-col justify-between"><div className="flex items-center justify-between text-[var(--faint)]"><span className="text-[11px] font-semibold uppercase tracking-[0.12em]">{label}</span><span className="[&>svg]:w-4 [&>svg]:h-4">{icon}</span></div><div><p className="text-2xl font-bold tracking-tight text-[var(--text)] tabular">{value}</p><p className="text-[11px] text-[var(--muted)] mt-0.5">{detail}</p></div></div>;
 }
 
-function Overview({ tasks, summary, projects, query, setQuery, onSelect }: { tasks: Task[]; summary: ReturnType<typeof buildAutonomySummary>; projects: Map<string, string>; query: string; setQuery: (value: string) => void; onSelect: (task: Task) => void }) {
+function Overview({ tasks, summary, metrics, projects, query, setQuery, onSelect }: { tasks: Task[]; summary: ReturnType<typeof buildAutonomySummary>; metrics: ReturnType<typeof computeAutonomyMetrics>; projects: Map<string, string>; query: string; setQuery: (value: string) => void; onSelect: (task: Task) => void }) {
   const lanes: { state: AutonomyState; title: string; tasks: Task[] }[] = [
     { state: "queued", title: "Queued", tasks: tasks.filter((task) => ["queued", "suggested"].includes(autonomyState(task) ?? "")) },
     { state: "in_progress", title: "Running", tasks: tasks.filter((task) => autonomyState(task) === "in_progress") },
@@ -176,8 +178,25 @@ function Overview({ tasks, summary, projects, query, setQuery, onSelect }: { tas
         <div className="space-y-2">{lane.tasks.length === 0 ? <EmptyLane /> : lane.tasks.slice(0, 8).map((task) => <TaskCard key={task.id} task={task} workspace={workspaceFor(task, projects)} onClick={() => onSelect(task)} />)}</div>
       </div>)}
     </div>
+    <section className="mt-6">
+      <div className="mb-3"><h2 className="text-lg font-semibold text-[var(--text)]">Automation health</h2><p className="text-xs text-[var(--muted)] mt-1">Only persisted task evidence is counted; unavailable metrics stay blank.</p></div>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <MetricCard label="Useful-run rate" value={metrics.usefulRunRate == null ? "—" : `${Math.round(metrics.usefulRunRate * 100)}%`} detail="runs with evidence awaiting review or verified" />
+        <MetricCard label="Verified throughput" value={String(metrics.verifiedThroughput7d)} detail="owner-verified tasks in the last 7 days" />
+        <MetricCard label="Oldest blocked" value={formatHours(metrics.oldestBlockedAgeHours)} detail="age since the most recent persisted blocker event" />
+        <MetricCard label="End-to-end" value={formatHours(metrics.averageEndToEndHours)} detail="average creation-to-verification time" />
+        <MetricCard label="Decision to result" value={formatHours(metrics.averageDecisionToResolutionHours)} detail="average approval-to-verification time" />
+        <MetricCard label="Lease recovery" value={formatHours(metrics.averageRecoveryHours)} detail="average expired-lease-to-requeue time" />
+      </div>
+    </section>
   </div>;
 }
+
+function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--faint)]">{label}</p><p className="mt-2 text-xl font-bold tabular text-[var(--text)]">{value}</p><p className="mt-1 text-[11px] text-[var(--muted)]">{detail}</p></div>;
+}
+
+function formatHours(value: number | null): string { return value == null ? "—" : value < 24 ? `${value}h` : `${Math.round((value / 24) * 10) / 10}d`; }
 
 function ReviewInbox({ tasks, projects, onSelect, onReview }: { tasks: Task[]; projects: Map<string, string>; onSelect: (task: Task) => void; onReview: (id: string, decision: "approve" | "verify" | "requeue" | "reject") => void }) {
   const reviewTasks = tasks.filter((task) => reviewBucket(task) && reviewBucket(task) !== "verified");
@@ -210,7 +229,8 @@ function Controls({ settings, onChange }: { settings: AutonomySettings; onChange
       <ControlRow label="Working window" hint="AWST · enforced at claim time"><div className="flex items-center gap-2"><input aria-label="Start time" type="time" value={settings.workingHoursStart} onChange={(event) => onChange({ workingHoursStart: event.target.value })} className="field px-2 py-1.5 text-xs" /><span className="text-[var(--faint)]">–</span><input aria-label="End time" type="time" value={settings.workingHoursEnd} onChange={(event) => onChange({ workingHoursEnd: event.target.value })} className="field px-2 py-1.5 text-xs" /></div></ControlRow>
     </ControlPanel>
     <ControlPanel title="Allowed work" description="Workers receive one workspace and one bounded task class.">
-      <div className="pb-4 mb-4 border-b border-[var(--border)]"><p className="text-xs font-semibold text-[var(--text)] mb-2.5">Workspaces</p><div className="flex flex-wrap gap-2">{WORKSPACES.map((workspace) => <ChipToggle key={workspace} active={settings.allowedWorkspaces.includes(workspace)} label={workspace} onClick={() => onChange({ allowedWorkspaces: toggleValue(settings.allowedWorkspaces, workspace) })} />)}</div></div>
+      <ControlRow label="Current business focus" hint="Guides decision packets and planner priority"><select aria-label="Current business focus" value={settings.currentBusinessFocus} onChange={(event) => onChange({ currentBusinessFocus: event.target.value })} className="field px-2 py-1.5 text-xs">{WORKSPACES.map((workspace) => <option key={workspace} value={workspace}>{workspace}</option>)}</select></ControlRow>
+      <div className="py-4 mb-4 border-b border-[var(--border)]"><p className="text-xs font-semibold text-[var(--text)] mb-2.5">Workspaces</p><div className="flex flex-wrap gap-2">{WORKSPACES.map((workspace) => <ChipToggle key={workspace} active={settings.allowedWorkspaces.includes(workspace)} label={workspace} onClick={() => onChange({ allowedWorkspaces: toggleValue(settings.allowedWorkspaces, workspace) })} />)}</div></div>
       <div><p className="text-xs font-semibold text-[var(--text)] mb-2.5">Task classes</p><div className="flex flex-wrap gap-2">{TASK_CLASSES.map(({ id, label }) => <ChipToggle key={id} active={settings.allowedTaskClasses.includes(id)} label={label} onClick={() => onChange({ allowedTaskClasses: toggleValue(settings.allowedTaskClasses, id) })} />)}</div></div>
     </ControlPanel>
     <ControlPanel title="Approval gate" description="Consequential actions remain outside autonomous authority."><ControlRow label="Implementation needs approval" hint="Research and planning can continue"><Switch checked={settings.requireApprovalForImplementation} onChange={(checked) => onChange({ requireApprovalForImplementation: checked })} /></ControlRow></ControlPanel></div>
