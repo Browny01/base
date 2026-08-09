@@ -1,5 +1,7 @@
 import { Redis } from "@upstash/redis";
-import { DATA_KEY, readCurrentData } from "@/lib/bridge-data";
+import { readCurrentData } from "@/lib/bridge-data";
+import { mergeBridgeWrite } from "@/lib/autonomy-persistence";
+import { mutateBridgeDataAtomically, type BridgeDataRecord } from "@/lib/versioned-bridge-store";
 
 export const runtime = "nodejs";
 
@@ -67,46 +69,24 @@ function validOperation(value: unknown): value is NativeOperation {
   return (operation.value as Record<string, unknown>).id === operation.recordId;
 }
 
-// Redis applies the full operation batch in one script so reconnecting clients
-// cannot overwrite unrelated records changed by another device between read/write.
-const APPLY_OPERATIONS = `
-local raw = redis.call("GET", KEYS[1])
-local data = raw and cjson.decode(raw) or {}
-local operations = cjson.decode(ARGV[1])
-
-if raw then
-  redis.call("LPUSH", KEYS[2], raw)
-  redis.call("LTRIM", KEYS[2], 0, 24)
-end
-
-for _, operation in ipairs(operations) do
-  local collection = data[operation.collection]
-  if type(collection) ~= "table" then collection = {} end
-
-  local match = nil
-  for index, record in ipairs(collection) do
-    if type(record) == "table" and tostring(record.id) == operation.recordId then
-      match = index
-      break
-    end
-  end
-
-  if operation.action == "delete" then
-    if match then table.remove(collection, match) end
-  elseif match then
-    collection[match] = operation.value
-  else
-    table.insert(collection, operation.value)
-  end
-
-  data[operation.collection] = collection
-end
-
-data.updatedAt = tonumber(ARGV[2])
-local encoded = cjson.encode(data)
-redis.call("SET", KEYS[1], encoded)
-return encoded
-`;
+function applyOperations(data: BridgeDataRecord, operations: NativeOperation[]): BridgeDataRecord {
+  const next: BridgeDataRecord = { ...data };
+  for (const operation of operations) {
+    const collection = Array.isArray(next[operation.collection])
+      ? [...next[operation.collection] as unknown[]]
+      : [];
+    const index = collection.findIndex((record) => Boolean(record) && typeof record === "object" && !Array.isArray(record) && String((record as Record<string, unknown>).id) === operation.recordId);
+    if (operation.action === "delete") {
+      if (index >= 0) collection.splice(index, 1);
+    } else if (index >= 0) {
+      collection[index] = operation.value!;
+    } else {
+      collection.push(operation.value!);
+    }
+    next[operation.collection] = collection;
+  }
+  return next;
+}
 
 export async function GET() {
   const redis = getRedis();
@@ -135,24 +115,30 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "Invalid native sync operation batch." }, { status: 400 });
     }
 
-    // This also migrates the legacy key before the Lua script reads DATA_KEY.
+    // Migrate the legacy key before the versioned mutation reads Bridge data.
     await readCurrentData(redis);
-    if (body.operations.length === 0) {
+    const operations = body.operations as NativeOperation[];
+    if (operations.length === 0) {
       return Response.json({ ok: true, data: unwrap(await readCurrentData(redis)), applied: [] });
     }
 
-    const updatedAt = Date.now();
-    const result = await redis.eval<unknown[], unknown>(
-      APPLY_OPERATIONS,
-      [DATA_KEY, HISTORY_KEY],
-      [JSON.stringify(body.operations), String(updatedAt)],
-    );
+    const mutation = await mutateBridgeDataAtomically(redis, (current) => {
+      const applied = applyOperations(current, operations);
+      return {
+        data: mergeBridgeWrite(current, applied, true),
+        result: { previous: current },
+      };
+    });
+    try {
+      await redis.lpush(HISTORY_KEY, JSON.stringify(mutation.result.previous));
+      await redis.ltrim(HISTORY_KEY, 0, 24);
+    } catch { /* a backup failure must not invalidate an already atomic sync */ }
 
     return Response.json({
       ok: true,
-      data: unwrap(result),
-      applied: body.operations.map((operation) => operation.id),
-      updatedAt,
+      data: mutation.data,
+      applied: operations.map((operation) => operation.id),
+      updatedAt: mutation.data.updatedAt,
     });
   } catch (error) {
     console.error("[bridge/native/sync POST]", error);

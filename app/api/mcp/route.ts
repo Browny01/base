@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import type { BoardDrawing, BoardItem, BridgeData, DrawTool, WikiPage } from "@/lib/store";
-import { isAutonomyTask, prepareAutonomySuggestion, sanitizeAutonomyAgentPatch, validateAutonomyEvidence } from "@/lib/autonomy";
+import { buildAutonomySummary, computeAutonomyMetrics, isAutonomyTask, normalizeAutonomySettings, prepareAutonomySuggestion, sanitizeAutonomyAgentPatch, validateAutonomyEvidence } from "@/lib/autonomy";
 import { BRIEF_TYPES, isBriefType, newestBriefs, upsertBriefCollection } from "@/lib/briefs";
 import { expandCalendarEvents } from "@/lib/calendar";
 import {
   CALENDAR_CATEGORIES, CALENDAR_COLORS, CALENDAR_REPEATS, createCalendarEvent,
   deleteCalendarEvent, updateCalendarEvent, validateCalendarRange,
 } from "@/lib/calendar-events";
-import { claimAutonomyTask, readRawData, sanitize, noteToText, submitAutonomyResult, writeRawData } from "@/lib/mcp-data";
+import { claimAutonomyTask, readRawData, reapExpiredAutonomyLeasesAtomic, sanitize, noteToText, submitAutonomyResult, writeRawData } from "@/lib/mcp-data";
 import { validateAccessToken } from "@/lib/mcp-oauth";
 
 export const runtime = "nodejs";
@@ -128,6 +128,36 @@ const TOOLS: Tool[] = [
     description: "A quick, privacy-safe summary of the Bridge workspace. Start here.",
     inputSchema: obj(),
     run: (_args, state) => publicOverview(state.data),
+  },
+  {
+    name: "get_autonomy_health",
+    description: "Read the guarded automation queue, current business focus, stale leases, and evidence-based success metrics without changing data.",
+    inputSchema: obj(),
+    run: (_args, state) => {
+      const tasks = (state.data.tasks ?? []).filter(isAutonomyTask);
+      const now = Date.now();
+      const staleLeases = tasks.filter((task) => {
+        if (task.executionState !== "in_progress") return false;
+        const lease = task.executionLeaseUntil ?? task.leaseUntil;
+        const leaseTime = typeof lease === "string" ? Date.parse(lease) : Number.NaN;
+        return Number.isFinite(leaseTime) && leaseTime <= now;
+      });
+      const settings = normalizeAutonomySettings(state.data.autonomySettings);
+      return {
+        healthy: staleLeases.length === 0,
+        currentBusinessFocus: settings.currentBusinessFocus,
+        enabled: settings.enabled,
+        summary: buildAutonomySummary(tasks),
+        metrics: computeAutonomyMetrics(tasks),
+        staleLeases: staleLeases.map((task) => ({ id: task.id, title: task.title, leaseUntil: task.executionLeaseUntil ?? task.leaseUntil })),
+      };
+    },
+  },
+  {
+    name: "reap_expired_autonomy_leases",
+    description: "Safely requeue only autonomous tasks whose execution lease has expired. This is idempotent and does not touch active runs.",
+    inputSchema: obj(),
+    run: async () => reapExpiredAutonomyLeasesAtomic(),
   },
   {
     name: "get_app_data",

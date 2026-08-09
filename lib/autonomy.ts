@@ -23,6 +23,7 @@ export interface AutonomySettings {
   workingHoursStart: string;
   workingHoursEnd: string;
   timezoneOffsetMinutes: number;
+  currentBusinessFocus: string;
   updatedAt?: string;
 }
 
@@ -37,6 +38,7 @@ export const DEFAULT_AUTONOMY_SETTINGS: AutonomySettings = {
   workingHoursStart: "09:00",
   workingHoursEnd: "23:00",
   timezoneOffsetMinutes: 480,
+  currentBusinessFocus: "Dropshipping",
 };
 
 export interface AutonomyTaskLike {
@@ -52,6 +54,14 @@ export interface AutonomyTaskLike {
   autonomyBrief?: string;
   executionNote?: string;
   executionStartedAt?: string;
+  executionFinishedAt?: string;
+  executionId?: string;
+  executionLeaseUntil?: string;
+  leaseUntil?: string;
+  approvedAt?: string;
+  lastLeaseExpiredAt?: string;
+  lastExecutionStartedAt?: string;
+  requeuedAt?: string;
   nightExecutedAt?: string;
   verifiedAt?: string;
   resultSummary?: string;
@@ -65,6 +75,7 @@ export interface AutonomyTaskLike {
   correctionAttempts?: number;
   verificationStatus?: string;
   implementationApproved?: boolean;
+  executionEvidence?: unknown[];
 }
 
 const TASK_CLASSES: AutonomyTaskClass[] = ["research", "planning", "implementation", "review", "operations"];
@@ -94,6 +105,9 @@ export function normalizeAutonomySettings(input: unknown, current: AutonomySetti
     workingHoursStart: hhmm("workingHoursStart"),
     workingHoursEnd: hhmm("workingHoursEnd"),
     timezoneOffsetMinutes: integer("timezoneOffsetMinutes", current.timezoneOffsetMinutes, -720, 840),
+    currentBusinessFocus: typeof value.currentBusinessFocus === "string" && value.currentBusinessFocus.trim()
+      ? value.currentBusinessFocus.trim().slice(0, 60)
+      : current.currentBusinessFocus,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : current.updatedAt,
   };
 }
@@ -104,6 +118,9 @@ export function reviewAutonomyTask(task: AutonomyTaskLike, decision: AutonomyRev
   if (!["awaiting_review", "blocked", "needs_input"].includes(task.executionState ?? "")) {
     return { ok: false, task, error: "Task is not awaiting a review decision." };
   }
+  if (decision === "verify" && task.executionState !== "awaiting_review") {
+    return { ok: false, task, error: "Only work awaiting review can be verified." };
+  }
   if (decision === "verify") return { ok: true, task: { ...task, done: true, completedAt: timestamp, verifiedAt: timestamp, verificationStatus: "verified", executionState: "completed" } };
   if (decision === "reject") return { ok: true, task: { ...task, verificationStatus: "rejected", executionState: "rejected" } };
   const attempts = task.correctionAttempts ?? 0;
@@ -113,7 +130,8 @@ export function reviewAutonomyTask(task: AutonomyTaskLike, decision: AutonomyRev
 
 const AUTONOMY_RUNTIME_PROTECTED_FIELDS = new Set([
   "done", "completedAt", "executionState", "executionId", "executionStartedAt", "executionFinishedAt",
-  "executionAgent", "workerModel", "executionEvidence", "resultSummary", "resultNoteId", "nightExecutedAt",
+  "executionLeaseUntil", "leaseUntil", "executionOwner", "startedAt", "approvedAt", "lastLeaseExpiredAt",
+  "lastExecutionStartedAt", "requeuedAt", "executionAgent", "workerModel", "executionEvidence", "resultSummary", "resultNoteId", "nightExecutedAt",
   "verificationStatus", "verifiedAt", "correctionAttempts", "implementationApproved", "blockedReason",
 ]);
 const AUTONOMY_AGENT_PROTECTED_FIELDS = new Set([
@@ -185,6 +203,69 @@ export function buildAutonomySummary(tasks: AutonomyTaskLike[]): AutonomySummary
     if (state === "needs_input") summary.needsApproval += 1;
   }
   return summary;
+}
+
+export interface AutonomyMetrics {
+  usefulRunRate: number | null;
+  verifiedThroughput7d: number;
+  oldestBlockedAgeHours: number | null;
+  averageEndToEndHours: number | null;
+  averageDecisionToResolutionHours: number | null;
+  averageRecoveryHours: number | null;
+}
+
+function timestamp(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function averageHours(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length / 3_600_000) * 10) / 10;
+}
+
+export function computeAutonomyMetrics(tasks: AutonomyTaskLike[], nowIso = new Date().toISOString()): AutonomyMetrics {
+  const now = timestamp(nowIso) ?? Date.now();
+  const runs = tasks.filter((task) => timestamp(task.executionStartedAt ?? task.lastExecutionStartedAt) != null);
+  const usefulRuns = runs.filter((task) =>
+    ["awaiting_review", "completed"].includes(autonomyState(task) ?? "")
+    && Boolean(task.resultSummary?.trim())
+    && Array.isArray(task.executionEvidence)
+    && task.executionEvidence.length > 0,
+  );
+  const verifiedTimes = tasks
+    .filter((task) => autonomyState(task) === "completed")
+    .map((task) => timestamp(task.verifiedAt ?? task.completedAt))
+    .filter((value): value is number => value != null);
+  const blockedAges = tasks
+    .filter((task) => ["blocked", "needs_input"].includes(autonomyState(task) ?? ""))
+    .map((task) => timestamp(task.executionFinishedAt ?? task.nightExecutedAt ?? task.executionStartedAt ?? task.createdAt))
+    .filter((value): value is number => value != null && value <= now)
+    .map((value) => (now - value) / 3_600_000);
+  const endToEnd = tasks.flatMap((task) => {
+    const start = timestamp(task.createdAt);
+    const end = timestamp(task.verifiedAt ?? task.completedAt);
+    return start != null && end != null && end >= start ? [end - start] : [];
+  });
+  const decisionToResolution = tasks.flatMap((task) => {
+    const start = timestamp(task.approvedAt);
+    const end = timestamp(task.verifiedAt ?? task.completedAt);
+    return start != null && end != null && end >= start ? [end - start] : [];
+  });
+  const recovery = tasks.flatMap((task) => {
+    const start = timestamp(task.lastLeaseExpiredAt);
+    const end = timestamp(task.requeuedAt ?? task.executionStartedAt);
+    return start != null && end != null && end >= start ? [end - start] : [];
+  });
+  return {
+    usefulRunRate: runs.length ? Math.round((usefulRuns.length / runs.length) * 100) / 100 : null,
+    verifiedThroughput7d: verifiedTimes.filter((value) => value >= now - 7 * 24 * 3_600_000 && value <= now).length,
+    oldestBlockedAgeHours: blockedAges.length ? Math.round(Math.max(...blockedAges) * 10) / 10 : null,
+    averageEndToEndHours: averageHours(endToEnd),
+    averageDecisionToResolutionHours: averageHours(decisionToResolution),
+    averageRecoveryHours: averageHours(recovery),
+  };
 }
 
 export function eligibleAutonomyTasks<T extends AutonomyTaskLike>(tasks: T[], settings: AutonomySettings): T[] {
