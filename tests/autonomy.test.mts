@@ -4,6 +4,7 @@ import {
   DEFAULT_AUTONOMY_SETTINGS,
   autonomyState,
   buildAutonomySummary,
+  computeAutonomyMetrics,
   eligibleAutonomyTasks,
   normalizeAutonomySettings,
   prepareAutonomySuggestion,
@@ -98,6 +99,39 @@ test("normalizeAutonomySettings clamps unsafe control values", () => {
   assert.equal(settings.maxCorrectionAttempts, 1);
   assert.deepEqual(settings.allowedTaskClasses, ["research"]);
   assert.deepEqual(settings.allowedWorkspaces, ["Bridge"]);
+  assert.equal(settings.currentBusinessFocus, "Dropshipping");
+});
+
+test("computeAutonomyMetrics reports grounded rates and timings without inventing missing values", () => {
+  const metrics = computeAutonomyMetrics([
+    task({
+      id: "verified",
+      createdAt: "2026-08-05T00:00:00.000Z",
+      executionStartedAt: "2026-08-07T00:00:00.000Z",
+      approvedAt: "2026-08-07T00:30:00.000Z",
+      executionFinishedAt: "2026-08-07T01:00:00.000Z",
+      verifiedAt: "2026-08-07T02:00:00.000Z",
+      completedAt: "2026-08-07T02:00:00.000Z",
+      executionState: "completed",
+      done: true,
+      resultSummary: "Useful result",
+      executionEvidence: ["pass"],
+    }),
+    task({
+      id: "blocked",
+      createdAt: "2026-08-06T00:00:00.000Z",
+      executionStartedAt: "2026-08-08T00:00:00.000Z",
+      executionFinishedAt: "2026-08-08T01:00:00.000Z",
+      executionState: "blocked",
+    }),
+  ], "2026-08-09T00:00:00.000Z");
+
+  assert.equal(metrics.usefulRunRate, 0.5);
+  assert.equal(metrics.verifiedThroughput7d, 1);
+  assert.equal(metrics.oldestBlockedAgeHours, 23);
+  assert.equal(metrics.averageEndToEndHours, 50);
+  assert.equal(metrics.averageDecisionToResolutionHours, 1.5);
+  assert.equal(metrics.averageRecoveryHours, null);
 });
 
 test("reviewAutonomyTask permits one correction then blocks further retries", () => {
@@ -110,6 +144,16 @@ test("reviewAutonomyTask permits one correction then blocks further retries", ()
   const second = reviewAutonomyTask({ ...first.task!, executionState: "awaiting_review" }, "requeue", "2026-08-07T05:00:00.000Z", 1);
   assert.equal(second.ok, false);
   assert.equal(second.task?.executionState, "blocked");
+});
+
+test("reviewAutonomyTask only verifies work that is awaiting review", () => {
+  for (const executionState of ["blocked", "needs_input"] as const) {
+    const current = task({ id: `verify-${executionState}`, executionState });
+    const result = reviewAutonomyTask(current, "verify", "2026-08-07T05:00:00.000Z", 1);
+    assert.equal(result.ok, false);
+    assert.equal(result.task?.executionState, executionState);
+    assert.equal(result.task?.done, false);
+  }
 });
 
 test("generic agent writes cannot bypass autonomy claiming or verification", () => {
