@@ -34,6 +34,7 @@ test("autonomyState normalizes legacy completed and blocked tasks", () => {
   assert.equal(autonomyState(task({ done: true, executionState: undefined })), "completed");
   assert.equal(autonomyState(task({ executionNote: "Source missing", executionState: undefined })), "blocked");
   assert.equal(autonomyState(task({ tag: "@work", nightPolicy: undefined, executionState: undefined })), null);
+  assert.equal(autonomyState(task({ tag: "@work", nightPolicy: undefined, taskClass: undefined, executionState: "in_progress" })), "in_progress");
 });
 
 test("buildAutonomySummary counts actionable states without inventing runs", () => {
@@ -69,6 +70,24 @@ test("eligibleAutonomyTasks respects pause, concurrency, dependencies, and prior
   assert.deepEqual(eligibleAutonomyTasks(tasks, { ...DEFAULT_AUTONOMY_SETTINGS, enabled: false }), []);
   const implementations = [task({ id: "approval-needed", taskClass: "implementation" }), task({ id: "approved", taskClass: "implementation", implementationApproved: true })];
   assert.deepEqual(eligibleAutonomyTasks(implementations, DEFAULT_AUTONOMY_SETTINGS).map((item) => item.id), ["approved"]);
+});
+
+test("eligibleAutonomyTasks ignores unrelated in-progress experiments when enforcing worker capacity", () => {
+  const unrelatedExperiment = {
+    id: "paper-trading",
+    title: "Run paper-trading experiment",
+    tag: "@development",
+    taskClass: "experiment",
+    executionState: "in_progress",
+    done: false,
+  } as unknown as ReturnType<typeof task>;
+  const queued = task({ id: "dropshipping-research", workspace: "Dropshipping", taskClass: "research" });
+
+  assert.deepEqual(
+    eligibleAutonomyTasks([unrelatedExperiment, queued], { ...DEFAULT_AUTONOMY_SETTINGS, maxConcurrentWorkers: 1 }).map((item) => item.id),
+    ["dropshipping-research"],
+  );
+  assert.equal(buildAutonomySummary([unrelatedExperiment]).running, 0);
 });
 
 test("reviewBucket separates owner decisions from routine verification", () => {
