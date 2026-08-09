@@ -96,8 +96,26 @@ test("only owning run can submit and submission clears the active lease", () => 
 test("implementation remains owner-gated", () => {
   const implementation = { ...queued, taskClass: "implementation", workspace: "Bridge" };
   const denied = claimAutonomyTaskInData({ tasks: [implementation], autonomySettings: SETTINGS }, {
-    taskId: "task-1", runId: "run-a", agent: "parent", model: "worker", startedAt: "2026-08-09T08:00:00.000Z",
+    taskId: "task-1", runId: "run-implementation", agent: "worker", model: "model", startedAt: "2026-08-09T08:00:00.000Z",
   });
   assert.equal(denied.result.ok, false);
-  assert.match(denied.result.error ?? "", /approval/i);
+  assert.match(String(denied.result.error), /approval/i);
+});
+
+test("unrelated in-progress experiments do not consume autonomy worker capacity", () => {
+  const unrelatedExperiment = {
+    id: "paper-trading",
+    title: "Run paper-trading experiment",
+    tag: "@development",
+    taskClass: "experiment",
+    executionState: "in_progress",
+    executionStartedAt: "2026-08-09T07:30:00.000Z",
+    done: false,
+  };
+  const claimed = claimAutonomyTaskInData({ tasks: [unrelatedExperiment, queued], autonomySettings: { ...SETTINGS, dailyRunLimit: 1 } }, {
+    taskId: "task-1", runId: "run-isolated", agent: "worker", model: "model", startedAt: "2026-08-09T08:00:00.000Z",
+  });
+
+  assert.equal(claimed.result.ok, true);
+  assert.equal(claimed.result.runId, "run-isolated");
 });
