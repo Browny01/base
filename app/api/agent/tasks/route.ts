@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { DATA_KEY as KEY, readCurrentData } from "@/lib/bridge-data";
+import { readCurrentData } from "@/lib/bridge-data";
+import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
 import { bridgeAgentToken } from "@/lib/env";
+import type { BridgeData as StoreBridgeData } from "@/lib/store";
 
 type Priority = "P1" | "P2" | "P3";
 type TaskTag = "@work" | "@personal" | "@money" | "@admin";
@@ -60,7 +62,7 @@ async function readData(redis: Redis): Promise<BridgeData> {
 
 async function writeData(redis: Redis, data: BridgeData) {
   const next = { ...data, tasks: data.tasks ?? [], updatedAt: Date.now() };
-  await redis.set(KEY, next);
+  await safeWriteBridgeData(redis, next as unknown as StoreBridgeData, true);
   return next;
 }
 

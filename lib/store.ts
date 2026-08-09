@@ -28,6 +28,12 @@ export interface Task {
   autonomyBrief?: string;
   executionNote?: string;
   executionStartedAt?: string;
+  lastExecutionStartedAt?: string;
+  executionLeaseUntil?: string;
+  leaseUntil?: string;
+  lastLeaseExpiredAt?: string;
+  requeuedAt?: string;
+  approvedAt?: string;
   nightExecutedAt?: string;
   executionAgent?: string;
   executionId?: string;
