@@ -1,5 +1,7 @@
 import {
+  consumesAutonomyWorkerCapacity,
   isAutonomyTask,
+  isAutonomyWorkerManagedTask,
   normalizeAutonomySettings,
   type AutonomyTaskLike,
 } from "./autonomy.ts";
@@ -125,13 +127,14 @@ export function claimAutonomyTaskInData(data: BridgeDataRecord, input: ClaimAuto
   const settings = normalizeAutonomySettings(current.autonomySettings);
   if (!settings.enabled) return { data: current, result: { ok: false, error: "Autonomy is paused." }, changed: reaped.reaped > 0 };
 
-  const running = tasks.filter((task) => task.executionState === "in_progress").length;
+  const running = tasks.filter((task) => consumesAutonomyWorkerCapacity(task as unknown as AutonomyTaskLike)).length;
   if (running >= settings.maxConcurrentWorkers) {
     return { data: current, result: { ok: false, error: "Worker capacity is full." }, changed: reaped.reaped > 0 };
   }
 
   const today = localDateKey(startedMs, settings.timezoneOffsetMinutes);
   const todayRuns = tasks.filter((task) => {
+    if (!isAutonomyWorkerManagedTask(task as unknown as AutonomyTaskLike)) return false;
     const timestamp = parseTime(task.executionStartedAt ?? task.lastExecutionStartedAt);
     return timestamp != null && localDateKey(timestamp, settings.timezoneOffsetMinutes) === today;
   }).length;

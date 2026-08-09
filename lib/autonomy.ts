@@ -196,7 +196,7 @@ export function buildAutonomySummary(tasks: AutonomyTaskLike[]): AutonomySummary
     if (!state) continue;
     summary.total += 1;
     if (state === "queued" || state === "suggested") summary.queued += 1;
-    if (state === "in_progress") summary.running += 1;
+    if (state === "in_progress" && consumesAutonomyWorkerCapacity(task)) summary.running += 1;
     if (state === "awaiting_review") summary.awaitingReview += 1;
     if (state === "completed") summary.verified += 1;
     if (state === "blocked" || state === "rejected") summary.blocked += 1;
@@ -268,9 +268,17 @@ export function computeAutonomyMetrics(tasks: AutonomyTaskLike[], nowIso = new D
   };
 }
 
+export function isAutonomyWorkerManagedTask(task: AutonomyTaskLike): boolean {
+  return typeof task.taskClass !== "string" || TASK_CLASSES.includes(task.taskClass as AutonomyTaskClass);
+}
+
+export function consumesAutonomyWorkerCapacity(task: AutonomyTaskLike): boolean {
+  return autonomyState(task) === "in_progress" && isAutonomyWorkerManagedTask(task);
+}
+
 export function eligibleAutonomyTasks<T extends AutonomyTaskLike>(tasks: T[], settings: AutonomySettings): T[] {
   if (!settings.enabled) return [];
-  const running = tasks.filter((task) => autonomyState(task) === "in_progress").length;
+  const running = tasks.filter(consumesAutonomyWorkerCapacity).length;
   const capacity = Math.max(0, Math.min(3, settings.maxConcurrentWorkers) - running);
   if (capacity === 0) return [];
   const completedIds = new Set(tasks.filter((task) => task.done || autonomyState(task) === "completed").map((task) => task.id));
