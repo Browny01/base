@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build the native macOS Bridge app in Release and install it permanently into
+# Build the native macOS Base app in Release and install it permanently into
 # /Applications (launchable from Spotlight, Launchpad, and the Dock).
 #
 # Run this once to install. After that, the app keeps itself up to date via
@@ -13,7 +13,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAC_DIR="$REPO_ROOT/macos"
 DD="$MAC_DIR/.build/dd"
-APP_NAME="Bridge.app"
+APP_NAME="Base.app"
 DEST="/Applications/$APP_NAME"
 
 command -v xcodegen >/dev/null || { echo "❌ xcodegen not found — run: brew install xcodegen"; exit 1; }
@@ -21,8 +21,8 @@ command -v xcodegen >/dev/null || { echo "❌ xcodegen not found — run: brew i
 echo "▸ Generating Xcode project…"
 ( cd "$MAC_DIR" && xcodegen generate >/dev/null )
 
-echo "▸ Building Bridge (Release)…"
-xcodebuild -project "$MAC_DIR/Bridge.xcodeproj" -scheme Bridge \
+echo "▸ Building Base (Release)…"
+xcodebuild -project "$MAC_DIR/Base.xcodeproj" -scheme Base \
   -configuration Release -derivedDataPath "$DD" \
   -destination 'platform=macOS' build >/dev/null
 
@@ -30,7 +30,7 @@ BUILT="$DD/Build/Products/Release/$APP_NAME"
 [ -d "$BUILT" ] || { echo "❌ build product not found at $BUILT"; exit 1; }
 
 # Quit any running copy so we can replace it cleanly.
-osascript -e 'tell application "Bridge" to quit' >/dev/null 2>&1 || true
+osascript -e 'tell application "Base" to quit' >/dev/null 2>&1 || true
 sleep 1
 
 echo "▸ Installing to ${DEST}…"
@@ -43,4 +43,4 @@ echo "▸ Launching…"
 open "$DEST"
 
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DEST/Contents/Info.plist" 2>/dev/null || echo "?")
-echo "✅ Installed Bridge $VERSION to /Applications. It will check for updates automatically."
+echo "✅ Installed Base $VERSION to /Applications. It will check for updates automatically."

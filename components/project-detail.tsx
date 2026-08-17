@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
+import { useConfirm } from "@/lib/confirm-context";
 import { prepareProjectLogo } from "@/lib/project-logo";
 import { prepareProjectFile } from "@/lib/project-file";
 import { uid, getToday } from "@/lib/utils";
@@ -55,6 +56,7 @@ function formatFileSize(bytes: number): string {
 export function ProjectDetail({ id }: { id: string }) {
   const { data, mutate } = useBridge();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("tasks");
 
@@ -202,8 +204,9 @@ export function ProjectDetail({ id }: { id: string }) {
     setOptionsOpen(false);
     if (nextArchived) router.push("/projects");
   }
-  function deleteProject() {
-    if (!confirm("Delete this project? Tasks will remain but be unlinked.")) return;
+  async function deleteProject() {
+    const ok = await confirm({ message: "Delete this project? Tasks will remain but be unlinked." });
+    if (!ok) return;
     // snapshot everything so Undo can restore the full project
     const snap = {
       project: data.projects.find((p) => p.id === id),

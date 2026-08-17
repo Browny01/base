@@ -66,9 +66,9 @@ function form(p: Params, err = ""): string {
     .map((k) => `<input type="hidden" name="${k}" value="${escapeAttr(p[k])}">`).join("");
   return `
     <form method="post" class="card">
-      <div class="logo">N</div>
-      <h1>Connect to Bridge</h1>
-      <p class="sub">An AI assistant wants permission to read and edit your Bridge workspace. Locked notes stay private. Enter your MCP password to approve.</p>
+      <div class="logo">B</div>
+      <h1>Connect to Base</h1>
+      <p class="sub">An AI assistant wants permission to read and edit your Base workspace. Locked notes stay private. Enter your MCP password to approve.</p>
       ${err ? `<p class="err">${escapeHtml(err)}</p>` : ""}
       ${hidden}
       <input type="password" name="password" placeholder="MCP password" autofocus autocomplete="off" />
@@ -76,7 +76,7 @@ function form(p: Params, err = ""): string {
     </form>`;
 }
 function page(inner: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bridge · Authorize</title>
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Base · Authorize</title>
   <style>
     *{box-sizing:border-box} body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a0a;color:#ededed;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;padding:20px}
     .card{width:100%;max-width:360px;background:#131316;border:1px solid #272729;border-radius:16px;padding:28px;text-align:center;box-shadow:0 20px 60px -20px rgba(0,0,0,.6)}

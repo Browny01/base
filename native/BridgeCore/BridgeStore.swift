@@ -11,7 +11,7 @@ final class BridgeStore: ObservableObject {
         case failed(String)
     }
 
-    static let serviceURL = URL(string: "https://bridge-ten-lovat.vercel.app")!
+    static let serviceURL = URL(string: "https://base.lucasbrown.xyz")!
 
     @Published private(set) var document: [String: JSONValue] = [:]
     @Published private(set) var syncState: SyncState = .offline

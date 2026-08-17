@@ -1,4 +1,4 @@
-// Builds a compact, sanitized snapshot of the user's Bridge data to give the chat
+// Builds a compact, sanitized snapshot of the user's Base data to give the chat
 // AI site-wide context. Locked and trashed notes are never included — same rule
 // as the MCP server. Client-safe (no server-only imports).
 

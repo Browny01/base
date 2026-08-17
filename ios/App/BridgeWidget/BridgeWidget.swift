@@ -22,7 +22,7 @@ struct BridgeSummary: Codable {
 enum BridgeAPI {
     // Personal single-user app. The token matches the server default
     // (BRIDGE_AGENT_TOKEN / BRIDGE_PASSWORD, default 151715).
-    static let base = "https://bridge-ten-lovat.vercel.app"
+    static let base = "https://base.lucasbrown.xyz"
     static let token = "151715"
 
     static func fetchSummary() async -> BridgeSummary {
@@ -205,7 +205,7 @@ struct BridgeWidget: Widget {
         StaticConfiguration(kind: kind, provider: BridgeProvider()) { entry in
             BridgeWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Bridge")
+        .configurationDisplayName("Base")
         .description("Today's tasks, streak, habits, and revenue vs target.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

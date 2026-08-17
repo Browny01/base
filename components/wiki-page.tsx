@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
+import { useConfirm } from "@/lib/confirm-context";
 import { uid, cn } from "@/lib/utils";
 import type { WikiPage as WikiPageT, WikiBlock, WikiFolder } from "@/lib/store";
 import { WikiEditor, blocksToText } from "@/components/wiki-editor";
@@ -111,6 +112,7 @@ function pageToPrintDoc(page: WikiPageT): string {
 export function WikiPage() {
   const { data, mutate } = useBridge();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const allWiki = data.wikiPages ?? [];
   const pages = allWiki.filter((p) => !p.deletedAt);          // live pages
   const deletedPages = allWiki.filter((p) => p.deletedAt);    // in Trash
@@ -192,8 +194,9 @@ export function WikiPage() {
     if (!name) return;
     mutate((d) => ({ ...d, wikiFolders: (d.wikiFolders ?? []).map((f) => (f.id === id ? { ...f, name } : f)) }));
   }
-  function deleteFolder(id: string) {
-    if (typeof window !== "undefined" && !window.confirm("Delete this folder? Its pages move out to the top level (pages are kept).")) return;
+  async function deleteFolder(id: string) {
+    const ok = await confirm({ message: "Delete this folder? Its pages move out to the top level (pages are kept)." });
+    if (!ok) return;
     mutate((d) => ({
       ...d,
       wikiFolders: (d.wikiFolders ?? []).filter((f) => f.id !== id),
@@ -244,8 +247,9 @@ export function WikiPage() {
   }
 
   // Permanently delete a trashed page (the "delete a second time" action).
-  function purgePage(id: string) {
-    if (typeof window !== "undefined" && !window.confirm("Permanently delete this page? This cannot be undone.")) return;
+  async function purgePage(id: string) {
+    const ok = await confirm({ message: "Permanently delete this page? This cannot be undone." });
+    if (!ok) return;
     const ids = subtreeIds(id, allWiki);
     mutate((d) => ({ ...d, wikiPages: (d.wikiPages ?? []).filter((p) => !ids.has(p.id)) }));
   }

@@ -7,9 +7,9 @@ import { getData } from "@/lib/store";
 import { useTheme } from "@/lib/theme-context";
 import { useNavMode } from "@/lib/nav-mode-context";
 import {
-  LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
-  FolderKanban, Newspaper, Trophy, Briefcase,
-  Search, CornerDownLeft, NotebookText, LayoutGrid, Dumbbell, MessageCircle, type LucideIcon,
+  LayoutDashboard, CheckSquare, Timer, DollarSign,
+  FolderKanban, Newspaper,
+  Search, CornerDownLeft, NotebookText, LayoutGrid, type LucideIcon,
   Settings, Sun, Moon, PanelBottom, CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,22 +19,16 @@ type Item =
   | { kind: "action"; key: string; label: string; icon: LucideIcon; keywords?: string; run: () => void }
   | { kind: "wiki"; key: string; label: string; emoji: string; id: string }
   | { kind: "board"; key: string; label: string; id: string }
-  | { kind: "chat"; key: string; label: string; id: string }
   | { kind: "project"; key: string; label: string; id: string; keywords?: string };
 
 const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string }[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard, keywords: "home overview" },
-  { href: "/chat",     label: "Chat",      icon: MessageCircle,   keywords: "ai assistant gemini claude gpt" },
-  { href: "/player",   label: "Personal",  icon: Trophy,          keywords: "self ratings skills goals" },
-  { href: "/gym",      label: "Gym",       icon: Dumbbell,        keywords: "workout lifting training exercise sets reps" },
-  { href: "/business", label: "Business",  icon: Briefcase,       keywords: "stripe revenue bookings" },
   { href: "/projects", label: "Projects",  icon: FolderKanban,    keywords: "roadmap docs kanban" },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid,      keywords: "board collage moodboard" },
   { href: "/notes",    label: "Notes",     icon: NotebookText,    keywords: "wiki docs pages" },
   { href: "/calendar", label: "Calendar",  icon: CalendarDays,    keywords: "events agenda schedule bookings dates" },
   { href: "/tasks",    label: "Tasks",     icon: CheckSquare,     keywords: "todo kanban" },
   { href: "/focus",    label: "Focus",     icon: Timer,           keywords: "pomodoro timer" },
-  { href: "/habits",   label: "Habits",    icon: Repeat2,         keywords: "streak routine" },
   { href: "/finance",  label: "Finance",   icon: DollarSign,      keywords: "money wallet crypto" },
   { href: "/news",     label: "News",      icon: Newspaper,       keywords: "markets headlines" },
   { href: "/settings", label: "Settings",  icon: Settings,        keywords: "preferences appearance theme navigation" },
@@ -57,15 +51,14 @@ export function CommandBar() {
     setOpen(true);
   }, []);
 
-  // Projects, notes pages, chats + vision boards, snapshotted from local data when the palette opens.
+  // Projects, notes pages + vision boards, snapshotted from local data when the palette opens.
   const dyn = useMemo(() => {
-    if (!open) return { projects: [] as Item[], wiki: [] as Item[], boards: [] as Item[], chats: [] as Item[] };
+    if (!open) return { projects: [] as Item[], wiki: [] as Item[], boards: [] as Item[] };
     const d = getData();
     return {
       projects: (d.projects ?? []).map((p): Item => ({ kind: "project", key: `project:${p.id}`, id: p.id, label: p.name || "Untitled project", keywords: `${p.category ?? ""} ${p.status ?? ""} roadmap milestone` })),
       wiki: (d.wikiPages ?? []).filter((p) => !p.deletedAt).map((p): Item => ({ kind: "wiki", key: `wiki:${p.id}`, id: p.id, label: p.title || "Untitled", emoji: p.icon || "📄" })),
       boards: (d.boards ?? []).map((b): Item => ({ kind: "board", key: `board:${b.id}`, id: b.id, label: b.name || "Untitled board" })),
-      chats: (d.chatThreads ?? []).filter((t) => !t.deletedAt).map((t): Item => ({ kind: "chat", key: `chat:${t.id}`, id: t.id, label: t.title || "New chat" })),
     };
   }, [open]);
 
@@ -74,23 +67,21 @@ export function CommandBar() {
     { kind: "action", key: "act:newevent", label: "New event", icon: CalendarDays, keywords: "create add calendar schedule", run: () => { try { localStorage.setItem("bridge_open_new_event", "1"); window.dispatchEvent(new Event("bridge:new-event")); } catch {} router.push("/calendar"); } },
     { kind: "action", key: "act:newtask", label: "New task", icon: CheckSquare, keywords: "create add todo", run: () => { try { localStorage.setItem("bridge_open_new_task", "1"); } catch {} router.push("/tasks"); } },
     { kind: "action", key: "act:newproject", label: "New project", icon: FolderKanban, keywords: "create add", run: () => { try { localStorage.setItem("bridge_open_new_project", "1"); } catch {} router.push("/projects"); } },
-    { kind: "action", key: "act:newchat", label: "New chat", icon: MessageCircle, keywords: "ai ask new conversation", run: () => router.push("/chat") },
     { kind: "action", key: "act:theme", label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode", icon: theme === "dark" ? Sun : Moon, keywords: "theme dark light appearance", run: toggleTheme },
     { kind: "action", key: "act:nav", label: mode === "dock" ? "Use sidebar navigation" : "Use dock navigation", icon: mode === "dock" ? LayoutDashboard : PanelBottom, keywords: "dock sidebar navigation layout", run: () => setMode(mode === "dock" ? "sidebar" : "dock") },
   ], [router, theme, toggleTheme, mode, setMode]);
 
   // Filter each group, then flatten in the SAME order they're rendered so keyboard
   // navigation (results[active]) lines up with the rendered rows.
-  const { acts, pages, projects, notes, chats, boards, results } = useMemo(() => {
+  const { acts, pages, projects, notes, boards, results } = useMemo(() => {
     const q = query.trim().toLowerCase();
     const match = (it: Item) => !q || (it.label + " " + ("keywords" in it ? it.keywords ?? "" : "")).toLowerCase().includes(q);
     const acts = q ? actions.filter(match) : actions;   // always show actions, filtered by query
     const pages = PAGE_ITEMS.filter(match);
     const projects = dyn.projects.filter(match);
     const notes = dyn.wiki.filter(match);
-    const chats = dyn.chats.filter(match);
     const boards = dyn.boards.filter(match);
-    return { acts, pages, projects, notes, chats, boards, results: [...acts, ...pages, ...projects, ...notes, ...chats, ...boards] };
+    return { acts, pages, projects, notes, boards, results: [...acts, ...pages, ...projects, ...notes, ...boards] };
   }, [query, dyn, actions]);
 
   // ⌘K / Ctrl+K toggle
@@ -124,12 +115,6 @@ export function CommandBar() {
       router.push("/notes");
       return;
     }
-    if (it.kind === "chat") {
-      try { localStorage.setItem("bridge_chat_active", it.id); } catch {}
-      window.dispatchEvent(new CustomEvent("bridge:open-chat", { detail: it.id }));
-      router.push("/chat");
-      return;
-    }
     // board
     try { localStorage.setItem("bridge_vision_active", it.id); } catch {}
     window.dispatchEvent(new CustomEvent("bridge:open-vision", { detail: it.id }));
@@ -146,7 +131,7 @@ export function CommandBar() {
   const renderRow = (it: Item, idx: number) => {
     const isActive = idx === active;
     const isCurrent = it.kind === "page" && (it.href === "/" ? pathname === "/" : pathname.startsWith(it.href));
-    const Icon = it.kind === "page" || it.kind === "action" ? it.icon : it.kind === "chat" ? MessageCircle : it.kind === "project" ? FolderKanban : LayoutGrid;
+    const Icon = it.kind === "page" || it.kind === "action" ? it.icon : it.kind === "project" ? FolderKanban : LayoutGrid;
     return (
       <button
         key={it.key}
@@ -203,8 +188,7 @@ export function CommandBar() {
                   {renderSection("Pages", pages, acts.length)}
                   {renderSection("Projects", projects, acts.length + pages.length)}
                   {renderSection("Notes", notes, acts.length + pages.length + projects.length)}
-                  {renderSection("Chats", chats, acts.length + pages.length + projects.length + notes.length)}
-                  {renderSection("Vision boards", boards, acts.length + pages.length + projects.length + notes.length + chats.length)}
+                  {renderSection("Vision boards", boards, acts.length + pages.length + projects.length + notes.length)}
                 </>
               )}
             </div>

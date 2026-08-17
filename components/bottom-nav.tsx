@@ -5,19 +5,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
-  FolderKanban, Repeat2, Newspaper, X, MoreHorizontal,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays,
-  Settings, Bot, type LucideIcon,
+  FolderKanban, Newspaper, X, MoreHorizontal,
+  Sun, Moon, LayoutGrid, NotebookText, CalendarDays,
+  Settings, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
 
 type Item = { href: string; label: string; icon: LucideIcon };
 
-// The five fixed tabs — a standard iOS tab bar. Everything else lives in "More".
+// The fixed tabs — a standard iOS tab bar. Everything else lives in "More".
 const TABS: Item[] = [
   { href: "/",         label: "Home",     icon: LayoutDashboard },
-  { href: "/chat",     label: "Chat",     icon: MessageCircle   },
   { href: "/projects", label: "Projects", icon: FolderKanban    },
   { href: "/tasks",    label: "Tasks",    icon: CheckSquare     },
 ];
@@ -25,20 +24,13 @@ const TABS: Item[] = [
 // Everything — the More sheet
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat",     label: "Chat",      icon: MessageCircle },
-  { href: "/autonomy", label: "Autonomy",  icon: Bot           },
-  { href: "/player",   label: "Personal",  icon: Trophy        },
-  { href: "/gym",      label: "Gym",       icon: Dumbbell      },
-  { href: "/business", label: "Business",  icon: Briefcase     },
   { href: "/projects", label: "Projects",  icon: FolderKanban  },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid    },
   { href: "/notes",    label: "Notes",     icon: NotebookText  },
   { href: "/calendar", label: "Calendar",  icon: CalendarDays  },
   { href: "/tasks",    label: "Tasks",     icon: CheckSquare   },
   { href: "/focus",    label: "Focus",     icon: Timer         },
-  { href: "/habits",   label: "Habits",    icon: Repeat2       },
   { href: "/finance",  label: "Finance",   icon: DollarSign    },
-  { href: "/learn",    label: "Learn",     icon: Lightbulb     },
   { href: "/news",     label: "News",      icon: Newspaper     },
   { href: "/settings", label: "Settings",  icon: Settings      },
 ];
@@ -46,7 +38,7 @@ const ALL: Item[] = [
 const isActive = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 
-// A tab that isn't one of the fixed five is still "active" when its page is open,
+// A tab that isn't one of the fixed tabs is still "active" when its page is open,
 // which we surface by lighting up the More button.
 const TAB_HREFS = new Set(TABS.map((t) => t.href));
 

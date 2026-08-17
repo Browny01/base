@@ -2,15 +2,13 @@
 
 import { useId, useState, useEffect, useRef } from "react";
 import { useBridge } from "@/lib/hooks";
-import { uid, formatCurrency, formatDate, getToday, calcStreak } from "@/lib/utils";
+import { uid, formatCurrency, formatDate, getToday } from "@/lib/utils";
 import type { Priority, Task, TaskTag } from "@/lib/store";
-import { Repeat2, Flame, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, Grip, SlidersHorizontal, RotateCcw, X, Check, Timer, Target, NotebookText, CreditCard, Dumbbell, GraduationCap } from "lucide-react";
+import { Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, Grip, SlidersHorizontal, RotateCcw, X, Check, Timer, NotebookText, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
-import { DashAskBar } from "@/components/dash-ask-bar";
 import { ProjectLogo } from "@/components/project-logo";
-import { HermesBriefings } from "@/components/hermes-briefings";
 import { Responsive, noCompactor, useContainerWidth, type Layout, type ResponsiveLayouts } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -19,27 +17,20 @@ const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
 const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
 
 type DashboardBreakpoint = "lg" | "md" | "sm" | "xs" | "xxs";
-type WidgetId = "tasks-metric" | "habits-metric" | "streak-metric" | "revenue-metric" | "news" | "hermes-briefings" | "tasks" | "habits" | "projects" | "focus" | "goals" | "notes" | "payments" | "workout" | "learning";
+type WidgetId = "tasks-metric" | "revenue-metric" | "news" | "tasks" | "projects" | "focus" | "notes" | "payments";
 
 const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "tasks-metric", label: "Tasks left" },
-  { id: "habits-metric", label: "Habits" },
-  { id: "streak-metric", label: "Streak" },
   { id: "revenue-metric", label: "Revenue" },
   { id: "news", label: "News briefing" },
-  { id: "hermes-briefings", label: "Hermes Briefings" },
   { id: "tasks", label: "Today's tasks" },
-  { id: "habits", label: "Today's habits" },
   { id: "projects", label: "Projects" },
   { id: "focus", label: "Focus today" },
-  { id: "goals", label: "Active goals" },
   { id: "notes", label: "Recent notes" },
   { id: "payments", label: "Upcoming payments" },
-  { id: "workout", label: "Latest workout" },
-  { id: "learning", label: "Learning progress" },
 ];
 
-const DEFAULT_WIDGET_IDS: WidgetId[] = ["tasks-metric", "habits-metric", "streak-metric", "revenue-metric", "news", "hermes-briefings", "tasks", "habits", "projects"];
+const DEFAULT_WIDGET_IDS: WidgetId[] = ["tasks-metric", "revenue-metric", "news", "tasks", "projects"];
 
 const BREAKPOINTS: Record<DashboardBreakpoint, number> = { lg: 1180, md: 900, sm: 680, xs: 420, xxs: 0 };
 const GRID_COLUMNS: Record<DashboardBreakpoint, number> = { lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 };
@@ -49,37 +40,23 @@ const DASHBOARD_LAYOUT_VERSION = 2;
 const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
   lg: [
     { i: "tasks-metric", x: 0, y: 0, w: 3, h: 4, minW: 2, minH: 4 },
-    { i: "habits-metric", x: 3, y: 0, w: 3, h: 4, minW: 2, minH: 4 },
-    { i: "streak-metric", x: 6, y: 0, w: 3, h: 4, minW: 2, minH: 4 },
-    { i: "revenue-metric", x: 9, y: 0, w: 3, h: 4, minW: 2, minH: 4 },
+    { i: "revenue-metric", x: 3, y: 0, w: 3, h: 4, minW: 2, minH: 4 },
     { i: "news", x: 0, y: 4, w: 12, h: 6, minW: 4, minH: 4 },
-    { i: "hermes-briefings", x: 0, y: 10, w: 12, h: 9, minW: 6, minH: 7 },
-    { i: "tasks", x: 0, y: 19, w: 6, h: 11, minW: 3, minH: 6 },
-    { i: "habits", x: 6, y: 19, w: 6, h: 11, minW: 3, minH: 6 },
-    { i: "projects", x: 0, y: 30, w: 12, h: 9, minW: 4, minH: 6 },
-    { i: "focus", x: 0, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "goals", x: 4, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "notes", x: 8, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "payments", x: 0, y: 47, w: 6, h: 8, minW: 3, minH: 6 },
-    { i: "workout", x: 6, y: 47, w: 6, h: 8, minW: 3, minH: 6 },
-    { i: "learning", x: 0, y: 55, w: 12, h: 8, minW: 4, minH: 6 },
+    { i: "tasks", x: 0, y: 10, w: 6, h: 11, minW: 3, minH: 6 },
+    { i: "projects", x: 0, y: 21, w: 12, h: 9, minW: 4, minH: 6 },
+    { i: "focus", x: 0, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "notes", x: 4, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "payments", x: 8, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
   ],
   md: [
     { i: "tasks-metric", x: 0, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
-    { i: "habits-metric", x: 2, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
-    { i: "streak-metric", x: 4, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
-    { i: "revenue-metric", x: 6, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
+    { i: "revenue-metric", x: 2, y: 0, w: 2, h: 4, minW: 2, minH: 4 },
     { i: "news", x: 0, y: 4, w: 8, h: 6, minW: 4, minH: 4 },
-    { i: "hermes-briefings", x: 0, y: 10, w: 8, h: 9, minW: 6, minH: 7 },
-    { i: "tasks", x: 0, y: 19, w: 4, h: 11, minW: 3, minH: 6 },
-    { i: "habits", x: 4, y: 19, w: 4, h: 11, minW: 3, minH: 6 },
-    { i: "projects", x: 0, y: 30, w: 8, h: 9, minW: 4, minH: 6 },
-    { i: "focus", x: 0, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "goals", x: 4, y: 39, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "notes", x: 0, y: 47, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "payments", x: 4, y: 47, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "workout", x: 0, y: 55, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "learning", x: 4, y: 55, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "tasks", x: 0, y: 10, w: 4, h: 11, minW: 3, minH: 6 },
+    { i: "projects", x: 0, y: 21, w: 8, h: 9, minW: 4, minH: 6 },
+    { i: "focus", x: 0, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "notes", x: 4, y: 30, w: 4, h: 8, minW: 3, minH: 6 },
+    { i: "payments", x: 0, y: 38, w: 4, h: 8, minW: 3, minH: 6 },
   ],
   sm: [], xs: [], xxs: [],
 };
@@ -92,7 +69,7 @@ function stackedLayout(cols: number): Layout {
   return WIDGETS.map(({ id }, index) => {
     const isMetric = id.endsWith("metric");
     const metricIndex = WIDGETS.slice(0, index).filter((widget) => widget.id.endsWith("metric")).length;
-    const height = isMetric ? 4 : id === "news" ? 6 : id === "hermes-briefings" ? 18 : id === "tasks" || id === "habits" ? 11 : id === "projects" ? 10 : 8;
+    const height = isMetric ? 4 : id === "news" ? 6 : id === "tasks" || id === "projects" ? 11 : 8;
     const y = isMetric ? Math.floor(metricIndex / metricsPerRow) * 4 : contentY;
     if (!isMetric) contentY += height;
     return {
@@ -119,23 +96,12 @@ function migrateDashboardPreferences(saved: {
   if ((saved.version ?? 1) >= DASHBOARD_LAYOUT_VERSION) return saved;
 
   const visible = (saved.visibleWidgets ?? DEFAULT_WIDGET_IDS).filter((id) => WIDGETS.some((widget) => widget.id === id));
-  if (!visible.includes("hermes-briefings")) {
-    const newsIndex = visible.indexOf("news");
-    visible.splice(newsIndex >= 0 ? newsIndex + 1 : visible.length, 0, "hermes-briefings");
-  }
 
   const sourceLayouts = saved.layouts ?? DEFAULT_LAYOUTS;
   const migratedLayouts = Object.fromEntries(
     (Object.keys(GRID_COLUMNS) as DashboardBreakpoint[]).map((breakpoint) => {
       const layout = [...(sourceLayouts[breakpoint] ?? DEFAULT_LAYOUTS[breakpoint] ?? [])];
-      if (layout.some((item) => item.i === "hermes-briefings")) return [breakpoint, layout];
-      const news = layout.find((item) => item.i === "news");
-      const template = DEFAULT_LAYOUTS[breakpoint]?.find((item) => item.i === "hermes-briefings");
-      const insertionY = news ? news.y + news.h : layout.reduce((max, item) => Math.max(max, item.y + item.h), 0);
-      const height = template?.h ?? 9;
-      const shifted = layout.map((item) => item.y >= insertionY ? { ...item, y: item.y + height } : item);
-      shifted.push({ ...(template ?? { i: "hermes-briefings", x: 0, w: GRID_COLUMNS[breakpoint], h: height }), y: insertionY });
-      return [breakpoint, shifted];
+      return [breakpoint, layout];
     }),
   ) as ResponsiveLayouts<DashboardBreakpoint>;
 
@@ -257,10 +223,6 @@ export function Dashboard() {
   // ── Stats ──────────────────────────────────────────────────────────────────
   const todayTasks = data.tasks.filter((t) => !t.done && (t.dueDate === today || !t.dueDate));
   const doneTodayCount = data.tasks.filter((t) => t.done && taskCompletionDay(t) === today).length;
-  const completedHabitsToday = data.habitLogs.filter((l) => l.date === today && l.completed).length;
-  const overallStreak = data.habits.length > 0
-    ? Math.max(...data.habits.map((h) => calcStreak(data.habitLogs.filter((l) => l.habitId === h.id))), 0)
-    : 0;
   const todayIncome = data.incomeEntries
     .filter((e) => e.date === today && e.type === "income")
     .reduce((s, e) => s + e.amount, 0);
@@ -271,7 +233,6 @@ export function Dashboard() {
   // ── Real-data mini-series for the metric sparklines (no fabricated data) ─────
   const days14 = lastNDays(14);
   const tasksDoneSeries = days14.map((d) => data.tasks.filter((t) => t.done && taskCompletionDay(t) === d).length);
-  const habitsSeries = days14.map((d) => data.habitLogs.filter((l) => l.date === d && l.completed).length);
   const revenueSeries = days14.map((d) =>
     data.incomeEntries.filter((e) => e.date === d && e.type === "income").reduce((s, e) => s + e.amount, 0),
   );
@@ -305,20 +266,13 @@ export function Dashboard() {
   const overviewProjects = data.projects.filter((p) => !p.archived);
   const todayFocusSessions = data.focusSessions.filter((session) => session.date === today);
   const todayFocusMinutes = todayFocusSessions.reduce((sum, session) => sum + session.durationMins, 0);
-  const activeGoals = data.goals.filter((goal) => !goal.done);
   const recentNotes = (data.wikiPages ?? []).filter((page) => !page.deletedAt).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const upcomingPayments = data.subscriptions.filter((subscription) => subscription.active).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  const latestWorkout = [...data.workouts].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const readyCourses = data.courses.filter((course) => course.status === "ready");
 
   function renderWidget(id: WidgetId) {
     switch (id) {
       case "tasks-metric":
         return <MetricCard icon={<CheckSquare style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor="var(--muted)" label="Tasks Left" value={todayTasks.length.toString()} sub={`${doneTodayCount} done today`} series={tasksDoneSeries} seriesColor="var(--muted)" href="/tasks" />;
-      case "habits-metric":
-        return <MetricCard icon={<Repeat2 style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor="var(--c-emerald)" label="Habits" value={`${completedHabitsToday}/${data.habits.length}`} sub="done today" series={habitsSeries} seriesColor="var(--c-emerald)" href="/habits" />;
-      case "streak-metric":
-        return <MetricCard icon={<Flame style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor="var(--c-purple)" label="Streak" value={`${overallStreak}d`} sub="best in a row" series={habitsSeries} seriesColor="var(--c-purple)" href="/habits" />;
       case "revenue-metric":
         return (
           <MetricCard
@@ -335,8 +289,6 @@ export function Dashboard() {
         );
       case "news":
         return <DashNewsBriefing />;
-      case "hermes-briefings":
-        return <HermesBriefings briefs={data.briefs} />;
       case "tasks":
         return (
           <section className="card h-full p-5 flex flex-col gap-4 overflow-auto">
@@ -371,30 +323,6 @@ export function Dashboard() {
             )}
           </section>
         );
-      case "habits":
-        return (
-          <section className="card h-full p-5 overflow-auto">
-            <div className="flex items-center justify-between mb-4">
-              <SectionTitle icon={<Repeat2 style={{ width: 15, height: 15 }} strokeWidth={1.9} />}>Today&apos;s Habits</SectionTitle>
-              <Link href="/habits" className="text-xs text-[var(--faint)] hover:text-[var(--text)] transition-colors font-medium inline-flex items-center gap-1">All <ArrowRight className="w-3 h-3" /></Link>
-            </div>
-            {data.habits.length === 0 ? <p className="text-sm text-[var(--faint)]">No habits yet.</p> : (
-              <ul className="flex flex-col -mx-2">
-                {data.habits.slice(0, 5).map((habit) => {
-                  const done = data.habitLogs.some((log) => log.habitId === habit.id && log.date === today && log.completed);
-                  const streak = calcStreak(data.habitLogs.filter((log) => log.habitId === habit.id));
-                  return (
-                    <li key={habit.id} className="flex items-start gap-3 text-sm px-2 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-2)] transition-colors">
-                      <span className={cn("w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 transition-all", done ? "bg-[var(--c-emerald)] border-[var(--c-emerald)]" : "border-[var(--border-2)]")} style={{ width: 18, height: 18 }}>{done && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-[var(--bg)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>
-                      <span className={cn("flex-1 min-w-0 leading-snug whitespace-normal break-words [overflow-wrap:anywhere]", done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{habit.name}</span>
-                      {streak > 0 && <span className="text-[11px] text-[var(--faint)] tabular shrink-0 mt-0.5">{streak}d</span>}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        );
       case "projects":
         return (
           <section className="card h-full p-5 overflow-auto">
@@ -425,14 +353,6 @@ export function Dashboard() {
             )}
           </WidgetPanel>
         );
-      case "goals":
-        return (
-          <WidgetPanel title="Active goals" icon={<Target className="w-[15px] h-[15px]" />} href="/player">
-            {activeGoals.length === 0 ? <WidgetEmpty>No open goals right now.</WidgetEmpty> : (
-              <div className="space-y-1">{activeGoals.slice(0, 7).map((goal) => <button key={goal.id} onClick={() => mutate((current) => ({ ...current, goals: current.goals.map((item) => item.id === goal.id ? { ...item, done: true } : item) }))} className="w-full flex items-start gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-[var(--surface-2)]"><span className="mt-0.5 w-4 h-4 rounded-full border border-[var(--border-2)] shrink-0" /><span className="flex-1 min-w-0 text-[13px] text-[var(--text)] leading-snug">{goal.text}</span><span className="text-[10px] uppercase tracking-wide text-[var(--faint)] shrink-0 mt-0.5">{goal.period}</span></button>)}</div>
-            )}
-          </WidgetPanel>
-        );
       case "notes":
         return (
           <WidgetPanel title="Recent notes" icon={<NotebookText className="w-[15px] h-[15px]" />} href="/notes">
@@ -449,22 +369,6 @@ export function Dashboard() {
             )}
           </WidgetPanel>
         );
-      case "workout":
-        return (
-          <WidgetPanel title="Latest workout" icon={<Dumbbell className="w-[15px] h-[15px]" />} href="/gym">
-            {!latestWorkout ? <WidgetEmpty>Your latest workout will appear here.</WidgetEmpty> : (
-              <div><div className="mb-4"><p className="text-xl font-bold text-[var(--text)]">{latestWorkout.name}</p><p className="text-[11.5px] text-[var(--faint)] mt-1">{new Date(`${latestWorkout.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}{latestWorkout.durationMins ? ` · ${latestWorkout.durationMins} min` : ""}</p></div><div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-[var(--surface-2)] p-3"><p className="text-lg font-bold text-[var(--text)] tabular">{latestWorkout.exercises.length}</p><p className="text-[10.5px] text-[var(--faint)]">Exercises</p></div><div className="rounded-lg bg-[var(--surface-2)] p-3"><p className="text-lg font-bold text-[var(--text)] tabular">{latestWorkout.exercises.reduce((sum, exercise) => sum + exercise.sets.filter((set) => set.done).length, 0)}</p><p className="text-[10.5px] text-[var(--faint)]">Sets completed</p></div></div></div>
-            )}
-          </WidgetPanel>
-        );
-      case "learning":
-        return (
-          <WidgetPanel title="Learning progress" icon={<GraduationCap className="w-[15px] h-[15px]" />} href="/learn">
-            {readyCourses.length === 0 ? <WidgetEmpty>Start a course to track learning progress here.</WidgetEmpty> : (
-              <div className="space-y-3">{readyCourses.slice(0, 5).map((course) => { const lessons = course.modules.flatMap((module) => module.lessons); const completed = lessons.filter((lesson) => lesson.done).length; const percent = lessons.length ? Math.round((completed / lessons.length) * 100) : 0; return <Link key={course.id} href="/learn" className="block rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><div className="flex items-center justify-between gap-3 mb-2"><span className="text-[13px] font-medium text-[var(--text)] truncate">{course.topic}</span><span className="text-[10.5px] text-[var(--faint)] tabular shrink-0">{completed}/{lessons.length}</span></div><div className="h-1.5 rounded-full bg-[var(--chip)] overflow-hidden"><div className="h-full rounded-full bg-[var(--text)]" style={{ width: `${percent}%` }} /></div></Link>; })}</div>
-            )}
-          </WidgetPanel>
-        );
     }
   }
 
@@ -473,7 +377,7 @@ export function Dashboard() {
       {/* ── Greeting — sits directly on the canvas, subtle watermark on the right ── */}
       <header className="relative mb-6">
         <img
-          src="/bridge-mark.png"
+          src="/base-mark.png"
           alt=""
           aria-hidden="true"
           className="pointer-events-none select-none absolute right-0 -top-2 w-40 sm:w-56 opacity-[0.045] dark:opacity-[0.06]"
@@ -483,11 +387,6 @@ export function Dashboard() {
           Good {greetText}, Lucas.
         </h1>
       </header>
-
-      {/* ── Bridge AI prompt (model selector + Files + Data live inside) ── */}
-      <div className="mb-6 w-full lg:w-3/4 max-w-[980px]">
-        <DashAskBar />
-      </div>
 
       <div ref={gridContainerRef} className={cn("dashboard-grid -mx-3", editing && "is-editing")}>
         {gridMounted && (

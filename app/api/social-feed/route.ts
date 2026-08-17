@@ -16,7 +16,7 @@ export interface SocialFeedItem {
 const parser = new Parser({
   timeout: 8000,
   headers: {
-    "User-Agent": "Bridge/1.0 (+https://vercel.app)",
+    "User-Agent": "Base/1.0 (+https://vercel.app)",
   },
 });
 

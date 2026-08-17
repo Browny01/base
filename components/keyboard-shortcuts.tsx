@@ -6,19 +6,13 @@ import { createPortal } from "react-dom";
 // Press `g` then a key to jump around. `?` opens the cheat-sheet.
 const NAV: { key: string; href: string; label: string }[] = [
   { key: "d", href: "/",         label: "Dashboard" },
-  { key: "c", href: "/chat",     label: "Chat" },
-  { key: "p", href: "/player",   label: "Personal" },
-  { key: "g", href: "/gym",      label: "Gym" },
-  { key: "b", href: "/business", label: "Business" },
   { key: "j", href: "/projects", label: "Projects" },
   { key: "v", href: "/vision",   label: "Vision" },
   { key: "n", href: "/notes",    label: "Notes" },
   { key: "a", href: "/calendar", label: "Calendar" },
   { key: "t", href: "/tasks",    label: "Tasks" },
   { key: "o", href: "/focus",    label: "Focus" },
-  { key: "h", href: "/habits",   label: "Habits" },
   { key: "f", href: "/finance",  label: "Finance" },
-  { key: "e", href: "/learn",    label: "Learn" },
   { key: "r", href: "/news",     label: "News" },
   { key: "s", href: "/settings", label: "Settings" },
 ];

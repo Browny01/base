@@ -11,12 +11,12 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Bridge — Personal Command Center",
+  title: "Base — Personal Command Center",
   description: "Your personal hub for focus, productivity, and income.",
   manifest: "/manifest.json",
   // black-translucent → the app draws edge-to-edge under the status bar; the
   // chrome pads itself with env(safe-area-inset-*) so nothing is occluded.
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Bridge" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Base" },
 };
 
 export const viewport: Viewport = {

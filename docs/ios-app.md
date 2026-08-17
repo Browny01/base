@@ -1,6 +1,6 @@
-# Bridge for iPhone
+# Base for iPhone
 
-Bridge for iPhone is a native SwiftUI app. It does not load the website in a web
+Base for iPhone is a native SwiftUI app. It does not load the website in a web
 view. The app launches from an on-device snapshot and keeps a durable queue of
 changes made while offline.
 
@@ -51,7 +51,7 @@ available offline.
 
 ## Offline sync
 
-`native/BridgeCore/BridgeStore.swift` writes the complete Bridge JSON snapshot and
+`native/BridgeCore/BridgeStore.swift` writes the complete Base JSON snapshot and
 pending operations to the app's Application Support directory. Every native edit:
 
 1. Updates the local snapshot immediately.
@@ -83,7 +83,7 @@ changes continue to deploy independently to Vercel.
 
 ## Home-screen widget
 
-Long-press the Home Screen, tap `+`, search for Bridge, and choose a widget size.
+Long-press the Home Screen, tap `+`, search for Base, and choose a widget size.
 The widget uses `/api/widget/summary` and refreshes separately from the app's
 offline store. If the production authentication token changes, update
 `BridgeAPI.token` in `ios/App/BridgeWidget/BridgeWidget.swift`.

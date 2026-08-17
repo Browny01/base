@@ -39,7 +39,7 @@ export async function writeRawData(data: BridgeData): Promise<boolean> {
 
 export async function reapExpiredAutonomyLeasesAtomic(): Promise<{ ok: boolean; reaped: number; at: string; error?: string }> {
   const redis = mcpRedis();
-  if (!redis) return { ok: false, reaped: 0, at: new Date().toISOString(), error: "Bridge data is not configured." };
+  if (!redis) return { ok: false, reaped: 0, at: new Date().toISOString(), error: "Base data is not configured." };
   const at = new Date().toISOString();
   const mutation = await mutateBridgeDataAtomically(redis, (current) => {
     const reaped = reapExpiredAutonomyLeases(current, at);
@@ -54,7 +54,7 @@ export async function reapExpiredAutonomyLeasesAtomic(): Promise<{ ok: boolean; 
 
 export async function claimAutonomyTask(taskId: string, runId: string, agent: string, model: string, startedAt: string): Promise<AtomicAutonomyResult> {
   const redis = mcpRedis();
-  if (!redis) return { ok: false, error: "Bridge data is not configured." };
+  if (!redis) return { ok: false, error: "Base data is not configured." };
   const mutation = await mutateBridgeDataAtomically(redis, (current) => {
     const claim = claimAutonomyTaskInData(current, { taskId, runId, agent, model, startedAt });
     return { data: claim.data, result: claim.result, write: claim.changed };
@@ -64,7 +64,7 @@ export async function claimAutonomyTask(taskId: string, runId: string, agent: st
 
 export async function submitAutonomyResult(input: SubmitAutonomyInput): Promise<AtomicAutonomyResult> {
   const redis = mcpRedis();
-  if (!redis) return { ok: false, error: "Bridge data is not configured." };
+  if (!redis) return { ok: false, error: "Base data is not configured." };
   const mutation = await mutateBridgeDataAtomically(redis, (current) => {
     const submitted = submitAutonomyResultInData(current, input);
     return { data: submitted.data, result: submitted.result, write: submitted.changed };
