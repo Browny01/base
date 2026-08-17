@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useEffect, useRef } from "react";
+import { useId, useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday } from "@/lib/utils";
 import type { Priority, Task, TaskTag } from "@/lib/store";
@@ -108,6 +108,27 @@ function migrateDashboardPreferences(saved: {
   return { version: DASHBOARD_LAYOUT_VERSION, layouts: migratedLayouts, visibleWidgets: visible };
 }
 
+function loadSavedDashboard() {
+  try {
+    const raw = localStorage.getItem(DASHBOARD_LAYOUT_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as {
+      version?: number;
+      layouts?: ResponsiveLayouts<DashboardBreakpoint>;
+      visibleWidgets?: WidgetId[];
+    };
+    const preferences = migrateDashboardPreferences(saved);
+    if (!preferences?.layouts || !preferences?.visibleWidgets) return null;
+    const valid = preferences.visibleWidgets.filter((id) => WIDGETS.some((widget) => widget.id === id));
+    if (preferences !== saved) {
+      localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(preferences));
+    }
+    return { layouts: preferences.layouts, visibleWidgets: valid };
+  } catch {
+    return null;
+  }
+}
+
 const COLOR_DOT: Record<string, string> = {
   indigo: "bg-[var(--c-indigo)]", cyan: "bg-[var(--c-cyan)]", emerald: "bg-[var(--c-emerald)]",
   yellow: "bg-[var(--c-amber)]",  red: "bg-[var(--c-rose)]",  purple: "bg-[var(--c-purple)]",
@@ -140,36 +161,11 @@ export function Dashboard() {
   const [quickTag, setQuickTag] = useState<TaskTag>("@work");
   const [showQuickForm, setShowQuickForm] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [layouts, setLayouts] = useState<ResponsiveLayouts<DashboardBreakpoint>>(DEFAULT_LAYOUTS);
-  const [visibleWidgets, setVisibleWidgets] = useState<WidgetId[]>(DEFAULT_WIDGET_IDS);
+  const savedDashboard = loadSavedDashboard();
+  const [layouts, setLayouts] = useState<ResponsiveLayouts<DashboardBreakpoint>>(savedDashboard?.layouts ?? DEFAULT_LAYOUTS);
+  const [visibleWidgets, setVisibleWidgets] = useState<WidgetId[]>(savedDashboard?.visibleWidgets ?? DEFAULT_WIDGET_IDS);
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
-  const layoutLoaded = useRef(false);
   const { width: gridWidth, containerRef: gridContainerRef, mounted: gridMounted } = useContainerWidth({ measureBeforeMount: true });
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem(DASHBOARD_LAYOUT_KEY) || "null") as {
-          version?: number;
-          layouts?: ResponsiveLayouts<DashboardBreakpoint>;
-          visibleWidgets?: WidgetId[];
-        } | null;
-        const preferences = saved ? migrateDashboardPreferences(saved) : null;
-        if (preferences?.layouts) setLayouts(preferences.layouts);
-        if (preferences?.visibleWidgets) {
-          const valid = preferences.visibleWidgets.filter((id) => WIDGETS.some((widget) => widget.id === id));
-          setVisibleWidgets(valid);
-        }
-        if (preferences && preferences.version !== saved?.version) {
-          localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(preferences));
-        }
-      } catch {
-        // Ignore malformed local preferences and use the polished default layout.
-      }
-      layoutLoaded.current = true;
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     if (!editing) return;
@@ -184,7 +180,6 @@ export function Dashboard() {
   }, [editing]);
 
   function persistDashboard(nextLayouts: ResponsiveLayouts<DashboardBreakpoint>, nextVisible = visibleWidgets) {
-    if (!layoutLoaded.current) return;
     localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify({ version: DASHBOARD_LAYOUT_VERSION, layouts: nextLayouts, visibleWidgets: nextVisible }));
   }
 
