@@ -417,7 +417,7 @@ export function CalendarPage() {
             )}
 
             {calcomState === "loading" && enabled.calcom && <p className="mt-3 flex items-center gap-2 text-[10.5px] text-[var(--faint)]"><Loader2 className="h-3 w-3 animate-spin" /> Refreshing Cal.com</p>}
-            {calcomState === "error" && enabled.calcom && <p className="mt-3 flex items-center gap-2 text-[10.5px] text-[var(--c-rose)]"><AlertCircle className="h-3 w-3" /> Cal.com is unavailable; Bridge events are unaffected.</p>}
+            {calcomState === "error" && enabled.calcom && <p className="mt-3 flex items-center gap-2 text-[10.5px] text-[var(--c-rose)]"><AlertCircle className="h-3 w-3" /> Cal.com is unavailable; Base events are unaffected.</p>}
             {calcomState === "unconfigured" && enabled.calcom && <p className="mt-3 text-[10.5px] text-[var(--faint)]">Add CALCOM_API_KEY to include bookings.</p>}
           </aside>
         </div>

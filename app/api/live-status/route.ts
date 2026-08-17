@@ -25,7 +25,7 @@ function avatarUrl(platform: CreatorPlatform, handle: string) {
 async function twitchStatus(handle: string): Promise<Pick<LiveStatusItem, "status" | "title">> {
   try {
     const res = await fetch(`https://www.twitch.tv/${encodeURIComponent(handle)}`, {
-      headers: { "User-Agent": "Mozilla/5.0 Bridge/1.0" },
+      headers: { "User-Agent": "Mozilla/5.0 Base/1.0" },
       next: { revalidate: 120 },
     });
     if (!res.ok) return { status: "unknown" };
@@ -41,7 +41,7 @@ async function twitchStatus(handle: string): Promise<Pick<LiveStatusItem, "statu
 async function kickStatus(handle: string): Promise<Pick<LiveStatusItem, "status" | "title">> {
   try {
     const res = await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(handle)}`, {
-      headers: { "User-Agent": "Mozilla/5.0 Bridge/1.0", Accept: "application/json" },
+      headers: { "User-Agent": "Mozilla/5.0 Base/1.0", Accept: "application/json" },
       next: { revalidate: 120 },
     });
     if (!res.ok) return { status: "unknown" };

@@ -81,7 +81,7 @@ export async function mutateBridgeDataAtomically<T>(
     const write = await compareAndSwapBridgeData(redis, snapshot.revision, nextData);
     if (write.ok) return { data: nextData, result: mutation.result, revision: write.revision };
   }
-  throw new Error(`Bridge data changed during ${maxAttempts} concurrent writes; retry later.`);
+  throw new Error(`Base data changed during ${maxAttempts} concurrent writes; retry later.`);
 }
 
 export async function updateBridgeDataAtomically(

@@ -1,25 +1,20 @@
-# Bridge
+# Base
 
-Bridge is a personal command center for planning, focus, money, learning, notes,
-projects, and AI-assisted daily work. It includes a Next.js web app plus native
-SwiftUI apps for iPhone and Mac. The native apps keep a local copy of Bridge data,
+Base is a personal command center for planning, focus, money, notes, projects,
+and AI-assisted daily work. It includes a Next.js web app plus native
+SwiftUI apps for iPhone and Mac. The native apps keep a local copy of Base data,
 queue edits without a connection, and merge those edits when the internet returns.
 
 ## Highlights
 
-- **Overview dashboard** - a full-width command center with greeting, Bridge AI
-  prompt, task/habit/project summaries, revenue target progress, portfolio trend
-  data, and news briefing cards.
-- **Bridge AI chat** - multi-thread chat with folders, pinned and trashed
-  conversations, file attachments, optional Bridge data context, reusable skills,
-  local Ollama relay support, and web/search tools.
+- **Overview dashboard** - a full-width command center with greeting,
+  task/project summaries, revenue target progress, portfolio trend data, and
+  news briefing cards.
 - **Tasks** - priority/tagged tasks, due dates, recurring settings, subtasks, AI
   task breakdowns, completion tracking, and native offline creation.
 - **Calendar** - editable all-day and timed events, recurring series, month and
   agenda views, plus dated tasks, milestones, payments, exams, workouts, and
   optional Cal.com bookings in one schedule.
-- **Habits** - button and numeric habits, reminders, daily logs, streak-style
-  progress, and history-aware dashboard metrics.
 - **Focus** - deep-work timer with session logging, task tags, notes, and saved
   focus history.
 - **Projects** - active/on-hold/done project tracking with categories, logos,
@@ -30,28 +25,20 @@ queue edits without a connection, and merge those edits when the internet return
   shapes, arrows, undo/redo, board switching, and image uploads.
 - **Finance** - income/spend ledger, daily revenue target, subscriptions, wallet
   balances, token data, FX conversion, and portfolio snapshots.
-- **Business** - Stripe stats, Cal.com bookings, business KPIs, social metrics,
-  and active project rollups.
-- **Personal** - Player OS for skills, domains, goals, body metrics, weight,
-  sleep, progress photos, and self-review data.
-- **Gym** - workout builder, exercises, sets, notes, repeat/edit/delete flows,
-  body metrics, and muscle-map summaries.
-- **Learn** - AI-generated courses with modules, lessons, quizzes, source links,
-  and sandboxed interactive widgets.
 - **News** - RSS/live news, market cards, AI summaries, creator feeds, Reddit/X
   preferences, and live status checks.
 - **Settings** - appearance, navigation mode, accent/theme preferences, personal
   AI context, news/feed sources, and local app preferences.
 - **Command palette and shortcuts** - `Cmd+K` search across pages, projects,
-  notes, chats, boards, and common actions.
+  notes, boards, and common actions.
 - **Native iPhone support** - SwiftUI dashboard, tasks, projects, notes, habits,
   focus, finance, cached news, offline mutation queue, and WidgetKit home-screen
   widget.
-- **Mac support** - the complete live Bridge interface in a native window, a
+- **Mac support** - the complete live Base interface in a native window, a
   SwiftUI offline fallback, a reliable `Control+Option+Space` global shortcut,
   Spotlight/Dock install flow, and Sparkle updates.
 - **Backend integrations** - Upstash Redis/KV persistence, Vercel Blob uploads,
-  Gemini, Perplexity, Stripe, Cal.com, wallet/token APIs, cron snapshots, and an
+  Gemini, Perplexity, Cal.com, wallet/token APIs, cron snapshots, and an
   OAuth-capable MCP server.
 
 ## Tech Stack
@@ -116,7 +103,7 @@ npx tsc --noEmit
 
 ## Environment Variables
 
-Bridge can boot with partial configuration, but the production app expects these
+Base can boot with partial configuration, but the production app expects these
 variables depending on the feature set you want enabled:
 
 | Variable | Used for |
@@ -145,7 +132,7 @@ The iPhone app is a real SwiftUI client, not a web view. It opens from local dat
 so tasks, projects, notes, habits, focus sessions, and finance entries remain usable
 without internet. Each change is written to disk immediately and added to a durable
 operation queue. On reconnect, `/api/native/sync` atomically merges those record
-changes into the main Bridge document and downloads the latest state.
+changes into the main Base document and downloads the latest state.
 
 ```bash
 npm run ios   # open ios/App/App.xcodeproj
@@ -157,18 +144,18 @@ See `docs/ios-app.md` for signing, offline behavior, and installation details.
 
 ## macOS App
 
-The macOS app renders the production Bridge website directly, so it has the same
-layout, routes, and functionality as Bridge in a browser. If the website cannot
+The macOS app renders the production Base website directly, so it has the same
+layout, routes, and functionality as Base in a browser. If the website cannot
 be reached, it switches to the shared native workspace; offline edits are queued
 and synchronized after reconnecting. Press `Control+Option+Space` from any app to
-bring Bridge forward. Sparkle distributes Mac app updates.
+bring Base forward. Sparkle distributes Mac app updates.
 
 Useful commands:
 
 ```bash
 npm run mac:gen       # generate macOS Xcode project with XcodeGen
 npm run mac           # generate and open the project
-npm run mac:install   # build Release and install Bridge.app to /Applications
+npm run mac:install   # build Release and install Base.app to /Applications
 npm run mac:release   # build/sign/publish a Sparkle update
 ```
 

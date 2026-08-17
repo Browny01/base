@@ -1,6 +1,6 @@
 # Hermes brief publishing
 
-Bridge stores published Hermes reports as first-class `briefs` records. Hermes publishes through Bridge's authenticated MCP endpoint; dashboard readers do not need a separate service or credential.
+Base stores published Hermes reports as first-class `briefs` records. Hermes publishes through Base's authenticated MCP endpoint; dashboard readers do not need a separate service or credential.
 
 ## Brief types
 
@@ -29,7 +29,7 @@ type Brief = {
 };
 ```
 
-Bridge assigns `id`, `status`, `createdAt`, and `updatedAt`. The MCP input may include `status`, but its only accepted value is `published`.
+Base assigns `id`, `status`, `createdAt`, and `updatedAt`. The MCP input may include `status`, but its only accepted value is `published`.
 
 ## MCP tools
 
@@ -58,7 +58,7 @@ Idempotency is automatic:
 - Reports without a period use `type + the calendar date in generatedAt`.
 - Retrying the same report updates its existing record and preserves its original `id` and `createdAt`.
 
-This tool can only replace or append records in `briefs` (plus Bridge's normal document update timestamp). The generic collection mutation tools do not expose `briefs`.
+This tool can only replace or append records in `briefs` (plus Base's normal document update timestamp). The generic collection mutation tools do not expose `briefs`.
 
 ### `get_briefs`
 
@@ -75,7 +75,7 @@ Returns published reports newest first. Both arguments are optional.
 
 ## Scheduled MCP example
 
-A scheduled Hermes run sends the normal MCP `tools/call` JSON-RPC request to Bridge's existing MCP URL. Keep the bearer token in the scheduler's secret store; never place it in a prompt, report, log, or repository.
+A scheduled Hermes run sends the normal MCP `tools/call` JSON-RPC request to Base's existing MCP URL. Keep the bearer token in the scheduler's secret store; never place it in a prompt, report, log, or repository.
 
 ```sh
 curl --request POST "$BRIDGE_MCP_URL" \
@@ -99,14 +99,14 @@ curl --request POST "$BRIDGE_MCP_URL" \
   }'
 ```
 
-Use a timestamp with an explicit timezone. Bridge displays it in each reader's local time.
+Use a timestamp with an explicit timezone. Base displays it in each reader's local time.
 
 ## Privacy and content rules
 
-Briefs are published dashboard content. Before calling `upsert_brief`, Hermes must summarise source material and remove credentials, API keys, bearer tokens, passwords, private keys, raw model/tool transcripts, and content copied from locked Notes pages. Bridge rejects common secret and raw-transcript patterns as a final safeguard. Locked and trashed Notes remain excluded from MCP reads and must never be reconstructed into a brief.
+Briefs are published dashboard content. Before calling `upsert_brief`, Hermes must summarise source material and remove credentials, API keys, bearer tokens, passwords, private keys, raw model/tool transcripts, and content copied from locked Notes pages. Base rejects common secret and raw-transcript patterns as a final safeguard. Locked and trashed Notes remain excluded from MCP reads and must never be reconstructed into a brief.
 
-Markdown is rendered through Bridge's HTML-escaping Markdown renderer. External links are allowed; raw HTML is displayed as text rather than executed.
+Markdown is rendered through Base's HTML-escaping Markdown renderer. External links are allowed; raw HTML is displayed as text rather than executed.
 
 ## Dashboard behaviour
 
-The configurable **Hermes Briefings** widget appears immediately after News by default. It always presents the current Morning COO, Weekly Business Review, and Content Opportunity brief in that order. Missing report types show an honest unpublished state. Older reports remain available from **History**, and reports beyond their expected publishing cadence receive a stale label.
+Published briefs are retained in the `briefs` collection and remain available through the MCP `get_briefs` tool and the authenticated data store. The dashboard no longer surfaces a dedicated Hermes Briefings widget.

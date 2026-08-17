@@ -5,7 +5,7 @@ import WebKit
 
 @MainActor
 final class WebModel: NSObject, ObservableObject {
-    static let homeURL = URL(string: "https://bridge-ten-lovat.vercel.app")!
+    static let homeURL = URL(string: "https://base.lucasbrown.xyz")!
 
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false

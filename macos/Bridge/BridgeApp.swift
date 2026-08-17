@@ -40,7 +40,7 @@ struct BridgeCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("Show Bridge") { BridgeGlobalShortcut.shared.activate() }
+            Button("Show Base") { BridgeGlobalShortcut.shared.activate() }
                 .keyboardShortcut(" ", modifiers: [.control, .option])
             Button("Home") { model.goHome() }
                 .keyboardShortcut("H", modifiers: [.command, .shift])

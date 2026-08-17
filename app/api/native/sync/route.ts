@@ -96,7 +96,7 @@ export async function GET() {
     return Response.json({ data: unwrap(await readCurrentData(redis)), configured: true });
   } catch (error) {
     console.error("[bridge/native/sync GET]", error);
-    return Response.json({ data: null, configured: true, error: "Unable to load Bridge data." }, { status: 500 });
+    return Response.json({ data: null, configured: true, error: "Unable to load Base data." }, { status: 500 });
   }
 }
 
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, error: "Invalid native sync operation batch." }, { status: 400 });
     }
 
-    // Migrate the legacy key before the versioned mutation reads Bridge data.
+    // Migrate the legacy key before the versioned mutation reads Base data.
     await readCurrentData(redis);
     const operations = body.operations as NativeOperation[];
     if (operations.length === 0) {
@@ -142,6 +142,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("[bridge/native/sync POST]", error);
-    return Response.json({ ok: false, error: "Unable to sync Bridge data." }, { status: 500 });
+    return Response.json({ ok: false, error: "Unable to sync Base data." }, { status: 500 });
   }
 }

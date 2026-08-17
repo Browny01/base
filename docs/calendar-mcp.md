@@ -1,6 +1,6 @@
 # Calendar MCP tools
 
-Bridge's authenticated MCP endpoint exposes dedicated Calendar tools. Calendar events are intentionally excluded from generic collection mutations so every agent-created change follows the same validation rules as the Calendar page.
+Base's authenticated MCP endpoint exposes dedicated Calendar tools. Calendar events are intentionally excluded from generic collection mutations so every agent-created change follows the same validation rules as the Calendar page.
 
 ## `get_calendar_events`
 
@@ -55,7 +55,7 @@ Pass the stored event `id` and a shallow patch containing only fields that shoul
 }
 ```
 
-Updating a recurring event changes the entire series. Bridge preserves its original `id` and `createdAt` and refreshes `updatedAt`.
+Updating a recurring event changes the entire series. Base preserves its original `id` and `createdAt` and refreshes `updatedAt`.
 
 ## `delete_calendar_event`
 
@@ -74,6 +74,6 @@ Deleting a recurring event deletes the entire series. Recurrence exceptions and 
 - Single-day timed events must end after they start.
 - All-day records do not retain start or end times.
 - Unknown fields, invalid categories, colours, recurrence values, dates, and times are rejected.
-- Create, update, and delete operations replace only `calendarEvents` plus Bridge's normal document update timestamp. Other collections are preserved.
+- Create, update, and delete operations replace only `calendarEvents` plus Base's normal document update timestamp. Other collections are preserved.
 
 All four tools use the existing MCP bearer authentication. Keep that token in the calling agent or scheduler's secret store.

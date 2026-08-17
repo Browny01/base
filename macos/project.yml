@@ -1,12 +1,12 @@
-# XcodeGen spec for the native macOS Bridge app.
+# XcodeGen spec for the native macOS Base app.
 #
 # Regenerate the Xcode project after editing this file (or after a fresh clone):
-#   cd macos && xcodegen generate && open Bridge.xcodeproj
+#   cd macos && xcodegen generate && open Base.xcodeproj
 #
-# The app renders the full Bridge website and falls back to the shared native
+# The app renders the full Base website and falls back to the shared native
 # offline workspace when the website cannot be reached.
 # Native-code changes ship via Sparkle auto-update (see scripts/release_mac.sh).
-name: Bridge
+name: Base
 options:
   bundleIdPrefix: app.bridge
   deploymentTarget:
@@ -31,7 +31,7 @@ settings:
     CODE_SIGNING_ALLOWED: true
 
 targets:
-  Bridge:
+  Base:
     type: application
     platform: macOS
     sources:
@@ -42,7 +42,7 @@ targets:
       - package: Sparkle
     settings:
       base:
-        PRODUCT_NAME: Bridge
+        PRODUCT_NAME: Base
         PRODUCT_BUNDLE_IDENTIFIER: app.bridge.personal.mac
         INFOPLIST_FILE: Bridge/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -50,4 +50,4 @@ targets:
         ENABLE_HARDENED_RUNTIME: false
         COMBINE_HIDPI_IMAGES: true
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
-        INFOPLIST_KEY_NSHumanReadableCopyright: "Bridge"
+        INFOPLIST_KEY_NSHumanReadableCopyright: "Base"

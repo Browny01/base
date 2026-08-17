@@ -1,6 +1,6 @@
 {
-  "name": "Bridge — Personal Command Center",
-  "short_name": "Bridge",
+  "name": "Base — Personal Command Center",
+  "short_name": "Base",
   "description": "Your personal hub for focus, productivity, and income.",
   "start_url": "/",
   "display": "standalone",

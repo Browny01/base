@@ -1,6 +1,6 @@
-# Bridge for macOS
+# Base for macOS
 
-Bridge for macOS is a native SwiftUI/WebKit host for the production Bridge site.
+Base for macOS is a native SwiftUI/WebKit host for the production Base site.
 The normal online experience is the complete website, with the same interface,
 routes, and behavior as a browser. If the site cannot load, the app switches to
 the shared native workspace so core records remain available offline.
@@ -13,7 +13,7 @@ npm run mac:install
 ```
 
 The install script generates the Xcode project, builds a Release app, installs it
-at `/Applications/Bridge.app`, and launches it. Bridge then appears in Spotlight,
+at `/Applications/Base.app`, and launches it. Base then appears in Spotlight,
 Launchpad, and the Dock.
 
 For development:
@@ -22,11 +22,11 @@ For development:
 npm run mac
 ```
 
-Select the `Bridge` scheme and press Run.
+Select the `Base` scheme and press Run.
 
 ## Global shortcut
 
-Press `Control+Option+Space` from any application to activate Bridge and bring its
+Press `Control+Option+Space` from any application to activate Base and bring its
 window to the front. The shortcut is registered with Carbon, so it does not need
 Accessibility permission. A tap of Fn/Globe is also supported as a convenience,
 but macOS may reserve that key for system features on some keyboards.
@@ -38,7 +38,7 @@ shortcut in **System Settings > Keyboard > Keyboard Shortcuts**.
 
 `macos/Bridge/WebView.swift` loads the production URL in a persistent `WKWebView`,
 including the normal website navigation, settings, uploads, AI tools, and browser
-session. External links open in the default browser, while Bridge links stay in
+session. External links open in the default browser, while Base links stay in
 the app.
 
 If initial navigation fails, `ContentView` displays native screens for Today,
@@ -61,12 +61,12 @@ macos/
   Bridge/
     BridgeApp.swift      app lifecycle, global shortcut, Sparkle
     ContentView.swift    website host and native fallback switch
-    WebView.swift        persistent Bridge web view and navigation
+    WebView.swift        persistent Base web view and navigation
     Info.plist           app and Sparkle configuration
     Assets.xcassets/     icon and accent assets
 ```
 
-Regenerate `macos/Bridge.xcodeproj` after changing `project.yml`:
+Regenerate `macos/Base.xcodeproj` after changing `project.yml`:
 
 ```bash
 npm run mac:gen
@@ -75,14 +75,14 @@ npm run mac:gen
 ## Sparkle updates
 
 Installed builds check the Sparkle feed on launch and approximately once per day.
-Use **Bridge > Check for Updates...** to check manually. Updates are signed with
+Use **Base > Check for Updates...** to check manually. Updates are signed with
 the Sparkle EdDSA key and published to the public
 `Browny01/bridge-mac-releases` release repository.
 
 Publish a native release with:
 
 ```bash
-npm run mac:release -- 0.2.1 "Full Bridge website with offline fallback"
+npm run mac:release -- 0.2.1 "Full Base website with offline fallback"
 ```
 
 The release script bumps the version, builds and signs the app archive, regenerates

@@ -339,7 +339,7 @@ export interface ChatThread {
   messages: ChatMessage[];
   pinned?: boolean;
   folderId?: string | null; // groups chats under a sidebar folder
-  projectId?: string | null; // links a chat to a Bridge project
+  projectId?: string | null; // links a chat to a Base project
   deletedAt?: string | null; // soft-deleted to Trash (purged after 14 days)
   locked?: boolean;         // requires a passcode to open
   lockPass?: string;        // the passcode (client-side soft lock)

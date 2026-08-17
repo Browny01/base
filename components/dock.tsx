@@ -4,9 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
+  LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Newspaper, MoreHorizontal, X,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays, Bot,
+  Sun, Moon, LayoutGrid, NotebookText, CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,34 +17,22 @@ type Item = { href: string; label: string; icon: LucideIcon };
 // The always-visible dock row (curated). Everything else lives in "More".
 const DOCK: Item[] = [
   { href: "/",        label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat",    label: "Chat",      icon: MessageCircle   },
-  { href: "/autonomy",label: "Autonomy",  icon: Bot             },
-  { href: "/player",  label: "Personal",  icon: Trophy          },
-  { href: "/gym",     label: "Gym",       icon: Dumbbell        },
   { href: "/projects",label: "Projects",  icon: FolderKanban    },
   { href: "/tasks",   label: "Tasks",     icon: CheckSquare     },
   { href: "/finance", label: "Finance",   icon: DollarSign      },
-  { href: "/learn",   label: "Learn",     icon: Lightbulb       },
   { href: "/news",    label: "News",      icon: Newspaper       },
 ];
 
 // The full list (shown in the More panel that expands upward).
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { href: "/chat",     label: "Chat",      icon: MessageCircle },
-  { href: "/autonomy", label: "Autonomy",  icon: Bot           },
-  { href: "/player",   label: "Personal",  icon: Trophy        },
-  { href: "/gym",      label: "Gym",       icon: Dumbbell      },
-  { href: "/business", label: "Business",  icon: Briefcase     },
   { href: "/projects", label: "Projects",  icon: FolderKanban  },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid    },
   { href: "/notes",    label: "Notes",     icon: NotebookText  },
   { href: "/calendar", label: "Calendar",  icon: CalendarDays  },
   { href: "/tasks",    label: "Tasks",     icon: CheckSquare   },
   { href: "/focus",    label: "Focus",     icon: Timer         },
-  { href: "/habits",   label: "Habits",    icon: Repeat2       },
   { href: "/finance",  label: "Finance",   icon: DollarSign    },
-  { href: "/learn",    label: "Learn",     icon: Lightbulb     },
   { href: "/news",     label: "News",      icon: Newspaper     },
 ];
 

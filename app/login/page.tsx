@@ -43,8 +43,8 @@ export default function LoginPage() {
       <div className="w-full max-w-[340px]">
         {/* Logo — the one place the brand accent appears */}
         <div className="flex items-center justify-center gap-2.5 mb-10">
-          <img src="/bridge-mark.png" alt="" className="w-9 h-9 object-contain" />
-          <span className="text-lg font-semibold text-[var(--text)] tracking-tight">Bridge</span>
+          <img src="/base-mark.png" alt="" className="w-9 h-9 object-contain" />
+          <span className="text-lg font-semibold text-[var(--text)] tracking-tight">Base</span>
         </div>
 
         {/* Card */}

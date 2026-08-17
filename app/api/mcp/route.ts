@@ -14,7 +14,7 @@ import { validateAccessToken } from "@/lib/mcp-oauth";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const SERVER_INFO = { name: "bridge", title: "Bridge — Agent Control", version: "2.1.0" };
+const SERVER_INFO = { name: "bridge", title: "Base — Agent Control", version: "2.1.0" };
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -50,7 +50,7 @@ const asObject = (value: unknown): Record<string, unknown> | null => value && ty
 const error = (message: string) => ({ error: message });
 const omit = (record: Record<string, unknown>, keys: string[]) => Object.fromEntries(Object.entries(record).filter(([key]) => !keys.includes(key)));
 
-// These are all ordinary Bridge collections. Vision and Notes get their own
+// These are all ordinary Base collections. Vision and Notes get their own
 // tools below because they need extra safeguards and useful drawing semantics.
 const COLLECTIONS = [
   "tasks", "focusSessions", "incomeEntries", "subscriptions", "habits", "habitLogs",
@@ -125,7 +125,7 @@ function isProtectedFolder(raw: BridgeData, id: string): boolean {
 const TOOLS: Tool[] = [
   {
     name: "get_overview",
-    description: "A quick, privacy-safe summary of the Bridge workspace. Start here.",
+    description: "A quick, privacy-safe summary of the Base workspace. Start here.",
     inputSchema: obj(),
     run: (_args, state) => publicOverview(state.data),
   },
@@ -161,13 +161,13 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_app_data",
-    description: "Read all standard editable Bridge data in one response. Locked/trashed Notes, Calendar events, and Hermes briefs are excluded; use their dedicated tools instead.",
+    description: "Read all standard editable Base data in one response. Locked/trashed Notes, Calendar events, and Hermes briefs are excluded; use their dedicated tools instead.",
     inputSchema: obj(),
     run: (_args, state) => omit(state.data as unknown as Record<string, unknown>, ["briefs", "calendarEvents"]),
   },
   {
     name: "get_calendar_events",
-    description: "Read Bridge Calendar events. Provide startDate and endDate to expand recurring series into dated occurrences; omit both to list stored series records.",
+    description: "Read Base Calendar events. Provide startDate and endDate to expand recurring series into dated occurrences; omit both to list stored series records.",
     inputSchema: obj({
       startDate: { type: "string", format: "date" },
       endDate: { type: "string", format: "date" },
@@ -193,7 +193,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "create_calendar_event",
-    description: "Create a validated Bridge Calendar event or repeating series. Timed events require HH:MM startTime and endTime; all-day events omit times.",
+    description: "Create a validated Base Calendar event or repeating series. Timed events require HH:MM startTime and endTime; all-day events omit times.",
     inputSchema: obj(CALENDAR_EVENT_PROPERTIES, ["title", "startDate", "endDate", "allDay"]),
     run: async (args, state) => {
       const result = createCalendarEvent(state.raw, args, newId());
@@ -204,7 +204,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "update_calendar_event",
-    description: "Update a Bridge Calendar event by id. Send only changed fields in patch; changes apply to the entire repeating series.",
+    description: "Update a Base Calendar event by id. Send only changed fields in patch; changes apply to the entire repeating series.",
     inputSchema: obj({ id: { type: "string" }, patch: obj(CALENDAR_EVENT_PROPERTIES) }, ["id", "patch"]),
     run: async (args, state) => {
       if (typeof args.id !== "string") return error("id is required.");
@@ -218,7 +218,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "delete_calendar_event",
-    description: "Delete a Bridge Calendar event by id. For a repeating event this deletes the entire series.",
+    description: "Delete a Base Calendar event by id. For a repeating event this deletes the entire series.",
     inputSchema: obj({ id: { type: "string" } }, ["id"]),
     run: async (args, state) => {
       if (typeof args.id !== "string") return error("id is required.");
@@ -266,13 +266,13 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_collection",
-    description: "Read one editable Bridge collection, such as tasks, projects, habits, chats, finance entries, or wikiFolders.",
+    description: "Read one editable Base collection, such as tasks, projects, habits, chats, finance entries, or wikiFolders.",
     inputSchema: obj({ collection: { type: "string", enum: COLLECTIONS } }, ["collection"]),
     run: (args, state) => isCollection(args.collection) ? collectionData(state, args.collection) : error("Unknown collection."),
   },
   {
     name: "create_record",
-    description: "Create an item in any standard Bridge collection. Bridge assigns an id and createdAt when omitted. Use the dedicated Vision and Notes tools for those areas.",
+    description: "Create an item in any standard Base collection. Base assigns an id and createdAt when omitted. Use the dedicated Vision and Notes tools for those areas.",
     inputSchema: obj({ collection: { type: "string", enum: COLLECTIONS }, record: freeObject }, ["collection", "record"]),
     run: async (args, state) => {
       if (!isCollection(args.collection)) return error("Unknown collection.");
@@ -290,7 +290,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "update_record",
-    description: "Update any standard Bridge item by id (or platform/date for records without ids). The patch is a shallow merge, so send only fields that should change.",
+    description: "Update any standard Base item by id (or platform/date for records without ids). The patch is a shallow merge, so send only fields that should change.",
     inputSchema: obj({ collection: { type: "string", enum: COLLECTIONS }, id: { type: "string" }, patch: freeObject }, ["collection", "id", "patch"]),
     run: async (args, state) => {
       if (!isCollection(args.collection) || typeof args.id !== "string") return error("Unknown collection or missing id.");
@@ -311,7 +311,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "delete_record",
-    description: "Permanently delete one item from a standard Bridge collection by id (or platform/date for records without ids). Use this only when deletion is intended.",
+    description: "Permanently delete one item from a standard Base collection by id (or platform/date for records without ids). Use this only when deletion is intended.",
     inputSchema: obj({ collection: { type: "string", enum: COLLECTIONS }, id: { type: "string" } }, ["collection", "id"]),
     run: async (args, state) => {
       if (!isCollection(args.collection) || typeof args.id !== "string") return error("Unknown collection or missing id.");
@@ -326,11 +326,11 @@ const TOOLS: Tool[] = [
   },
   {
     name: "update_settings",
-    description: "Update a singleton Bridge setting. Autonomy controls are owner-only and must be changed in the authenticated Bridge UI.",
+    description: "Update a singleton Base setting. Autonomy controls are owner-only and must be changed in the authenticated Base UI.",
     inputSchema: obj({ setting: { type: "string", enum: SETTINGS }, value: {}, replace: { type: "boolean" } }, ["setting", "value"]),
     run: async (args, state) => {
       if (!isSetting(args.setting)) return error("Unknown setting.");
-      if (args.setting === "autonomySettings") return error("Autonomy controls are owner-only. Change them in the authenticated Bridge UI.");
+      if (args.setting === "autonomySettings") return error("Autonomy controls are owner-only. Change them in the authenticated Base UI.");
       const current = state.raw[args.setting];
       const nextValue = !args.replace && asObject(current) && asObject(args.value)
         ? { ...asObject(current), ...asObject(args.value) }
@@ -381,7 +381,7 @@ const TOOLS: Tool[] = [
       if (typeof args.id !== "string" || typeof args.done !== "boolean") return error("id and done are required.");
       const index = (state.raw.tasks ?? []).findIndex((task) => task.id === args.id);
       if (index < 0) return error("Task not found.");
-      if (isAutonomyTask(state.raw.tasks[index])) return error("Autonomous tasks must be reviewed in the owner-authenticated Bridge UI.");
+      if (isAutonomyTask(state.raw.tasks[index])) return error("Autonomous tasks must be reviewed in the owner-authenticated Base UI.");
       const tasks = [...state.raw.tasks];
       tasks[index] = { ...tasks[index], done: args.done, completedAt: args.done ? now() : null };
       await save(state, { ...state.raw, tasks });
@@ -496,12 +496,12 @@ const TOOLS: Tool[] = [
   },
   {
     name: "delete_vision_board",
-    description: "Delete a Vision board and all of its items and drawings. Bridge always keeps at least one board.",
+    description: "Delete a Vision board and all of its items and drawings. Base always keeps at least one board.",
     inputSchema: obj({ id: { type: "string" } }, ["id"]),
     run: async (args, state) => {
       if (typeof args.id !== "string") return error("id is required.");
       const boards = state.raw.boards ?? [];
-      if (boards.length <= 1) return error("Bridge keeps at least one Vision board.");
+      if (boards.length <= 1) return error("Base keeps at least one Vision board.");
       if (!boards.some((board) => board.id === args.id)) return error("Vision board not found.");
       await save(state, { ...state.raw, boards: boards.filter((board) => board.id !== args.id), boardItems: (state.raw.boardItems ?? []).filter((item) => item.boardId !== args.id), boardDrawings: (state.raw.boardDrawings ?? []).filter((drawing) => drawing.boardId !== args.id) });
       return { ok: true, deleted: args.id };
@@ -617,7 +617,7 @@ async function loadState(): Promise<McpState | null> {
     raw: nextRaw,
     data: sanitize(nextRaw),
     save: async (next) => {
-      if (!(await writeRawData(next))) throw new Error("Bridge data store is not configured.");
+      if (!(await writeRawData(next))) throw new Error("Base data store is not configured.");
       cache = { at: Date.now(), state: makeState(next) };
     },
   });
@@ -635,14 +635,14 @@ async function handle(message: RpcReq): Promise<object | null> {
   if (id === undefined || id === null) return null;
   switch (method) {
     case "initialize":
-      return ok(id, { protocolVersion: (params?.protocolVersion as string) || "2025-06-18", capabilities: { tools: {}, resources: {} }, serverInfo: SERVER_INFO, instructions: "Bridge agents can read and edit the workspace, including Calendar events, Hermes briefings, and Vision boards. Locked Notes pages are private: they are never listed, read, edited, or deleted." });
+      return ok(id, { protocolVersion: (params?.protocolVersion as string) || "2025-06-18", capabilities: { tools: {}, resources: {} }, serverInfo: SERVER_INFO, instructions: "Base agents can read and edit the workspace, including Calendar events, Hermes briefings, and Vision boards. Locked Notes pages are private: they are never listed, read, edited, or deleted." });
     case "ping": return ok(id, {});
     case "tools/list": return ok(id, { tools: TOOLS.map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })) });
     case "tools/call": {
       const tool = TOOLS.find((candidate) => candidate.name === params?.name);
       if (!tool) return err(id, -32602, `Unknown tool: ${String(params?.name)}`);
       const state = await loadState();
-      if (!state) return ok(id, { content: [{ type: "text", text: "Bridge data store isn't configured (no Redis)." }], isError: true });
+      if (!state) return ok(id, { content: [{ type: "text", text: "Base data store isn't configured (no Redis)." }], isError: true });
       try {
         const result = await tool.run((params?.arguments as Record<string, unknown>) || {}, state);
         return ok(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !!(asObject(result)?.error) });
@@ -677,7 +677,7 @@ export async function POST(req: NextRequest) {
 export function GET(req: NextRequest) {
   if ((req.headers.get("accept") || "").includes("text/event-stream")) return new Response("SSE stream not supported (stateless server).", { status: 405, headers: CORS });
   const configured = process.env.MCP_TOKEN ? "configured" : "NOT configured (set MCP_TOKEN)";
-  return jsonResponse({ name: SERVER_INFO.name, transport: "streamable-http (POST JSON-RPC)", auth: `Bearer token (${configured})`, tools: TOOLS.map((tool) => tool.name), note: "Agents can edit Bridge data through validated tools. Locked Notes are always excluded and protected." });
+  return jsonResponse({ name: SERVER_INFO.name, transport: "streamable-http (POST JSON-RPC)", auth: `Bearer token (${configured})`, tools: TOOLS.map((tool) => tool.name), note: "Agents can edit Base data through validated tools. Locked Notes are always excluded and protected." });
 }
 
 export function OPTIONS() { return new Response(null, { status: 204, headers: CORS }); }

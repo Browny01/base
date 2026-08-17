@@ -6,6 +6,7 @@ import { ContentContainer } from "@/components/content-container";
 import { SidebarProvider } from "@/lib/sidebar-context";
 import { NavModeProvider } from "@/lib/nav-mode-context";
 import { ToastProvider } from "@/lib/toast-context";
+import { ConfirmProvider } from "@/lib/confirm-context";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 
 // Desktop nav (sidebar vs dock) is chosen by the `data-nav` attribute on <html> +
@@ -15,6 +16,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <NavModeProvider>
        <ToastProvider>
+        <ConfirmProvider>
         <KeyboardShortcuts />
         <div className="flex h-full bg-[var(--bg)]">
           {/* Sidebar — desktop, when nav mode = sidebar */}
@@ -40,6 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <BottomNav />
           </div>
         </div>
+       </ConfirmProvider>
        </ToastProvider>
       </NavModeProvider>
     </SidebarProvider>

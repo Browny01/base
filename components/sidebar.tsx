@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useTheme } from "@/lib/theme-context";
 import {
-  LayoutDashboard, CheckSquare, Timer, Repeat2, DollarSign,
+  LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Newspaper, ChevronsLeft, Settings,
-  Trophy, Briefcase, Sun, Moon, LayoutGrid, NotebookText, Dumbbell, MessageCircle, Lightbulb, CalendarDays, Bot,
+  Sun, Moon, LayoutGrid, NotebookText, CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,21 +20,11 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Command",
     items: [
       { href: "/",     label: "Dashboard", icon: LayoutDashboard },
-      { href: "/chat", label: "Chat",      icon: MessageCircle   },
-      { href: "/autonomy", label: "Autonomy", icon: Bot },
-    ],
-  },
-  {
-    label: "Personal",
-    items: [
-      { href: "/player", label: "Personal", icon: Trophy   },
-      { href: "/gym",    label: "Gym",      icon: Dumbbell },
     ],
   },
   {
     label: "Build",
     items: [
-      { href: "/business", label: "Business", icon: Briefcase    },
       { href: "/projects", label: "Projects", icon: FolderKanban },
       { href: "/vision",   label: "Vision",   icon: LayoutGrid   },
       { href: "/notes",    label: "Notes",    icon: NotebookText },
@@ -46,15 +36,13 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
       { href: "/tasks",  label: "Tasks",  icon: CheckSquare },
       { href: "/focus",  label: "Focus",  icon: Timer       },
-      { href: "/habits", label: "Habits", icon: Repeat2     },
     ],
   },
   {
     label: "Intel",
     items: [
-      { href: "/finance", label: "Finance", icon: DollarSign    },
-      { href: "/learn",   label: "Learn",   icon: Lightbulb     },
-      { href: "/news",    label: "News",    icon: Newspaper     },
+      { href: "/finance", label: "Finance", icon: DollarSign },
+      { href: "/news",    label: "News",    icon: Newspaper  },
     ],
   },
 ];

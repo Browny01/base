@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Cut a new macOS Bridge release and publish it so installed apps auto-update.
+# Cut a new macOS Base release and publish it so installed apps auto-update.
 #
 # What it does:
 #   1. Bumps the app version, builds Release, zips the .app.
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 VERSION="${1:-}"
-NOTES="${2:-Bridge $VERSION}"
+NOTES="${2:-Base $VERSION}"
 [ -n "$VERSION" ] || { echo "Usage: $0 <version> [release notes]   e.g. $0 0.2.0 \"…\""; exit 1; }
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -48,11 +48,11 @@ echo "▸ Bumping to $VERSION (build $BUILD)…"
 
 echo "▸ Generating project + building Release…"
 ( cd "$MAC_DIR" && xcodegen generate >/dev/null )
-xcodebuild -project "$MAC_DIR/Bridge.xcodeproj" -scheme Bridge \
+xcodebuild -project "$MAC_DIR/Base.xcodeproj" -scheme Base \
   -configuration Release -derivedDataPath "$DD" \
   -destination 'platform=macOS' build >/dev/null
 
-APP="$DD/Build/Products/Release/Bridge.app"
+APP="$DD/Build/Products/Release/Base.app"
 [ -d "$APP" ] || { echo "❌ build product missing"; exit 1; }
 
 # Locate Sparkle's CLI tools (shipped inside the resolved SPM artifact).
@@ -61,11 +61,11 @@ SPARKLE_BIN="$(find "$DD/SourcePackages/artifacts" -type d -path '*sparkle/Spark
 
 echo "▸ Packaging + signing…"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
-ZIP="$STAGE/Bridge-$VERSION.zip"
+ZIP="$STAGE/Base-$VERSION.zip"
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
 # Release notes as HTML alongside the zip → Sparkle shows them in the update dialog.
-printf '<h2>Bridge %s</h2>\n<p>%s</p>\n' "$VERSION" "$NOTES" > "$STAGE/Bridge-$VERSION.html"
+printf '<h2>Base %s</h2>\n<p>%s</p>\n' "$VERSION" "$NOTES" > "$STAGE/Base-$VERSION.html"
 
 # Read the EdDSA key through the security CLI so headless release runs do not
 # stall waiting for Sparkle's binary to receive Keychain UI approval.
@@ -78,11 +78,11 @@ printf '<h2>Bridge %s</h2>\n<p>%s</p>\n' "$VERSION" "$NOTES" > "$STAGE/Bridge-$V
 echo "▸ Publishing to $RELEASES_REPO ($TAG)…"
 if gh release view "$TAG" --repo "$RELEASES_REPO" >/dev/null 2>&1; then
   gh release upload "$TAG" "$ZIP" "$STAGE/appcast.xml" --repo "$RELEASES_REPO" --clobber
-  gh release edit "$TAG" --repo "$RELEASES_REPO" --title "Bridge $VERSION" --notes "$NOTES" --latest
+  gh release edit "$TAG" --repo "$RELEASES_REPO" --title "Base $VERSION" --notes "$NOTES" --latest
 else
   gh release create "$TAG" "$ZIP" "$STAGE/appcast.xml" \
-    --repo "$RELEASES_REPO" --title "Bridge $VERSION" --notes "$NOTES" --latest
+    --repo "$RELEASES_REPO" --title "Base $VERSION" --notes "$NOTES" --latest
 fi
 
-echo "✅ Published Bridge $VERSION. Installed apps will offer the update within a day (or via Check for Updates…)."
+echo "✅ Published Base $VERSION. Installed apps will offer the update within a day (or via Check for Updates…)."
 echo "   Commit the version bump in macos/project.yml so it stays in sync."
