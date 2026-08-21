@@ -123,6 +123,19 @@ export interface HabitLog {
   value?: string;      // for input habits
 }
 
+// ── Shopping List ─────────────────────────────────────────────────────────────
+
+export type ShoppingCategory = "produce" | "dairy" | "meat" | "bakery" | "pantry" | "frozen" | "drinks" | "snacks" | "household" | "other";
+
+export interface ShoppingListItem {
+  id: string;
+  name: string;
+  quantity: string;
+  category: ShoppingCategory;
+  checked: boolean;
+  createdAt: string;
+}
+
 export type ProjectStatus = "active" | "on-hold" | "done";
 export type ProjectCategory = "major" | "side";
 export type ProjectColor =
@@ -613,6 +626,7 @@ export interface BridgeData {
   courses: Course[];
   newsPrefs: NewsPrefs;
   autonomySettings: AutonomySettings;
+  shoppingList: ShoppingListItem[];
   updatedAt?: number;
 }
 
@@ -670,6 +684,7 @@ export const DEFAULT: BridgeData = {
   courses: [],
   newsPrefs: DEFAULT_NEWS_PREFS,
   autonomySettings: DEFAULT_AUTONOMY_SETTINGS,
+  shoppingList: [],
 };
 
 function migrateIncomeTypes(data: BridgeData): BridgeData {

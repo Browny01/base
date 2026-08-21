@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Newspaper, ChevronsLeft, Settings,
-  Sun, Moon, LayoutGrid, NotebookText, CalendarDays,
+  Sun, Moon, LayoutGrid, NotebookText, CalendarDays, ShoppingCart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,6 +20,12 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Command",
     items: [
       { href: "/",     label: "Dashboard", icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: "Personal",
+    items: [
+      { href: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
     ],
   },
   {

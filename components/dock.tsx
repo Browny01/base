@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Newspaper, MoreHorizontal, X,
-  Sun, Moon, LayoutGrid, NotebookText, CalendarDays,
+  Sun, Moon, LayoutGrid, NotebookText, CalendarDays, ShoppingCart,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ const DOCK: Item[] = [
 // The full list (shown in the More panel that expands upward).
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
+  { href: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
   { href: "/projects", label: "Projects",  icon: FolderKanban  },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid    },
   { href: "/notes",    label: "Notes",     icon: NotebookText  },
