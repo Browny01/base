@@ -10,7 +10,7 @@ import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Newspaper,
   Search, CornerDownLeft, NotebookText, LayoutGrid, type LucideIcon,
-  Settings, Sun, Moon, PanelBottom, CalendarDays,
+  Settings, Sun, Moon, PanelBottom, CalendarDays, ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,7 @@ const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string 
   { href: "/calendar", label: "Calendar",  icon: CalendarDays,    keywords: "events agenda schedule bookings dates" },
   { href: "/tasks",    label: "Tasks",     icon: CheckSquare,     keywords: "todo kanban" },
   { href: "/focus",    label: "Focus",     icon: Timer,           keywords: "pomodoro timer" },
+  { href: "/shopping-list", label: "Shopping List", icon: ShoppingCart, keywords: "groceries buy items cart" },
   { href: "/finance",  label: "Finance",   icon: DollarSign,      keywords: "money wallet crypto" },
   { href: "/news",     label: "News",      icon: Newspaper,       keywords: "markets headlines" },
   { href: "/settings", label: "Settings",  icon: Settings,        keywords: "preferences appearance theme navigation" },
@@ -181,7 +182,7 @@ export function CommandBar() {
 
             <div className="max-h-[360px] overflow-y-auto p-1.5">
               {results.length === 0 ? (
-                <div className="px-3 py-10 text-center"><p className="text-[13px] text-[var(--muted)]">No results for “{query}”</p></div>
+                <div className="px-3 py-10 text-center"><p className="text-[13px] text-[var(--muted)]">No results for "{query}"</p></div>
               ) : (
                 <>
                   {renderSection("Actions", acts, 0)}

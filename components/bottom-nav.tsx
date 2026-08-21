@@ -7,7 +7,7 @@ import {
   LayoutDashboard, CheckSquare, Timer, DollarSign,
   FolderKanban, Newspaper, X, MoreHorizontal,
   Sun, Moon, LayoutGrid, NotebookText, CalendarDays,
-  Settings, type LucideIcon,
+  Settings, ShoppingCart, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
@@ -24,6 +24,7 @@ const TABS: Item[] = [
 // Everything — the More sheet
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
+  { href: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
   { href: "/projects", label: "Projects",  icon: FolderKanban  },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid    },
   { href: "/notes",    label: "Notes",     icon: NotebookText  },
