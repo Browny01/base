@@ -25,7 +25,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Personal",
     items: [
-      { href: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
+      { href: "/shopping-list", label: "Wish List", icon: ShoppingCart },
     ],
   },
   {

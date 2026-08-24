@@ -123,15 +123,18 @@ export interface HabitLog {
   value?: string;      // for input habits
 }
 
-// ── Shopping List ─────────────────────────────────────────────────────────────
+// ── Shopping List (wish-list style) ──────────────────────────────────────────
 
-export type ShoppingCategory = "produce" | "dairy" | "meat" | "bakery" | "pantry" | "frozen" | "drinks" | "snacks" | "household" | "other";
+export type ShoppingCategory =
+  | "clothing" | "shoes" | "tech" | "gaming" | "home" | "furniture"
+  | "books" | "fitness" | "accessories" | "other";
 
 export interface ShoppingListItem {
   id: string;
   name: string;
-  quantity: string;
   category: ShoppingCategory;
+  price: number;         // estimated price in AUD (0 = not set)
+  priority: 1 | 2 | 3;  // 1 = must have, 2 = want, 3 = nice to have
   checked: boolean;
   createdAt: string;
 }

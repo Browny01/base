@@ -24,7 +24,7 @@ const TABS: Item[] = [
 // Everything — the More sheet
 const ALL: Item[] = [
   { href: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { href: "/shopping-list", label: "Shopping List", icon: ShoppingCart },
+  { href: "/shopping-list", label: "Wish List", icon: ShoppingCart },
   { href: "/projects", label: "Projects",  icon: FolderKanban  },
   { href: "/vision",   label: "Vision",    icon: LayoutGrid    },
   { href: "/notes",    label: "Notes",     icon: NotebookText  },
