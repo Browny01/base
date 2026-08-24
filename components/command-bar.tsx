@@ -29,7 +29,7 @@ const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string 
   { href: "/calendar", label: "Calendar",  icon: CalendarDays,    keywords: "events agenda schedule bookings dates" },
   { href: "/tasks",    label: "Tasks",     icon: CheckSquare,     keywords: "todo kanban" },
   { href: "/focus",    label: "Focus",     icon: Timer,           keywords: "pomodoro timer" },
-  { href: "/shopping-list", label: "Shopping List", icon: ShoppingCart, keywords: "groceries buy items cart" },
+  { href: "/shopping-list", label: "Wish List", icon: ShoppingCart, keywords: "shopping wishlist clothes tech gear buy want" },
   { href: "/finance",  label: "Finance",   icon: DollarSign,      keywords: "money wallet crypto" },
   { href: "/news",     label: "News",      icon: Newspaper,       keywords: "markets headlines" },
   { href: "/settings", label: "Settings",  icon: Settings,        keywords: "preferences appearance theme navigation" },
