@@ -137,6 +137,21 @@ export interface ShoppingListItem {
   priority: 1 | 2 | 3;  // 1 = must have, 2 = want, 3 = nice to have
   checked: boolean;
   createdAt: string;
+  icon?: string;         // custom emoji, or a data-URL / http(s) image URL — overrides the category emoji
+  url?: string;          // optional link to the product page
+  order?: number;        // manual sort position within the wish list (lower = higher up)
+}
+
+// ── Bookmarks (dashboard quick-links) ───────────────────────────────────────
+
+export interface Bookmark {
+  id: string;
+  title: string;
+  url: string;
+  icon?: string;     // custom emoji or image/data-URL — overrides the favicon
+  favicon?: string;  // favicon fetched from the site and cached (data-URL or URL)
+  createdAt: string;
+  order?: number;     // manual sort position (lower = first)
 }
 
 export type ProjectStatus = "active" | "on-hold" | "done";
@@ -630,6 +645,7 @@ export interface BridgeData {
   newsPrefs: NewsPrefs;
   autonomySettings: AutonomySettings;
   shoppingList: ShoppingListItem[];
+  bookmarks: Bookmark[];
   updatedAt?: number;
 }
 
@@ -688,6 +704,7 @@ export const DEFAULT: BridgeData = {
   newsPrefs: DEFAULT_NEWS_PREFS,
   autonomySettings: DEFAULT_AUTONOMY_SETTINGS,
   shoppingList: [],
+  bookmarks: [],
 };
 
 function migrateIncomeTypes(data: BridgeData): BridgeData {
