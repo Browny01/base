@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
-import { Play, Film, Tv, Youtube, Search, Plus, Loader2, Check } from "lucide-react";
+import { Play, Film, Tv, Video, Search, Plus, Loader2, Check } from "lucide-react";
 import { CardListPage, type CardConfig } from "@/components/card-list-page";
 import type { WatchListItem, WatchKind } from "@/lib/store";
 import type { TmdbResult } from "@/app/api/tmdb/search/route";
@@ -12,14 +12,14 @@ import type { YoutubeMeta } from "@/app/api/youtube/oembed/route";
 const KIND_BADGE: Record<WatchKind, { label: string; icon: typeof Film; emoji: string }> = {
   movie:  { label: "Movie",   icon: Film,    emoji: "🎬" },
   tv:     { label: "Show",    icon: Tv,      emoji: "📺" },
-  youtube:{ label: "YouTube", icon: Youtube, emoji: "▶️" },
+  youtube:{ label: "YouTube", icon: Video, emoji: "▶️" },
 };
 
 const FILTERS: { value: "all" | WatchKind; label: string; icon: typeof Film }[] = [
   { value: "all",     label: "All",     icon: Play },
   { value: "movie",   label: "Movies",  icon: Film },
   { value: "tv",      label: "Shows",   icon: Tv },
-  { value: "youtube", label: "YouTube", icon: Youtube },
+  { value: "youtube", label: "YouTube", icon: Video },
 ];
 
 const CONFIG: CardConfig<WatchListItem> = {
@@ -162,7 +162,7 @@ function AddWatch({ items, close, append }: {
             <img src={yt.thumbnail} alt="" className="w-32 aspect-video object-cover rounded-lg shrink-0" />
           ) : (
             <div className="w-32 aspect-video rounded-lg bg-[var(--chip)] grid place-items-center shrink-0">
-              <Youtube className="w-6 h-6 opacity-40" />
+              <Video className="w-6 h-6 opacity-40" />
             </div>
           )}
           <div className="flex-1 min-w-0">
