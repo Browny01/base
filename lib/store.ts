@@ -160,24 +160,27 @@ export type ReadingCategory = "fiction" | "non-fiction" | "self-help" | "busines
 export interface ReadingListItem {
   id: string;
   name: string;
-  author: string;        // optional; "" when unknown
+  author: string;           // optional; "" when unknown
   category: ReadingCategory;
-  price: number;         // estimated price in AUD (0 = not set)
-  priority: 1 | 2 | 3;
-  checked: boolean;      // read / owned
+  checked: boolean;         // read
   createdAt: string;
+  cover?: string;           // uploaded/URL cover image (data-URL or URL)
+  order?: number;           // manual sort position (lower = first)
 }
 
-export type WatchCategory = "movie" | "series" | "anime" | "documentary" | "youtube" | "other";
+export type WatchKind = "movie" | "tv" | "youtube";
 
 export interface WatchListItem {
   id: string;
-  name: string;
-  category: WatchCategory;
-  price: number;
-  priority: 1 | 2 | 3;
-  checked: boolean;      // watched
+  kind: WatchKind;
+  title: string;
+  year?: string;            // release year for movies/shows
+  channel?: string;         // channel name for YouTube videos
+  poster?: string;          // TMDB poster or YouTube thumbnail
+  tmdbId?: number;          // TMDB id for movies/shows
+  checked: boolean;         // watched
   createdAt: string;
+  order?: number;           // manual sort position (lower = first)
 }
 
 export type ProjectStatus = "active" | "on-hold" | "done";
