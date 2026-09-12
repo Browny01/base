@@ -204,3 +204,21 @@ native clients use the deployed API for synchronization and news refreshes.
 - Verify both native targets after shared Swift changes.
 - When changing the macOS shell source, regenerate the project from
   `macos/project.yml` rather than hand-editing generated project files.
+
+## Roadmap
+
+- **Habits & streaks** - habit tracking with week/habit calendar views,
+  completion streaks, and gentle reminders on web and native.
+- **Offline-first sync v2** - conflict-aware merges with field-level resolution
+  and end-to-end encryption for local native data.
+- **AI planning agent** - turn a project goal into a dated, prioritized task plan
+  using Gemini and pull results back into the calendar.
+- **Widgets & watch** - additional WidgetKit variants (tasks, calendar, focus) and
+  an Apple Watch companion for quick capture and glanceable summaries.
+- **Multi-workspace** - multiple Base documents per account with per-workspace
+  settings, themes, and sharing/read-only invites.
+- **On-device privacy mode** - a local mode backed by Upstash edges and an
+  optional self-hosted Ollama relay where chat and summaries never hit external
+  AI providers.
+- **Server-side image pipeline** - thumbnail generation, format optimization, and
+  restore/trash-friendly image handling for the vision board and projects.
