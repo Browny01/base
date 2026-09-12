@@ -183,17 +183,20 @@ function AddWatch({ items, close, append }: {
         <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
           {shownResults.map((r) => {
             const dup = isDupTmdb(r.id);
+            const BadgeIcon = KIND_BADGE[r.media_type].icon;
+            const badgeLabel = KIND_BADGE[r.media_type].label;
+            const emoji = KIND_BADGE[r.media_type].emoji;
             return (
               <div key={`${r.media_type}-${r.id}`} className="w-36 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden flex flex-col">
                 <div className="aspect-[2/3] w-full relative bg-[var(--chip)] grid place-items-center">
                   {r.poster ? (
                     <img src={r.poster} alt={r.title} className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
-                    <span className="text-3xl opacity-30">{KIND_BADGE[r.media_type].emoji}</span>
+                    <span className="text-3xl opacity-30">{emoji}</span>
                   )}
                   <span className="absolute top-1.5 left-1.5 flex items-center gap-1 rounded-full bg-[var(--bg)]/90 border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--muted)]">
-                    <KIND_BADGE[r.media_type].icon className="w-3 h-3" />
-                    {KIND_BADGE[r.media_type].label}
+                    <BadgeIcon className="w-3 h-3" />
+                    {badgeLabel}
                   </span>
                 </div>
                 <div className="p-2 flex items-start justify-between gap-1.5">
