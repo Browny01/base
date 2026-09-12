@@ -24,7 +24,7 @@ export interface CardConfig<T extends MediaCardLike> {
   doneLabel: (n: number) => string;
   cover: (item: T) => string | undefined;      // poster / thumbnail / uploaded cover
   titleOf: (item: T) => string;
-  subtitleOf: (item: T) => string;
+  subtitleOf: (item: T) => string | undefined;
   aspect: (item: T) => string;                 // "aspect-[2/3]" | "aspect-video" …
   badge?: (item: T) => { label: string; icon?: LucideIcon } | null;
   fallbackEmoji: (item: T) => string;
