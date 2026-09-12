@@ -4,38 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, CheckSquare, Timer, DollarSign,
-  FolderKanban, Newspaper, MoreHorizontal, X,
-  Sun, Moon, LayoutGrid, NotebookText, CalendarDays, ShoppingCart,
-  type LucideIcon,
+  MoreHorizontal, X, Sun, Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
-
-type Item = { href: string; label: string; icon: LucideIcon };
-
-// The always-visible dock row (curated). Everything else lives in "More".
-const DOCK: Item[] = [
-  { href: "/",        label: "Dashboard", icon: LayoutDashboard },
-  { href: "/projects",label: "Projects",  icon: FolderKanban    },
-  { href: "/tasks",   label: "Tasks",     icon: CheckSquare     },
-  { href: "/finance", label: "Finance",   icon: DollarSign      },
-  { href: "/news",    label: "News",      icon: Newspaper       },
-];
-
-// The full list (shown in the More panel that expands upward).
-const ALL: Item[] = [
-  { href: "/",         label: "Dashboard", icon: LayoutDashboard },
-  { href: "/shopping-list", label: "Wish List", icon: ShoppingCart },
-  { href: "/projects", label: "Projects",  icon: FolderKanban  },
-  { href: "/vision",   label: "Vision",    icon: LayoutGrid    },
-  { href: "/notes",    label: "Notes",     icon: NotebookText  },
-  { href: "/calendar", label: "Calendar",  icon: CalendarDays  },
-  { href: "/tasks",    label: "Tasks",     icon: CheckSquare   },
-  { href: "/focus",    label: "Focus",     icon: Timer         },
-  { href: "/finance",  label: "Finance",   icon: DollarSign    },
-  { href: "/news",     label: "News",      icon: Newspaper     },
-];
+import { useBridge } from "@/lib/hooks";
+import { visiblePages, isHidden, DEFAULT_DOCK, PAGE_BY_KEY, type NavPage } from "@/lib/nav-config";
 
 const isActive = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
@@ -49,7 +23,7 @@ function scaleFor(hover: number | null, i: number): number {
 }
 
 function DockIcon({ item, active, scale, hovered, onHover }: {
-  item: Item; active: boolean; scale: number; hovered: boolean; onHover: () => void;
+  item: NavPage; active: boolean; scale: number; hovered: boolean; onHover: () => void;
 }) {
   const Icon = item.icon;
   return (
@@ -77,9 +51,16 @@ function DockIcon({ item, active, scale, hovered, onHover }: {
 export function Dock() {
   const pathname = usePathname();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { data } = useBridge();
   const isDark = theme === "dark";
   const [hover, setHover] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
+
+  const navPrefs = data.navPrefs;
+  const dock = DEFAULT_DOCK
+    .map((key) => PAGE_BY_KEY.get(key))
+    .filter((p): p is NavPage => !!p && !isHidden(p.key, navPrefs));
+  const all = visiblePages(navPrefs);
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none pb-3">
@@ -92,7 +73,7 @@ export function Dock() {
               <button onClick={() => setOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--faint)] hover:bg-[var(--chip)] hover:text-[var(--text)]"><X className="h-3.5 w-3.5" /></button>
             </div>
             <div className="grid grid-cols-4 gap-1.5">
-              {ALL.map(({ href, label, icon: Icon }, i) => {
+              {all.map(({ href, label, icon: Icon }, i) => {
                 const active = isActive(pathname, href);
                 return (
                   <Link key={href} href={href} onClick={() => setOpen(false)}
@@ -114,11 +95,11 @@ export function Dock() {
 
         {/* The dock */}
         <div className="glass glass-edge flex items-end gap-0.5 rounded-[22px] border border-[var(--border)] px-2 py-1.5" onMouseLeave={() => setHover(null)}>
-          {DOCK.map((item, i) => (
+          {dock.map((item, i) => (
             <DockIcon key={item.href} item={item} active={isActive(pathname, item.href)} scale={scaleFor(hover, i)} hovered={hover === i} onHover={() => setHover(i)} />
           ))}
 
-          <div className="mx-1 h-8 w-px shrink-0 self-center bg-[var(--border)]" />
+          {dock.length > 0 && <div className="mx-1 h-8 w-px shrink-0 self-center bg-[var(--border)]" />}
 
           {/* More */}
           <button onMouseEnter={() => setHover(null)} onClick={() => setOpen((v) => !v)} title="More"

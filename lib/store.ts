@@ -3,6 +3,7 @@
 import { DEFAULT_CHAT_SETTINGS, type ChatSettings } from "@/lib/chat-models";
 import { DEFAULT_NEWS_PREFS, type NewsPrefs } from "@/lib/news-prefs";
 import { DEFAULT_AUTONOMY_SETTINGS, type AutonomySettings, type AutonomyState, type AutonomyTaskClass } from "@/lib/autonomy";
+import { DEFAULT_NAV_PREFS, type NavPrefs } from "@/lib/nav-config";
 
 export type Priority = "P1" | "P2" | "P3";
 export type TaskTag = "@work" | "@personal" | "@money" | "@admin" | "@night-auto" | `@${string}`;
@@ -152,6 +153,31 @@ export interface Bookmark {
   favicon?: string;  // favicon fetched from the site and cached (data-URL or URL)
   createdAt: string;
   order?: number;     // manual sort position (lower = first)
+}
+
+export type ReadingCategory = "fiction" | "non-fiction" | "self-help" | "business" | "tech" | "biography" | "other";
+
+export interface ReadingListItem {
+  id: string;
+  name: string;
+  author: string;        // optional; "" when unknown
+  category: ReadingCategory;
+  price: number;         // estimated price in AUD (0 = not set)
+  priority: 1 | 2 | 3;
+  checked: boolean;      // read / owned
+  createdAt: string;
+}
+
+export type WatchCategory = "movie" | "series" | "anime" | "documentary" | "youtube" | "other";
+
+export interface WatchListItem {
+  id: string;
+  name: string;
+  category: WatchCategory;
+  price: number;
+  priority: 1 | 2 | 3;
+  checked: boolean;      // watched
+  createdAt: string;
 }
 
 export type ProjectStatus = "active" | "on-hold" | "done";
@@ -646,6 +672,9 @@ export interface BridgeData {
   autonomySettings: AutonomySettings;
   shoppingList: ShoppingListItem[];
   bookmarks: Bookmark[];
+  readingList: ReadingListItem[];
+  watchList: WatchListItem[];
+  navPrefs: NavPrefs;
   updatedAt?: number;
 }
 
@@ -705,6 +734,9 @@ export const DEFAULT: BridgeData = {
   autonomySettings: DEFAULT_AUTONOMY_SETTINGS,
   shoppingList: [],
   bookmarks: [],
+  readingList: [],
+  watchList: [],
+  navPrefs: DEFAULT_NAV_PREFS,
 };
 
 function migrateIncomeTypes(data: BridgeData): BridgeData {

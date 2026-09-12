@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Check, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Check, Layers, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNavMode } from "@/lib/nav-mode-context";
@@ -17,6 +17,13 @@ import {
   type NewsPrefs,
   type YoutubeChannel,
 } from "@/lib/news-prefs";
+import {
+  ALL_PAGES,
+  SETTINGS_PAGE,
+  DEFAULT_NAV_PREFS,
+  orderedKeys,
+  type NavPrefs,
+} from "@/lib/nav-config";
 
 function SourceManager({ prefs, setPrefs }: { prefs: NewsPrefs; setPrefs: (prefs: NewsPrefs) => void }) {
   const [youtubeName, setYoutubeName] = useState("");
@@ -235,6 +242,169 @@ function ChatModelManager({ settings, setSettings }: { settings: ChatSettings; s
   );
 }
 
+function moveKey(arr: string[], key: string, dir: -1 | 1): string[] {
+  const idx = arr.indexOf(key);
+  const target = idx + dir;
+  if (idx < 0 || target < 0 || target >= arr.length) return arr;
+  const next = [...arr];
+  const [moved] = next.splice(idx, 1);
+  next.splice(target, 0, moved);
+  return next;
+}
+
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      role="switch"
+      aria-checked={on}
+      className={cn(
+        "relative h-6 w-10 shrink-0 rounded-full transition-colors",
+        on ? "bg-[var(--text)]" : "bg-[var(--chip)] border border-[var(--border-2)]"
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-all",
+          on ? "left-[22px]" : "left-[3px] bg-[var(--muted)]"
+        )}
+        style={{ width: 18, height: 18 }}
+      />
+    </button>
+  );
+}
+
+function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (prefs: NavPrefs) => void }) {
+  const hidden = new Set(prefs.hiddenPages);
+  const order = orderedKeys(prefs);
+  const tabs = prefs.bottomTabs?.length ? prefs.bottomTabs : DEFAULT_NAV_PREFS.bottomTabs;
+
+  function toggleHidden(key: string) {
+    const next = new Set(hidden);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    setPrefs({ ...prefs, hiddenPages: [...next] });
+  }
+
+  function moveKeyIn(key: string, dir: -1 | 1) {
+    setPrefs({ ...prefs, sidebarOrder: moveKey(order, key, dir) });
+  }
+
+  function toggleTab(key: string) {
+    setPrefs({
+      ...prefs,
+      bottomTabs: tabs.includes(key) ? tabs.filter((k) => k !== key) : [...tabs, key],
+    });
+  }
+
+  function moveTab(key: string, dir: -1 | 1) {
+    setPrefs({ ...prefs, bottomTabs: moveKey(tabs, key, dir) });
+  }
+
+  const pageFor = (key: string) => ALL_PAGES.find((p) => p.key === key);
+
+  return (
+    <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 lg:col-span-2">
+      <div className="flex items-center gap-2 mb-5">
+        <Layers className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
+        <h2 className="text-sm font-bold text-[var(--text)]">Pages &amp; Navigation</h2>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        {/* Page visibility */}
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
+          <p className="mb-1 text-sm font-bold text-[var(--text)]">Pages</p>
+          <p className="mb-3 text-[11px] text-[var(--faint)]">Switch a page off to remove it from the sidebar, dock and command bar. The page itself still works if you open it directly.</p>
+          <div className="space-y-1">
+            {ALL_PAGES.map((page) => (
+              <div key={page.key} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-[var(--chip)] transition-colors">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <page.icon className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
+                  <span className="text-[13px] text-[var(--text)] truncate">{page.label}</span>
+                </div>
+                <Toggle on={!hidden.has(page.key)} onClick={() => toggleHidden(page.key)} />
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 bg-[var(--chip)]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Settings className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
+                <span className="text-[13px] text-[var(--text)] truncate">{SETTINGS_PAGE.label}</span>
+              </div>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--faint)]">Always on</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-6">
+          {/* Sidebar order */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
+            <p className="text-sm font-bold text-[var(--text)]">Sidebar order</p>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">Reorders the sidebar on desktop and the "All pages" sheets.</p>
+            <div className="space-y-1">
+              {order.map((key, i) => {
+                const page = pageFor(key);
+                if (!page) return null;
+                return (
+                  <div key={key} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-[var(--chip)] transition-colors">
+                    <page.icon className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
+                    <span className="flex-1 min-w-0 truncate text-[13px] text-[var(--text)]">{page.label}</span>
+                    <button onClick={() => moveKeyIn(key, -1)} disabled={i === 0} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move up">
+                      <ArrowUp className="w-4 h-4" strokeWidth={1.9} />
+                    </button>
+                    <button onClick={() => moveKeyIn(key, 1)} disabled={i === order.length - 1} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move down">
+                      <ArrowDown className="w-4 h-4" strokeWidth={1.9} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mobile dock tabs */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
+            <p className="text-sm font-bold text-[var(--text)]">Mobile dock tabs</p>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">These fixed tabs always sit in the bottom bar. Everything else is reachable through "More".</p>
+            <div className="space-y-1">
+              {tabs.map((key, i) => {
+                const page = pageFor(key);
+                if (!page) return null;
+                return (
+                  <div key={key} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-[var(--chip)] transition-colors">
+                    <page.icon className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
+                    <span className="flex-1 min-w-0 truncate text-[13px] text-[var(--text)]">{page.label}</span>
+                    <button onClick={() => moveTab(key, -1)} disabled={i === 0} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move left">
+                      <ArrowUp className="w-4 h-4" strokeWidth={1.9} />
+                    </button>
+                    <button onClick={() => moveTab(key, 1)} disabled={i === tabs.length - 1} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move right">
+                      <ArrowDown className="w-4 h-4" strokeWidth={1.9} />
+                    </button>
+                    <button onClick={() => toggleTab(key)} className="text-[var(--faint)] hover:text-[var(--c-red)] transition-colors" title={`Remove ${page.label}`}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Add a tab</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {ALL_PAGES.filter((p) => !tabs.includes(p.key)).map((page) => (
+                <button
+                  key={page.key}
+                  onClick={() => toggleTab(page.key)}
+                  className="flex items-center gap-1 rounded-full bg-[var(--chip)] px-2 py-1 text-[11px] text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+                >
+                  <page.icon className="w-3 h-3" strokeWidth={2} />
+                  {page.label}
+                  <Plus className="w-3 h-3" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { accent, setAccent } = useAccent();
@@ -243,8 +413,10 @@ export function SettingsPage() {
   const { data, mutate } = useBridge();
   const newsPrefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
   const chatSettings = data.chatSettings ?? DEFAULT_CHAT_SETTINGS;
+  const navPrefs = data.navPrefs ?? DEFAULT_NAV_PREFS;
   const setNewsPrefs = (prefs: NewsPrefs) => mutate((d) => ({ ...d, newsPrefs: prefs }));
   const setChatSettings = (settings: ChatSettings) => mutate((d) => ({ ...d, chatSettings: settings }));
+  const setNavPrefs = (prefs: NavPrefs) => mutate((d) => ({ ...d, navPrefs: prefs }));
 
   return (
     <div className="p-4 sm:p-6">
@@ -370,6 +542,7 @@ export function SettingsPage() {
 
         <SourceManager prefs={newsPrefs} setPrefs={setNewsPrefs} />
         <ChatModelManager settings={chatSettings} setSettings={setChatSettings} />
+        <NavigationManager prefs={navPrefs} setPrefs={setNavPrefs} />
       </div>
     </div>
   );

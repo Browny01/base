@@ -6,13 +6,13 @@ import { useRouter, usePathname } from "next/navigation";
 import { getData } from "@/lib/store";
 import { useTheme } from "@/lib/theme-context";
 import { useNavMode } from "@/lib/nav-mode-context";
+import { useBridge } from "@/lib/hooks";
 import {
-  LayoutDashboard, CheckSquare, Timer, DollarSign,
-  FolderKanban, Newspaper,
-  Search, CornerDownLeft, NotebookText, LayoutGrid, type LucideIcon,
-  Settings, Sun, Moon, PanelBottom, CalendarDays, ShoppingCart,
+  FolderKanban, Search, CornerDownLeft, LayoutGrid,
+  type LucideIcon, Settings, Sun, Moon, PanelBottom, CalendarDays, CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { visiblePages, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
 
 type Item =
   | { kind: "page"; key: string; label: string; icon: LucideIcon; href: string; keywords?: string }
@@ -21,26 +21,12 @@ type Item =
   | { kind: "board"; key: string; label: string; id: string }
   | { kind: "project"; key: string; label: string; id: string; keywords?: string };
 
-const DESTS: { href: string; label: string; icon: LucideIcon; keywords?: string }[] = [
-  { href: "/",         label: "Dashboard", icon: LayoutDashboard, keywords: "home overview" },
-  { href: "/projects", label: "Projects",  icon: FolderKanban,    keywords: "roadmap docs kanban" },
-  { href: "/vision",   label: "Vision",    icon: LayoutGrid,      keywords: "board collage moodboard" },
-  { href: "/notes",    label: "Notes",     icon: NotebookText,    keywords: "wiki docs pages" },
-  { href: "/calendar", label: "Calendar",  icon: CalendarDays,    keywords: "events agenda schedule bookings dates" },
-  { href: "/tasks",    label: "Tasks",     icon: CheckSquare,     keywords: "todo kanban" },
-  { href: "/focus",    label: "Focus",     icon: Timer,           keywords: "pomodoro timer" },
-  { href: "/shopping-list", label: "Wish List", icon: ShoppingCart, keywords: "shopping wishlist clothes tech gear buy want" },
-  { href: "/finance",  label: "Finance",   icon: DollarSign,      keywords: "money wallet crypto" },
-  { href: "/news",     label: "News",      icon: Newspaper,       keywords: "markets headlines" },
-  { href: "/settings", label: "Settings",  icon: Settings,        keywords: "preferences appearance theme navigation" },
-];
-const PAGE_ITEMS: Item[] = DESTS.map((d) => ({ kind: "page", key: `page:${d.href}`, ...d }));
-
 export function CommandBar() {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, toggle: toggleTheme } = useTheme();
   const { mode, setMode } = useNavMode();
+  const { data } = useBridge();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -63,6 +49,11 @@ export function CommandBar() {
     };
   }, [open]);
 
+  const pageItems = useMemo<Item[]>(() => {
+    const pages: NavPage[] = [...visiblePages(data.navPrefs), SETTINGS_PAGE];
+    return pages.map((p) => ({ kind: "page", key: `page:${p.href}`, label: p.label, icon: p.icon, href: p.href, keywords: p.keywords } as Item));
+  }, [data.navPrefs]);
+
   // Quick actions — commands, not destinations.
   const actions = useMemo<Item[]>(() => [
     { kind: "action", key: "act:newevent", label: "New event", icon: CalendarDays, keywords: "create add calendar schedule", run: () => { try { localStorage.setItem("bridge_open_new_event", "1"); window.dispatchEvent(new Event("bridge:new-event")); } catch {} router.push("/calendar"); } },
@@ -78,12 +69,12 @@ export function CommandBar() {
     const q = query.trim().toLowerCase();
     const match = (it: Item) => !q || (it.label + " " + ("keywords" in it ? it.keywords ?? "" : "")).toLowerCase().includes(q);
     const acts = q ? actions.filter(match) : actions;   // always show actions, filtered by query
-    const pages = PAGE_ITEMS.filter(match);
+    const pages = pageItems.filter(match);
     const projects = dyn.projects.filter(match);
     const notes = dyn.wiki.filter(match);
     const boards = dyn.boards.filter(match);
     return { acts, pages, projects, notes, boards, results: [...acts, ...pages, ...projects, ...notes, ...boards] };
-  }, [query, dyn, actions]);
+  }, [query, dyn, actions, pageItems]);
 
   // ⌘K / Ctrl+K toggle
   useEffect(() => {

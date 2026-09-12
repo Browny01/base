@@ -5,60 +5,14 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useTheme } from "@/lib/theme-context";
-import {
-  LayoutDashboard, CheckSquare, Timer, DollarSign,
-  FolderKanban, Newspaper, ChevronsLeft, Settings,
-  Sun, Moon, LayoutGrid, NotebookText, CalendarDays, ShoppingCart,
-  type LucideIcon,
-} from "lucide-react";
-
-type NavItem = { href: string; label: string; icon: LucideIcon };
-type NavSection = { label: string; items: NavItem[] };
-
-const NAV_SECTIONS: NavSection[] = [
-  {
-    label: "Command",
-    items: [
-      { href: "/",     label: "Dashboard", icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: "Personal",
-    items: [
-      { href: "/shopping-list", label: "Wish List", icon: ShoppingCart },
-    ],
-  },
-  {
-    label: "Build",
-    items: [
-      { href: "/projects", label: "Projects", icon: FolderKanban },
-      { href: "/vision",   label: "Vision",   icon: LayoutGrid   },
-      { href: "/notes",    label: "Notes",    icon: NotebookText },
-    ],
-  },
-  {
-    label: "Systems",
-    items: [
-      { href: "/calendar", label: "Calendar", icon: CalendarDays },
-      { href: "/tasks",  label: "Tasks",  icon: CheckSquare },
-      { href: "/focus",  label: "Focus",  icon: Timer       },
-    ],
-  },
-  {
-    label: "Intel",
-    items: [
-      { href: "/finance", label: "Finance", icon: DollarSign },
-      { href: "/news",    label: "News",    icon: Newspaper  },
-    ],
-  },
-];
-
-const SETTINGS_ITEM: NavItem = { href: "/settings", label: "Settings", icon: Settings };
+import { useBridge } from "@/lib/hooks";
+import { visiblePages, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
+import { ChevronsLeft, Sun, Moon } from "lucide-react";
 
 const isActive = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
 
-function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: string; collapsed: boolean }) {
+function NavLink({ item, pathname, collapsed }: { item: NavPage; pathname: string; collapsed: boolean }) {
   const active = isActive(pathname, item.href);
   const Icon = item.icon;
 
@@ -88,7 +42,12 @@ export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { data } = useBridge();
   const isDark = theme === "dark";
+
+  const pages = visiblePages(data.navPrefs);
+  const sections: string[] = [];
+  for (const p of pages) if (!sections.includes(p.section)) sections.push(p.section);
 
   return (
     <aside
@@ -116,16 +75,16 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2.5 py-2 flex flex-col gap-3 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.label} className="flex flex-col gap-0.5">
+        {sections.map((section) => (
+          <div key={section} className="flex flex-col gap-0.5">
             {!collapsed ? (
               <p className="px-2.5 pt-1 pb-1.5 text-[10.5px] font-semibold text-[var(--faint)] tracking-[0.14em] uppercase">
-                {section.label}
+                {section}
               </p>
             ) : (
               <div className="mx-auto my-1 h-px w-7 bg-[var(--border)]" aria-hidden="true" />
             )}
-            {section.items.map((item) => (
+            {pages.filter((p) => p.section === section).map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} collapsed={collapsed} />
             ))}
           </div>
@@ -147,7 +106,7 @@ export function Sidebar() {
         {/* Settings + theme toggle (theme sits to the right of settings) */}
         <div className={cn("flex items-center gap-1", collapsed ? "flex-col" : "flex-row")}>
           <div className={collapsed ? "" : "flex-1 min-w-0"}>
-            <NavLink item={SETTINGS_ITEM} pathname={pathname} collapsed={collapsed} />
+            <NavLink item={SETTINGS_PAGE} pathname={pathname} collapsed={collapsed} />
           </div>
           <button
             onClick={toggleTheme}
