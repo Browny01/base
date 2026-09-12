@@ -8,7 +8,7 @@ import { useTheme } from "@/lib/theme-context";
 import { useNavMode } from "@/lib/nav-mode-context";
 import { useBridge } from "@/lib/hooks";
 import {
-  FolderKanban, Search, CornerDownLeft, LayoutGrid,
+  FolderKanban, Search, CornerDownLeft, LayoutGrid, LayoutDashboard,
   type LucideIcon, Settings, Sun, Moon, PanelBottom, CalendarDays, CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
