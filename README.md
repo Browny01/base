@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="public/base-mark.png" alt="Base" width="480" />
-</p>
+<img src="public/base-mark.png" alt="Base" width="240" />
 
 # Base
 

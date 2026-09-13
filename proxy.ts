@@ -59,6 +59,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
     pathname === "/base-mark.png" ||
+    pathname === "/base-icon-transparent.png" ||
     pathname === "/icon.png" ||
     pathname === "/apple-icon.png" ||
     (pathname.startsWith("/icon-") && pathname.endsWith(".png")) ||
