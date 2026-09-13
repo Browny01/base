@@ -62,10 +62,11 @@ export function Sidebar() {
         "flex items-center h-14 shrink-0 gap-1",
         collapsed ? "justify-center" : "px-3"
       )}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/base-icon-transparent.png"
           alt="Base"
-          className="w-7 h-7 object-contain shrink-0"
+          className="w-9 h-9 object-contain shrink-0"
         />
         {!collapsed && (
           <button

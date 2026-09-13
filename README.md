@@ -1,4 +1,4 @@
-<img src="public/base-icon-rounded.png" alt="Base" width="240" />
+<img src="public/base-icon-rounded.png" alt="Base" width="200" />
 
 # Base
 
