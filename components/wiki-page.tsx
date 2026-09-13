@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { useConfirm } from "@/lib/confirm-context";
@@ -12,6 +12,7 @@ import {
   Plus, FileText, Network, ChevronRight, Trash2, NotebookText, ChevronDown,
   Ellipsis, MoveHorizontal, Copy, CopyPlus, FileDown, Check, Lock, LockOpen,
   RotateCcw, LayoutTemplate, Trash, Folder, FolderPlus, FolderOpen, PanelLeft, Pencil,
+  Search, X,
 } from "lucide-react";
 
 const LOCK_PASSWORD = "151715";
@@ -64,6 +65,29 @@ function fmtStamp(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) + " · " +
     d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+// Depth of a page within its tree (used to indent search results).
+function pageDepth(id: string, pages: WikiPageT[]): number {
+  const byId = new Map(pages.map((p) => [p.id, p]));
+  let cur = byId.get(id);
+  let d = 0;
+  const guard = new Set<string>();
+  while (cur && cur.parentId && byId.has(cur.parentId) && !guard.has(cur.id)) { guard.add(cur.id); d += 1; cur = byId.get(cur.parentId); }
+  return d;
+}
+
+// Live page count per folder, including all nested sub-pages below roots.
+function countInFolder(folderId: string, pages: WikiPageT[]): number {
+  const byId = new Map(pages.map((p) => [p.id, p]));
+  let n = 0;
+  for (const p of pages) {
+    let cur: WikiPageT | undefined = p;
+    const guard = new Set<string>();
+    while (cur && cur.parentId && byId.has(cur.parentId) && !guard.has(cur.id)) { guard.add(cur.id); cur = byId.get(cur.parentId); }
+    if (cur?.folderId === folderId) n += 1;
+  }
+  return n;
 }
 
 // Build a standalone printable HTML document for a page (used for PDF export).
@@ -121,11 +145,18 @@ export function WikiPage() {
   const [rawActive, setRawActive] = useState<string>(() =>
     typeof window !== "undefined" ? localStorage.getItem("bridge_wiki_active") || "" : "");
   const [view, setView] = useState<"editor" | "graph">("editor");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { const v = localStorage.getItem("bridge_wiki_expanded"); return v ? new Set<string>(JSON.parse(v)) : new Set(); } catch { return new Set(); }
+  });
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { const v = localStorage.getItem("bridge_wiki_collapsed"); return v ? new Set<string>(JSON.parse(v)) : new Set(); } catch { return new Set(); }
+  });
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState<boolean>(() => typeof window !== "undefined" && localStorage.getItem("bridge_wiki_trash") === "1");
+  const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);     // mobile drawer
   // Pages unlocked this session (cleared on reload, so the password is needed again).
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
@@ -180,6 +211,34 @@ export function WikiPage() {
     setNewMenuOpen(false);
     createPage(null, tpl.build());
   }
+
+  // Keep a stable ref to the latest createPage so the global shortcut never goes stale.
+  const createPageRef = useRef(createPage);
+  useEffect(() => { createPageRef.current = createPage; });
+
+  // ⌘/Ctrl+N: new page. Escape: close any open page menu/drawer.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "n") {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+        e.preventDefault();
+        createPageRef.current(null);
+      } else if (e.key === "Escape") {
+        setNewMenuOpen(false);
+        setOptionsOpen(false);
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Persist sidebar UI state across reloads.
+  useEffect(() => { try { localStorage.setItem("bridge_wiki_expanded", JSON.stringify([...expanded])); } catch {} }, [expanded]);
+  useEffect(() => { try { localStorage.setItem("bridge_wiki_collapsed", JSON.stringify([...collapsedFolders])); } catch {} }, [collapsedFolders]);
+  useEffect(() => { try { localStorage.setItem("bridge_wiki_trash", trashOpen ? "1" : "0"); } catch {} }, [trashOpen]);
 
   // ── Folders ────────────────────────────────────────────────────────────────
   function createFolder() {
@@ -300,6 +359,23 @@ export function WikiPage() {
   const roots = pages.filter((p) => !p.parentId || !pages.some((q) => q.id === p.parentId));
   const ungrouped = roots.filter((p) => !p.folderId || !folders.some((f) => f.id === p.folderId));
 
+  // Search: show matching pages (and their ancestors) as a flat list.
+  const searching = search.trim().length > 0 && pages.length > 0;
+  let searchIds = new Set<string>();
+  if (searching) {
+    const q = search.trim().toLowerCase();
+    const matches = new Set(pages.filter((p) => (p.title || "").toLowerCase().includes(q)).map((p) => p.id));
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const p of pages) {
+        if (matches.has(p.id) && p.parentId && !matches.has(p.parentId)) { matches.add(p.parentId); changed = true; }
+      }
+    }
+    searchIds = matches;
+  }
+  const searchResults = searching ? pages.filter((p) => searchIds.has(p.id)) : [];
+
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] bg-[var(--bg)] relative">
       {/* mobile drawer backdrop */}
@@ -352,8 +428,41 @@ export function WikiPage() {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="shrink-0 px-2 pt-2 pb-1">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--faint)]" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search pages…"
+              className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-md pl-7 pr-7 py-1.5 text-[12.5px] text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                title="Clear search"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto py-2 px-1.5">
-          {roots.length === 0 && folders.length === 0 ? (
+          {searching ? (
+            searchResults.length === 0 ? (
+              <div className="px-3 py-8 text-center space-y-2">
+                <p className="text-[12.5px] text-[var(--faint)]">No pages match “{search.trim()}”</p>
+                <button onClick={() => setSearch("")} className="text-[12px] text-[var(--muted)] hover:text-[var(--text)] underline underline-offset-2 transition-colors">Clear search</button>
+              </div>
+            ) : (
+              searchResults.map((p) => (
+                <SearchRow key={p.id} page={p} depth={pageDepth(p.id, pages)} activeId={activeId} onSelect={selectPage} />
+              ))
+            )
+          ) : roots.length === 0 && folders.length === 0 ? (
             <button
               onClick={() => createPage(null)}
               className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-[13px] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
@@ -369,6 +478,7 @@ export function WikiPage() {
                   folder={f}
                   pages={pages}
                   folderRoots={roots.filter((p) => (p.folderId ?? null) === f.id)}
+                  count={countInFolder(f.id, pages)}
                   open={!collapsedFolders.has(f.id)}
                   activeId={activeId}
                   expanded={expanded}
@@ -650,13 +760,32 @@ function ViewBtn({ active, onClick, icon, label }: { active: boolean; onClick: (
   );
 }
 
+function SearchRow({ page, depth, activeId, onSelect }: { page: WikiPageT; depth: number; activeId: string; onSelect: (id: string) => void }) {
+  return (
+    <div
+      className={cn(
+        "group flex items-center rounded-md pr-1 transition-colors",
+        page.id === activeId ? "bg-[var(--chip)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--surface-2)]",
+      )}
+      style={{ paddingLeft: depth * 14 }}
+    >
+      <button onClick={() => onSelect(page.id)} className="flex-1 flex items-center gap-1.5 py-1.5 min-w-0 text-left text-[13px]">
+        <span className="shrink-0 text-[13px]">{page.icon || "📄"}</span>
+        <span className="truncate">{page.title || "Untitled"}</span>
+        {page.locked && <Lock className="w-3 h-3 shrink-0 text-[var(--faint)]" />}
+      </button>
+    </div>
+  );
+}
+
 function FolderSection({
-  folder, pages, folderRoots, open, activeId, expanded,
+  folder, pages, folderRoots, count, open, activeId, expanded,
   onToggleFolder, onRename, onDeleteFolder, onAddPage, onSelect, onToggle, onAddChild, onDelete,
 }: {
   folder: WikiFolder;
   pages: WikiPageT[];
   folderRoots: WikiPageT[];
+  count: number;
   open: boolean;
   activeId: string;
   expanded: Set<string>;
@@ -678,7 +807,7 @@ function FolderSection({
         <button onClick={onToggleFolder} className="flex-1 flex items-center gap-1.5 py-1.5 min-w-0 text-left text-[13px] font-medium">
           {open ? <FolderOpen className="w-4 h-4 shrink-0 text-[var(--faint)]" /> : <Folder className="w-4 h-4 shrink-0 text-[var(--faint)]" />}
           <span className="truncate">{folder.name}</span>
-          <span className="text-[11px] text-[var(--faint)] tabular-nums">{folderRoots.length}</span>
+          <span className="text-[11px] text-[var(--faint)] tabular-nums">{count}</span>
         </button>
         <button onClick={onAddPage} title="New page in folder" className="p-1 rounded text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"><Plus className="w-3.5 h-3.5" /></button>
         <button onClick={onRename} title="Rename folder" className="p-1 rounded text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"><Pencil className="w-3.5 h-3.5" /></button>

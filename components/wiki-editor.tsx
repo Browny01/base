@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { uid, cn } from "@/lib/utils";
 import type { WikiPage, WikiBlock, WikiBlockType } from "@/lib/store";
@@ -298,7 +298,23 @@ export function WikiEditor({
   };
 
   // ── Slash menu ─────────────────────────────────────────────────────────────
-  const slashResults = slash ? BLOCK_TYPES.filter((t) => t.label.toLowerCase().includes(slash.query.toLowerCase())) : [];
+  const slashResults: typeof BLOCK_TYPES = slash ? (() => {
+    const q = slash.query.trim().toLowerCase();
+    if (!q) return BLOCK_TYPES;
+    return BLOCK_TYPES
+      .map((t) => {
+        const label = t.label.toLowerCase();
+        const hint = t.hint.toLowerCase();
+        let score = -1;
+        if (label.startsWith(q)) score = 0;
+        else if (label.includes(q)) score = 1;
+        else if (hint.includes(q)) score = 2;
+        return { t, score };
+      })
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => a.score - b.score || a.t.label.localeCompare(b.t.label))
+      .map((x) => x.t);
+  })() : [];
   const pickSlash = (blockId: string, type: WikiBlockType) => {
     setSlash(null);
     const el = refs.current.get(blockId);
@@ -509,6 +525,17 @@ export function WikiEditor({
   let run = 0;
   for (const b of blocks) { if (b.type === "numbered") { run += 1; numbers.set(b.id, run); } else run = 0; }
 
+  // Live word / character / reading-time stats for the footer.
+  const stats = useMemo(() => {
+    let words = 0, chars = 0;
+    for (const b of blocks) {
+      const t = stripTags(b.text);
+      for (const w of t.trim().split(/\s+/)) if (w) words += 1;
+      chars += t.replace(/\s/g, "").length;
+    }
+    return { words, chars, mins: Math.max(1, Math.round(words / 200)) };
+  }, [blocks]);
+
   return (
     <div ref={rootRef} className={cn("relative mx-auto px-6 sm:px-12 py-10", fullWidth ? "max-w-none" : "max-w-[760px]", selectedAll && "nx-allsel")}>
       {/* Icon + title */}
@@ -557,8 +584,8 @@ export function WikiEditor({
             onUploadImage={(f) => onUploadImage(block.id, f)}
             onCaption={(c) => setCaption(block.id, c)}
             onPatch={(patch) => patchBlock(block.id, patch)}
-            slashMenu={slash?.blockId === block.id && slashResults.length ? (
-              <SlashMenu results={slashResults} index={slash.index} onPick={(t) => pickSlash(block.id, t)} />
+            slashMenu={slash?.blockId === block.id ? (
+              <SlashMenu results={slashResults} index={Math.min(slash.index, Math.max(0, slashResults.length - 1))} isEmpty={slashResults.length === 0} onPick={(t) => pickSlash(block.id, t)} />
             ) : null}
           />
         ))}
@@ -570,6 +597,15 @@ export function WikiEditor({
       >
         Click here to continue writing…
       </button>
+
+      {/* Stats footer */}
+      {stats.words > 0 && (
+        <div className="mt-4 flex items-center gap-3 text-[11px] text-[var(--faint)] select-none">
+          <span className="tabular-nums">{stats.words.toLocaleString()} words</span>
+          <span className="tabular-nums">{stats.chars.toLocaleString()} characters</span>
+          <span className="tabular-nums">{stats.mins} min read</span>
+        </div>
+      )}
 
       {/* Floating / pinned images (Vision-style, free-positioned over the page) */}
       <div className="absolute inset-0 z-10 pointer-events-none">
@@ -1052,10 +1088,13 @@ function ToggleBody({ value, onChange }: { value: string; onChange: (html: strin
 }
 
 // ── Slash command menu ──────────────────────────────────────────────────────────
-function SlashMenu({ results, index, onPick }: { results: typeof BLOCK_TYPES; index: number; onPick: (t: WikiBlockType) => void }) {
+function SlashMenu({ results, index, isEmpty, onPick }: { results: typeof BLOCK_TYPES; index: number; isEmpty: boolean; onPick: (t: WikiBlockType) => void }) {
   return (
     <div className="absolute left-0 top-full mt-1 z-50 w-64 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl p-1.5 nx-pop">
       <p className="px-2 py-1 text-[10px] font-semibold text-[var(--faint)] uppercase tracking-widest">Blocks</p>
+      {isEmpty ? (
+        <p className="px-2 py-3 text-[12.5px] text-[var(--faint)]">No blocks match your search.</p>
+      ) : (
       <div className="max-h-[260px] overflow-y-auto">
         {results.map((t, i) => (
           <button key={t.type} onMouseDown={(e) => { e.preventDefault(); onPick(t.type); }} className={cn("w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors", i === index ? "bg-[var(--chip)]" : "hover:bg-[var(--surface-2)]")}>
@@ -1067,6 +1106,7 @@ function SlashMenu({ results, index, onPick }: { results: typeof BLOCK_TYPES; in
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 }
