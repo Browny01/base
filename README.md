@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/base-mark.png" alt="Base" width="480" />
+</p>
+
 # Base
 
 Base is a personal command center for planning, focus, money, notes, projects,

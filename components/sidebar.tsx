@@ -57,11 +57,16 @@ export function Sidebar() {
         collapsed ? "w-[64px]" : "w-[252px]"
       )}
     >
-      {/* On macOS this clear header is occupied by the native traffic lights. */}
+      {/* On macOS the left of this header is occupied by the native traffic lights. */}
       <div className={cn(
-        "flex items-center h-14 shrink-0",
+        "flex items-center h-14 shrink-0 gap-1",
         collapsed ? "justify-center" : "px-3"
       )}>
+        <img
+          src="/base-icon-transparent.png"
+          alt="Base"
+          className="w-7 h-7 object-contain shrink-0"
+        />
         {!collapsed && (
           <button
             onClick={toggle}
