@@ -15,6 +15,8 @@ function harden(res: NextResponse): NextResponse {
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), browsing-topics=()");
   res.headers.set("X-DNS-Prefetch-Control", "off");
   res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  res.headers.set("Cross-Origin-Resource-Policy", "same-origin");         // don't let other sites embed our pages
+  res.headers.set("Cross-Origin-Opener-Policy", "same-origin");           // keep our window isolated from opener pages
   return res;
 }
 
@@ -81,7 +83,10 @@ export async function proxy(request: NextRequest) {
     return harden(NextResponse.redirect(new URL("/login", request.url)));
   }
 
-  return harden(NextResponse.next());
+  const res = harden(NextResponse.next());
+  // Authenticated pages and private APIs must never be cached outside the session.
+  res.headers.set("Cache-Control", "no-store");
+  return res;
 }
 
 export const config = {

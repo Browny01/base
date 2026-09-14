@@ -54,10 +54,10 @@ async function getNativePrices(): Promise<Record<string, number | null>> {
 
 // Fetch JSON with one retry — guards a daily snapshot against a single flaky
 // upstream call (RPCs / price APIs occasionally rate-limit).
-async function fetchJsonRetry(url: string, attempts = 2): Promise<{ ok: boolean; body: Record<string, unknown> }> {
+async function fetchJsonRetry(url: string, attempts = 2, headers: HeadersInit = {}): Promise<{ ok: boolean; body: Record<string, unknown> }> {
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url, { cache: "no-store", headers });
       const body = await res.json();
       if (res.ok && !body.error) return { ok: true, body };
       if (i === attempts - 1) return { ok: false, body };
@@ -69,11 +69,13 @@ async function fetchJsonRetry(url: string, attempts = 2): Promise<{ ok: boolean;
   return { ok: false, body: {} };
 }
 
-async function walletTotalAud(w: Wallet, origin: string, rate: number, prices: Record<string, number | null>): Promise<number> {
+async function walletTotalAud(w: Wallet, origin: string, rate: number, prices: Record<string, number | null>, cronHeaders: HeadersInit): Promise<number> {
   let total = 0;
   // native coin value
   const { body: balData } = await fetchJsonRetry(
-    `${origin}/api/wallet/balance?network=${encodeURIComponent(w.network)}&address=${encodeURIComponent(w.address)}`
+    `${origin}/api/wallet/balance?network=${encodeURIComponent(w.network)}&address=${encodeURIComponent(w.address)}`,
+    2,
+    cronHeaders
   );
   const balance = typeof balData.balance === "number" ? balData.balance : 0;
   const priceUsd = prices[COINGECKO_ID[w.network]];
@@ -82,7 +84,9 @@ async function walletTotalAud(w: Wallet, origin: string, rate: number, prices: R
   // SPL / ERC-20 token value (already in AUD)
   if (w.network === "solana" || w.network === "ethereum") {
     const { body: tokData } = await fetchJsonRetry(
-      `${origin}/api/wallet/tokens?network=${encodeURIComponent(w.network)}&address=${encodeURIComponent(w.address)}`
+      `${origin}/api/wallet/tokens?network=${encodeURIComponent(w.network)}&address=${encodeURIComponent(w.address)}`,
+      2,
+      cronHeaders
     );
     for (const t of (tokData.tokens ?? []) as { valueAud: number | null }[]) {
       if (typeof t.valueAud === "number") total += t.valueAud;
@@ -92,14 +96,16 @@ async function walletTotalAud(w: Wallet, origin: string, rate: number, prices: R
 }
 
 async function run(req: NextRequest) {
-  // Auth: when CRON_SECRET is configured, require Vercel's bearer header.
+  // Auth: require CRON_SECRET (fails closed when unset) so anonymous visitors
+  // can't force this endpoint to enumerate wallets or burn RPC credits.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    const key = new URL(req.url).searchParams.get("key");
-    if (auth !== `Bearer ${secret}` && key !== secret) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-    }
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  const auth = req.headers.get("authorization");
+  const key = new URL(req.url).searchParams.get("key");
+  if (auth !== `Bearer ${secret}` && key !== secret) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const redis = getRedis();
@@ -116,7 +122,8 @@ async function run(req: NextRequest) {
   const origin = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : new URL(req.url).origin;
   const [rate, prices] = await Promise.all([getUsdToAud(origin), getNativePrices()]);
 
-  const totals = await Promise.all(wallets.map(w => walletTotalAud(w, origin, rate, prices)));
+  const cronHeaders: HeadersInit = { Authorization: `Bearer ${secret}` };
+  const totals = await Promise.all(wallets.map(w => walletTotalAud(w, origin, rate, prices, cronHeaders)));
   const grandTotal = totals.reduce((a, b) => a + b, 0);
 
   if (!(grandTotal > 0)) return NextResponse.json({ ok: false, error: "computed total is 0 — leaving data untouched" });
