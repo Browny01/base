@@ -282,12 +282,6 @@ export function WikiEditor({
     if (idx < 0 || j < 0 || j >= blocks.length) return;
     const next = [...blocks]; [next[idx], next[j]] = [next[j], next[idx]]; commitBlocks(next);
   };
-  const addBlockBelow = (id: string) => {
-    const idx = blocks.findIndex((b) => b.id === id);
-    const nb = newBlock();
-    const next = [...blocks]; next.splice(idx + 1, 0, nb); commitBlocks(next);
-    setFocusReq({ id: nb.id, caret: "start" });
-  };
   // The "+" gutter button inserts a new block and opens the block picker for it.
   const insertAndPick = (afterId: string) => {
     const idx = blocks.findIndex((b) => b.id === afterId);
@@ -536,6 +530,17 @@ export function WikiEditor({
     return { words, chars, mins: Math.max(1, Math.round(words / 200)) };
   }, [blocks]);
 
+  // A page is "empty" when it has no title, description, or real block content.
+  const documentEmpty = useMemo(() => {
+    if (title.trim() || (description ?? "").trim()) return false;
+    return blocks.every((b) =>
+      stripTags(b.text).trim() === "" &&
+      stripTags(b.body ?? "").trim() === "" &&
+      !VOID_TYPES.has(b.type) &&
+      !b.src
+    );
+  }, [title, description, blocks]);
+
   return (
     <div ref={rootRef} className={cn("relative mx-auto px-6 sm:px-12 py-10", fullWidth ? "max-w-none" : "max-w-[760px]", selectedAll && "nx-allsel")}>
       {/* Icon + title */}
@@ -591,12 +596,12 @@ export function WikiEditor({
         ))}
       </div>
 
-      <button
-        onClick={() => { const last = blocks[blocks.length - 1]; if (last) addBlockBelow(last.id); }}
-        className="mt-2 w-full text-left px-1 py-2 text-[15px] text-[var(--faint)]/60 hover:text-[var(--muted)] transition-colors"
-      >
-        Click here to continue writing…
-      </button>
+      {/* Empty-state hint — shows only when the page has no content yet */}
+      {documentEmpty && (
+        <p className="mt-2 w-full text-left px-1 py-2 text-[15px] text-[var(--faint)]/45 select-none">
+          Click here to continue writing…
+        </p>
+      )}
 
       {/* Stats footer */}
       {stats.words > 0 && (
