@@ -410,7 +410,7 @@ export function WikiPage() {
             {newMenuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setNewMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-60 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl p-1.5 nx-pop">
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-56 max-w-[calc(100vw-2.5rem)] bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl p-1.5 nx-pop">
                   <p className="px-2 py-1 text-[10px] font-semibold text-[var(--faint)] uppercase tracking-widest flex items-center gap-1.5"><LayoutTemplate className="w-3 h-3" /> Templates</p>
                   {TEMPLATES.map((t) => (
                     <button key={t.id} onClick={() => createFromTemplate(t)} className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-[var(--surface-2)] transition-colors">
