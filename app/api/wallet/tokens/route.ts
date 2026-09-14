@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
+import { apiAccessAllowed } from "@/lib/access";
 
 export interface TokenBalance {
   mint: string;
@@ -337,6 +338,10 @@ async function fetchEthereumTokens(address: string, usdToAud: number): Promise<T
 
 // ─── Route handler ───────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
+  if (!(await apiAccessAllowed(req))) {
+    return NextResponse.json({ error: "Unauthorized", tokens: [] }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const network = searchParams.get("network");
   const address = searchParams.get("address");

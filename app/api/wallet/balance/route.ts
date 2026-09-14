@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiAccessAllowed } from "@/lib/access";
 
 const SOL_ENDPOINTS = [
   "https://api.mainnet-beta.solana.com",
@@ -35,6 +36,10 @@ async function tryEndpoints(
 }
 
 export async function GET(req: NextRequest) {
+  if (!(await apiAccessAllowed(req))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const network = searchParams.get("network");
   const address = searchParams.get("address");
