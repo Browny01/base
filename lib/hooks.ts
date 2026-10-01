@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { getData, updateData, DEFAULT, type BridgeData } from "./store";
+import { useCallback, useSyncExternalStore } from "react";
+import { getData, updateData, migrateAll, DEFAULT, type BridgeData } from "./store";
 
 const SYNC_DELAY_MS = 2500;
 
@@ -29,54 +29,103 @@ async function serverSet(data: BridgeData): Promise<void> {
   }
 }
 
-export function useBridge() {
-  const [data, setData] = useState<BridgeData>(DEFAULT);
-  const [loaded, setLoaded] = useState(false);   // true once Redis hydration has settled
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+// ── One store shared by every useBridge() consumer ─────────────────────────────
+//
+// useBridge() used to own per-component state: each of the six consumers
+// mounted app-wide (Sidebar, CommandBar, Dock, BottomNav, KeyboardShortcuts and
+// the page itself) ran its own hydration — its own getData() and its own
+// fetch of the entire dataset — and then registered its own bridge_update
+// listener. Every mutation therefore woke all six, each re-reading the whole
+// record, and each kept its own debounce timer that could POST the full
+// dataset again. Sharing one snapshot removes that N-fold work.
+let snapshot: BridgeData = DEFAULT;
+let hydrated = false;
+let hydration: Promise<void> | null = null;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    async function init() {
-      const local = getData();
-      setData(local);
+function emit() {
+  for (const l of listeners) l();
+}
 
-      const remote = await serverGet();
+function setSnapshot(next: BridgeData) {
+  if (next === snapshot) return;
+  snapshot = next;
+  emit();
+}
 
-      if (remote) {
-        const localTime = local.updatedAt ?? 0;
-        const serverTime = remote.updatedAt ?? 0;
+// Keep local listeners in step with writes made by any part of the app.
+if (typeof window !== "undefined") {
+  window.addEventListener("bridge_update", () => setSnapshot(getData()));
+}
 
-        if (serverTime >= localTime) {
-          // Server data is newer (or same age) — use it
-          const merged = { ...DEFAULT, ...remote };
-          updateData(() => merged);
-          setData(merged);
-        } else {
-          // Local data is newer — push it to server so other devices get it
-          serverSet(local);
-        }
+function hydrate() {
+  if (hydration) return hydration;
+  hydration = (async () => {
+    const local = getData();
+    setSnapshot(local);
+
+    const remote = await serverGet();
+
+    if (remote) {
+      const localTime = local.updatedAt ?? 0;
+      const serverTime = remote.updatedAt ?? 0;
+
+      if (serverTime >= localTime) {
+        // Server data is newer (or same age) — use it. migrateAll() is required:
+        // a server record may still be legacy-shaped, and updateData() writes
+        // straight through the store cache, so it will not be normalised later.
+        const merged = migrateAll({ ...DEFAULT, ...remote });
+        updateData(() => merged);
+        setSnapshot(merged);
       } else {
-        // No server data yet — push local data up
+        // Local data is newer — push it to server so other devices get it
         serverSet(local);
       }
-      setLoaded(true);   // hydration settled — safe for consumers to mutate
+    } else {
+      // No server data yet — push local data up
+      serverSet(local);
     }
 
-    init();
+    hydrated = true;
+    emit();
+  })();
+  return hydration;
+}
 
-    const sync = () => setData(getData());
-    window.addEventListener("bridge_update", sync);
-    return () => window.removeEventListener("bridge_update", sync);
-  }, []);
+function subscribe(fn: () => void) {
+  listeners.add(fn);
+  void hydrate();
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+const getServerData = () => DEFAULT;
+const getServerLoaded = () => false;
+
+export function useBridge() {
+  const data = useSyncExternalStore(subscribe, getSnapshotOfData, getServerData);
+  const loaded = useSyncExternalStore(subscribe, getLoaded, getServerLoaded);
 
   const mutate = useCallback((updater: (d: BridgeData) => BridgeData) => {
     const next = updateData((d) => ({ ...updater(d), updatedAt: Date.now() }));
-    setData(next);
+    setSnapshot(next);
 
     // Push the LATEST local state when the timer fires (not this stale snapshot),
     // so a mutation made before hydration can't clobber freshly-loaded server data.
-    if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => serverSet(getData()), SYNC_DELAY_MS);
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => serverSet(getData()), SYNC_DELAY_MS);
   }, []);
 
   return { data, mutate, loaded };
+}
+
+// Module-level getters keep their identity stable, which useSyncExternalStore
+// requires of its subscribe/getSnapshot pair.
+function getSnapshotOfData() {
+  return snapshot;
+}
+function getLoaded() {
+  return hydrated;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { useConfirm } from "@/lib/confirm-context";
@@ -67,27 +67,60 @@ function fmtStamp(iso: string): string {
     d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-// Depth of a page within its tree (used to indent search results).
-function pageDepth(id: string, pages: WikiPageT[]): number {
-  const byId = new Map(pages.map((p) => [p.id, p]));
-  let cur = byId.get(id);
-  let d = 0;
-  const guard = new Set<string>();
-  while (cur && cur.parentId && byId.has(cur.parentId) && !guard.has(cur.id)) { guard.add(cur.id); d += 1; cur = byId.get(cur.parentId); }
-  return d;
-}
+// One index for the whole page tree, built in a single pass.
+//
+// These three helpers each rebuilt a Map of every page and re-walked the tree,
+// and they were called per folder / per search row / per node — so one sidebar
+// render was O(folders × pages × depth) and every editor save redid all of it.
+type WikiIndex = {
+  byId: Map<string, WikiPageT>;
+  byParent: Map<string, WikiPageT[]>;
+  roots: WikiPageT[];
+  depth: Map<string, number>;        // nesting depth, for indenting search results
+  folderCounts: Map<string, number>; // live pages per folder, sub-pages included
+};
 
-// Live page count per folder, including all nested sub-pages below roots.
-function countInFolder(folderId: string, pages: WikiPageT[]): number {
-  const byId = new Map(pages.map((p) => [p.id, p]));
-  let n = 0;
+function buildWikiIndex(pages: WikiPageT[]): WikiIndex {
+  const byId = new Map<string, WikiPageT>();
+  for (const p of pages) byId.set(p.id, p);
+
+  const byParent = new Map<string, WikiPageT[]>();
+  const roots: WikiPageT[] = [];
   for (const p of pages) {
-    let cur: WikiPageT | undefined = p;
-    const guard = new Set<string>();
-    while (cur && cur.parentId && byId.has(cur.parentId) && !guard.has(cur.id)) { guard.add(cur.id); cur = byId.get(cur.parentId); }
-    if (cur?.folderId === folderId) n += 1;
+    if (p.parentId && byId.has(p.parentId)) {
+      const kids = byParent.get(p.parentId);
+      if (kids) kids.push(p);
+      else byParent.set(p.parentId, [p]);
+    } else {
+      roots.push(p);
+    }
   }
-  return n;
+
+  const depth = new Map<string, number>();
+  const depthOf = (id: string, seen: Set<string>): number => {
+    const cached = depth.get(id);
+    if (cached !== undefined) return cached;
+    const p = byId.get(id);
+    // Guard against a cycle in the stored parent links.
+    const d = !p || !p.parentId || !byId.has(p.parentId) || seen.has(id) ? 0 : 1 + depthOf(p.parentId, new Set(seen).add(id));
+    depth.set(id, d);
+    return d;
+  };
+
+  const folderCounts = new Map<string, number>();
+  const topFolderOf = (id: string, seen: Set<string>): string | null => {
+    const p = byId.get(id);
+    if (!p || !p.parentId || !byId.has(p.parentId) || seen.has(id)) return p?.folderId ?? null;
+    return topFolderOf(p.parentId, new Set(seen).add(id));
+  };
+
+  for (const p of pages) {
+    depthOf(p.id, new Set());
+    const f = topFolderOf(p.id, new Set());
+    if (f) folderCounts.set(f, (folderCounts.get(f) ?? 0) + 1);
+  }
+
+  return { byId, byParent, roots, depth, folderCounts };
 }
 
 // Build a standalone printable HTML document for a page (used for PDF export).
@@ -137,10 +170,11 @@ export function WikiPage() {
   const { data, mutate } = useBridge();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const allWiki = data.wikiPages ?? [];
-  const pages = allWiki.filter((p) => !p.deletedAt);          // live pages
-  const deletedPages = allWiki.filter((p) => p.deletedAt);    // in Trash
-  const folders = data.wikiFolders ?? [];
+  const allWiki = useMemo(() => data.wikiPages ?? [], [data.wikiPages]);
+  const pages = useMemo(() => allWiki.filter((p) => !p.deletedAt), [allWiki]);          // live pages
+  const deletedPages = useMemo(() => allWiki.filter((p) => p.deletedAt), [allWiki]);    // in Trash
+  const folders = useMemo(() => data.wikiFolders ?? [], [data.wikiFolders]);
+  const idx = useMemo(() => buildWikiIndex(pages), [pages]);
 
   const [rawActive, setRawActive] = useState<string>(() =>
     typeof window !== "undefined" ? localStorage.getItem("bridge_wiki_active") || "" : "");
@@ -273,10 +307,14 @@ export function WikiPage() {
     mutate((d) => ({ ...d, wikiPages: (d.wikiPages ?? []).map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
   }
 
-  // Collect a page id + all of its descendants (within the live tree).
+  // Collect a page id + all of its descendants (within the given tree).
   function subtreeIds(id: string, src: WikiPageT[]): Set<string> {
     const ids = new Set<string>();
-    const walk = (pid: string) => { ids.add(pid); src.filter((p) => p.parentId === pid).forEach((c) => walk(c.id)); };
+    const { byParent } = src === pages ? idx : buildWikiIndex(src);
+    const walk = (pid: string) => {
+      ids.add(pid);
+      for (const c of byParent.get(pid) ?? []) walk(c.id);
+    };
     walk(id);
     return ids;
   }
@@ -316,11 +354,11 @@ export function WikiPage() {
   // ── Page options (3-dot menu) ──────────────────────────────────────────────
   function duplicatePage(id: string) {
     const subtree: WikiPageT[] = [];
-    const collect = (pid: string) => { const p = pages.find((x) => x.id === pid); if (!p) return; subtree.push(p); pages.filter((x) => x.parentId === pid).forEach((c) => collect(c.id)); };
+    const collect = (pid: string) => { const p = idx.byId.get(pid); if (!p) return; subtree.push(p); (idx.byParent.get(pid) ?? []).forEach((c) => collect(c.id)); };
     collect(id);
     const idMap = new Map(subtree.map((p) => [p.id, uid()]));
     const now = new Date().toISOString();
-    const root = pages.find((x) => x.id === id);
+    const root = idx.byId.get(id);
     const copies: WikiPageT[] = subtree.map((p) => ({
       ...p,
       id: idMap.get(p.id)!,
@@ -353,10 +391,10 @@ export function WikiPage() {
   {
     let cur = activePage;
     const guard = new Set<string>();
-    while (cur && !guard.has(cur.id)) { trail.unshift(cur); guard.add(cur.id); cur = pages.find((p) => p.id === cur!.parentId) ?? null; }
+    while (cur && !guard.has(cur.id)) { trail.unshift(cur); guard.add(cur.id); cur = idx.byId.get(cur.parentId ?? "") ?? null; }
   }
 
-  const roots = pages.filter((p) => !p.parentId || !pages.some((q) => q.id === p.parentId));
+  const roots = idx.roots;
   const ungrouped = roots.filter((p) => !p.folderId || !folders.some((f) => f.id === p.folderId));
 
   // Search: show matching pages (and their ancestors) as a flat list.
@@ -459,7 +497,7 @@ export function WikiPage() {
               </div>
             ) : (
               searchResults.map((p) => (
-                <SearchRow key={p.id} page={p} depth={pageDepth(p.id, pages)} activeId={activeId} onSelect={selectPage} />
+                <SearchRow key={p.id} page={p} depth={idx.depth.get(p.id) ?? 0} activeId={activeId} onSelect={selectPage} />
               ))
             )
           ) : roots.length === 0 && folders.length === 0 ? (
@@ -476,9 +514,9 @@ export function WikiPage() {
                 <FolderSection
                   key={f.id}
                   folder={f}
-                  pages={pages}
+                  byParent={idx.byParent}
                   folderRoots={roots.filter((p) => (p.folderId ?? null) === f.id)}
-                  count={countInFolder(f.id, pages)}
+                  count={idx.folderCounts.get(f.id) ?? 0}
                   open={!collapsedFolders.has(f.id)}
                   activeId={activeId}
                   expanded={expanded}
@@ -501,7 +539,7 @@ export function WikiPage() {
                 <TreeNode
                   key={p.id}
                   page={p}
-                  pages={pages}
+                  byParent={idx.byParent}
                   depth={0}
                   activeId={activeId}
                   expanded={expanded}
@@ -779,11 +817,11 @@ function SearchRow({ page, depth, activeId, onSelect }: { page: WikiPageT; depth
 }
 
 function FolderSection({
-  folder, pages, folderRoots, count, open, activeId, expanded,
+  folder, byParent, folderRoots, count, open, activeId, expanded,
   onToggleFolder, onRename, onDeleteFolder, onAddPage, onSelect, onToggle, onAddChild, onDelete,
 }: {
   folder: WikiFolder;
-  pages: WikiPageT[];
+  byParent: Map<string, WikiPageT[]>;
   folderRoots: WikiPageT[];
   count: number;
   open: boolean;
@@ -820,7 +858,7 @@ function FolderSection({
               <Plus className="w-3.5 h-3.5" /> Add a page
             </button>
           ) : folderRoots.map((p) => (
-            <TreeNode key={p.id} page={p} pages={pages} depth={0} activeId={activeId} expanded={expanded}
+            <TreeNode key={p.id} page={p} byParent={byParent} depth={0} activeId={activeId} expanded={expanded}
               onSelect={onSelect} onToggle={onToggle} onAddChild={onAddChild} onDelete={onDelete} />
           ))}
         </div>
@@ -830,10 +868,10 @@ function FolderSection({
 }
 
 function TreeNode({
-  page, pages, depth, activeId, expanded, onSelect, onToggle, onAddChild, onDelete,
+  page, byParent, depth, activeId, expanded, onSelect, onToggle, onAddChild, onDelete,
 }: {
   page: WikiPageT;
-  pages: WikiPageT[];
+  byParent: Map<string, WikiPageT[]>;
   depth: number;
   activeId: string;
   expanded: Set<string>;
@@ -842,7 +880,7 @@ function TreeNode({
   onAddChild: (parentId: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const children = pages.filter((p) => p.parentId === page.id);
+  const children = byParent.get(page.id);
   const isOpen = expanded.has(page.id);
   const isActive = page.id === activeId;
 
@@ -856,8 +894,8 @@ function TreeNode({
         style={{ paddingLeft: depth * 14 }}
       >
         <button
-          onClick={() => children.length && onToggle(page.id)}
-          className={cn("p-0.5 rounded shrink-0", children.length ? "text-[var(--faint)] hover:text-[var(--text)]" : "opacity-0 pointer-events-none")}
+          onClick={() => children?.length && onToggle(page.id)}
+          className={cn("p-0.5 rounded shrink-0", children?.length ? "text-[var(--faint)] hover:text-[var(--text)]" : "opacity-0 pointer-events-none")}
         >
           {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
@@ -882,11 +920,11 @@ function TreeNode({
         </button>
       </div>
 
-      {isOpen && children.map((c) => (
+      {isOpen && children?.map((c) => (
         <TreeNode
           key={c.id}
           page={c}
-          pages={pages}
+          byParent={byParent}
           depth={depth + 1}
           activeId={activeId}
           expanded={expanded}
