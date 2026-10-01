@@ -451,7 +451,10 @@ export function WikiEditor({
         const rect = sel.getRangeAt(0).getBoundingClientRect();
         if (!rect.width && !rect.height) { setToolbar(null); return; }
         const top = rect.top > 56 ? rect.top - 46 : rect.bottom + 10;
-        setToolbar({ top, left: rect.left + rect.width / 2 });
+        // Keep the previous object when the position is unchanged: selectionchange
+        // fires on every keystroke, and a fresh object here re-rendered the whole
+        // editor plus the portal on each one.
+        setToolbar((prev) => (prev && prev.top === top && prev.left === rect.left + rect.width / 2 ? prev : { top, left: rect.left + rect.width / 2 }));
       });
     };
     document.addEventListener("selectionchange", onSel);
@@ -515,9 +518,12 @@ export function WikiEditor({
   const registerRef = (id: string, el: HTMLDivElement | null) => { if (el) refs.current.set(id, el); else refs.current.delete(id); };
 
   // Numbered-list display numbers (per contiguous run)
-  const numbers = new Map<string, number>();
-  let run = 0;
-  for (const b of blocks) { if (b.type === "numbered") { run += 1; numbers.set(b.id, run); } else run = 0; }
+  const numbers = useMemo(() => {
+    const m = new Map<string, number>();
+    let run = 0;
+    for (const b of blocks) { if (b.type === "numbered") { run += 1; m.set(b.id, run); } else run = 0; }
+    return m;
+  }, [blocks]);
 
   // Live word / character / reading-time stats for the footer.
   const stats = useMemo(() => {

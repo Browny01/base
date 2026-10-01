@@ -742,58 +742,86 @@ export const DEFAULT: BridgeData = {
   navPrefs: DEFAULT_NAV_PREFS,
 };
 
+// Each migration below is allocation-free when the stored data is already
+// current: it returns the SAME object it was given instead of rebuilding the
+// whole record. updateData() runs them on every mutation, and a plain
+// `return { ...data, habits: data.habits.map(...) }` re-allocated every habit,
+// project, income entry, board item and board drawing on every keystroke.
+
 function migrateIncomeTypes(data: BridgeData): BridgeData {
-  return {
-    ...data,
-    incomeEntries: data.incomeEntries.map((e) => {
-      const t = e.type as string;
-      if (t === "earned" || t === "invoiced") return { ...e, type: "income" as IncomeType };
-      if (t === "paid") return { ...e, type: "spent" as IncomeType };
-      return e;
-    }),
-  };
+  for (const e of data.incomeEntries) {
+    const t = e.type as string;
+    if (t === "earned" || t === "invoiced" || t === "paid") {
+      return {
+        ...data,
+        incomeEntries: data.incomeEntries.map((x) => {
+          const xt = x.type as string;
+          if (xt === "earned" || xt === "invoiced") return { ...x, type: "income" as IncomeType };
+          if (xt === "paid") return { ...x, type: "spent" as IncomeType };
+          return x;
+        }),
+      };
+    }
+  }
+  return data;
 }
 
 function migrateHabits(data: BridgeData): BridgeData {
-  return {
-    ...data,
-    habits: data.habits.map((raw) => {
-      const h = raw as unknown as Record<string, unknown>;
+  for (const raw of data.habits) {
+    const h = raw as unknown as Record<string, unknown>;
+    if (!h.emoji || !h.type) {
       return {
-        id: raw.id,
-        name: raw.name,
-        emoji: (h.emoji as string) || "⭐",
-        type: ((h.type as HabitType) || "button") as HabitType,
-        unit: h.unit as string | undefined,
-        reminderTime: raw.reminderTime,
+        ...data,
+        habits: data.habits.map((r) => {
+          const rh = r as unknown as Record<string, unknown>;
+          return {
+            id: r.id,
+            name: r.name,
+            emoji: (rh.emoji as string) || "⭐",
+            type: ((rh.type as HabitType) || "button") as HabitType,
+            unit: rh.unit as string | undefined,
+            reminderTime: r.reminderTime,
+          };
+        }),
       };
-    }),
-  };
+    }
+  }
+  return data;
 }
 
 function migrateProjects(data: BridgeData): BridgeData {
-  return {
-    ...data,
-    projects: data.projects.map((raw) => {
-      const p = raw as unknown as Record<string, unknown>;
-      return { ...raw, category: (p.category as ProjectCategory) || "major" };
-    }),
-  };
+  for (const raw of data.projects) {
+    if (!(raw as unknown as Record<string, unknown>).category) {
+      return {
+        ...data,
+        projects: data.projects.map((r) => ({
+          ...r,
+          category: ((r as unknown as Record<string, unknown>).category as ProjectCategory) || "major",
+        })),
+      };
+    }
+  }
+  return data;
 }
 
 // Ensure at least one board exists and every item/drawing is assigned to one.
 function migrateBoards(data: BridgeData): BridgeData {
-  let boards = data.boards ?? [];
+  let out = data;
+  let boards = out.boards ?? [];
   if (boards.length === 0) {
     boards = [{ id: "board-default", name: "My Board", createdAt: new Date().toISOString() }];
+    out = { ...out, boards };
   }
   const firstId = boards[0].id;
-  return {
-    ...data,
-    boards,
-    boardItems: (data.boardItems ?? []).map((it) => (it.boardId ? it : { ...it, boardId: firstId })),
-    boardDrawings: (data.boardDrawings ?? []).map((d) => (d.boardId ? d : { ...d, boardId: firstId })),
-  };
+  const items = out.boardItems ?? [];
+  if (items.some((it) => !it.boardId)) {
+    out = { ...out, boardItems: items.map((it) => (it.boardId ? it : { ...it, boardId: firstId })) };
+  }
+  const drawings = out.boardDrawings ?? [];
+  if (drawings.some((d) => !d.boardId)) {
+    out = { ...out, boardDrawings: drawings.map((d) => (d.boardId ? d : { ...d, boardId: firstId })) };
+  }
+  return out;
 }
 
 // Permanently drop notes pages that have been in the Trash for over 14 days.
@@ -818,23 +846,63 @@ function purgeOldTrash(data: BridgeData): BridgeData {
   return out;
 }
 
-function load(): BridgeData {
+const DATA_KEY = "bridge_data";
+const LEGACY_KEY = "nexus_data";
+
+// In-memory mirror of localStorage.
+//
+// getData() used to re-read and JSON.parse the entire record — then run four
+// migration passes over it — on every single call. hooks.ts calls getData()
+// once per bridge_update listener, and six useBridge() consumers are mounted
+// app-wide (Sidebar, CommandBar, Dock, BottomNav, KeyboardShortcuts + the
+// page), so every keystroke-burst in Notes parsed the whole dataset six times.
+// The mirror is dropped whenever another tab writes to storage, so cross-tab
+// sync still works.
+let cache: BridgeData | null = null;
+let watchingStorage = false;
+
+function watchExternalWrites() {
+  if (watchingStorage || typeof window === "undefined") return;
+  watchingStorage = true;
+  window.addEventListener("storage", (e) => {
+    // key === null means localStorage.clear() fired.
+    if (e.key === null || e.key === DATA_KEY || e.key === LEGACY_KEY) cache = null;
+  });
+}
+
+// Normalises any record — from localStorage OR from the server — to the current
+// shape. Callers that inject data from outside localStorage must use this
+// explicitly: load() only re-parses on a cache miss, so previously-pulled
+// server data would otherwise sit unmigrated in the cache until a reload.
+export function migrateAll(data: BridgeData): BridgeData {
+  return purgeOldTrash(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data)))));
+}
+
+function loadFromStorage(): BridgeData {
   if (typeof window === "undefined") return DEFAULT;
   try {
-    const raw = localStorage.getItem("bridge_data") ?? localStorage.getItem("nexus_data");
-    if (raw && !localStorage.getItem("bridge_data")) {
-      localStorage.setItem("bridge_data", raw);
+    const raw = localStorage.getItem(DATA_KEY) ?? localStorage.getItem(LEGACY_KEY);
+    if (raw && !localStorage.getItem(DATA_KEY)) {
+      localStorage.setItem(DATA_KEY, raw);
     }
     const parsed = raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
-    return purgeOldTrash(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(parsed)))));
+    return migrateAll(parsed);
   } catch {
     return DEFAULT;
   }
 }
 
+function load(): BridgeData {
+  if (cache) return cache;
+  watchExternalWrites();
+  cache = loadFromStorage();
+  return cache;
+}
+
 function save(data: BridgeData) {
+  cache = data;
   if (typeof window === "undefined") return;
-  localStorage.setItem("bridge_data", JSON.stringify(data));
+  localStorage.setItem(DATA_KEY, JSON.stringify(data));
 }
 
 export function getData(): BridgeData {
