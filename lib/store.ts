@@ -589,6 +589,7 @@ export interface WikiBlock {
   fileName?: string;          // file attachment label
   fileSize?: string;          // file attachment size label
   images?: string[];          // gallery
+  image?: string;             // bookmark thumbnail (og:image)
   cols?: string[];            // columns (HTML per column)
   panels?: WikiPanel[];       // tabs / accordion
   checks?: WikiCheckItem[];   // checklist

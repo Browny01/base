@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useBridge } from "@/lib/hooks";
 import { isHidden, PAGE_BY_HREF } from "@/lib/nav-config";
+import { SHORTCUT_SECTIONS, onOpenShortcutSheet } from "@/lib/shortcuts";
 // Press `g` then a key to jump around. `?` opens the cheat-sheet.
 const NAV: { key: string; href: string; label: string }[] = [
   { key: "d", href: "/",            label: "Dashboard" },
@@ -31,9 +32,10 @@ const isTyping = (el: EventTarget | null) => {
 
 export function KeyboardShortcuts() {
   const router = useRouter();
+  const pathname = usePathname();
   const { data } = useBridge();
   const [cheat, setCheat] = useState(false);
-  const gArmed = useRef<number>(0);
+  const gArmed = useRef(0);
 
   // Shortcuts for pages you've hidden in Settings still work (the page still
   // exists), but don't advertise them in the cheat-sheet.
@@ -41,6 +43,8 @@ export function KeyboardShortcuts() {
     const page = PAGE_BY_HREF.get(n.href);
     return !page || !isHidden(page.key, data.navPrefs);
   });
+
+  useEffect(() => onOpenShortcutSheet(() => setCheat(true)), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -64,26 +68,41 @@ export function KeyboardShortcuts() {
 
   if (!cheat || typeof document === "undefined") return null;
 
+  const sections = SHORTCUT_SECTIONS.map((s) => {
+    if (!s.only) return s;
+    if (!s.only.some((p) => pathname?.startsWith(p))) return null;
+    return { ...s, rows: s.id === "nav" ? visibleNav.map((n) => ({ keys: ["g", n.key], label: n.label })) : s.rows };
+  }).filter((s): s is NonNullable<typeof s> => !!s);
+
   return createPortal(
     <div className="fixed inset-0 z-[130] flex items-center justify-center px-4 bg-black/40 backdrop-blur-[2px] nx-fade" onClick={() => setCheat(false)}>
-      <div className="w-full max-w-md bg-[var(--bg)] border border-[var(--border)] rounded-2xl elevated nx-pop p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md max-h-[80vh] overflow-y-auto bg-[var(--bg)] border border-[var(--border)] rounded-2xl elevated nx-pop p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold text-[var(--text)]">Keyboard shortcuts</h2>
           <button onClick={() => setCheat(false)} className="text-[var(--faint)] hover:text-[var(--text)] text-lg leading-none">×</button>
         </div>
         <div className="space-y-1.5">
-          <Row keys={["⌘", "K"]} label="Search / command palette" />
-          <Row keys={["?"]} label="This cheat-sheet" />
-          <div className="my-2 h-px bg-[var(--border)]" />
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--faint)] pb-1">Go to — press <kbd className="mx-0.5 rounded border border-[var(--border)] px-1 text-[10px]">g</kbd> then…</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            {visibleNav.map((n) => <Row key={n.key} keys={["g", n.key]} label={n.label} />)}
-          </div>
+          {sections.map((s, i) => (
+            <div key={s.id}>
+              {(i > 0 || s.id !== "general") && <div className="my-2 h-px bg-[var(--border)]" />}
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--faint)] pb-1">
+                {s.title}
+                {s.lead && <> — press <kbd className="mx-0.5 rounded border border-[var(--border)] px-1 text-[10px]">{s.lead}</kbd> then…</>}
+              </p>
+              <div className={cn2(s.rows.length)}>
+                {s.rows.map((r) => <Row key={r.keys.join("") + r.label} keys={r.keys} label={r.label} />)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>,
     document.body,
   );
+}
+
+function cn2(n: number) {
+  return n > 2 ? "grid grid-cols-2 gap-x-4 gap-y-1.5" : "grid grid-cols-1 gap-y-1.5";
 }
 
 function Row({ keys, label }: { keys: string[]; label: string }) {

@@ -10,7 +10,7 @@ import type { WikiBlock, WikiPage, WikiPanel } from "@/lib/store";
 import {
   Plus, X, ChartColumn, ChartLine, ChartPie, Bookmark, Globe, Video, Music, Paperclip,
   ListTree, Link2, Workflow, Pencil, Star, Timer, Hash, MousePointerClick, Table2,
-  ChevronRight, ExternalLink, FileText, Download, Eraser,
+  ChevronRight, ExternalLink, FileText, Download, Eraser, Loader2,
 } from "lucide-react";
 
 // Grayscale donut palette — distinguishable in both light and dark themes.
@@ -287,6 +287,80 @@ async function uploadFile(file: File): Promise<string | null> {
   } catch { return null; }
 }
 
+function BookmarkBlock({ block, onPatch }: { block: WikiBlock; onPatch: (p: Partial<WikiBlock>) => void }) {
+  const url = block.url;
+  const [loading, setLoading] = useState(false);
+  const [thumbOk, setThumbOk] = useState(true);
+  const fetched = useRef<string | null>(null);
+
+  // Fill in the page's own title / description / thumbnail once per URL, and
+  // never overwrite a field the user has already filled in themselves.
+  useEffect(() => {
+    if (!url || fetched.current === url) return;
+    fetched.current = url;
+    setThumbOk(true);
+    let alive = true;
+    setLoading(true);
+    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { ok?: boolean; title?: string; description?: string; image?: string | null } | null) => {
+        if (!alive || !d?.ok) return;
+        const patch: Partial<WikiBlock> = {};
+        if (d.title && !block.text) patch.text = d.title;
+        if (d.description && !block.caption) patch.caption = d.description;
+        if (d.image && !block.image) patch.image = d.image;
+        if (Object.keys(patch).length) onPatch(patch);
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [url, block.text, block.caption, block.image, onPatch]);
+
+  if (!url) return <UrlPrompt Icon={Bookmark} label="Paste a link to bookmark…" onSet={(u) => onPatch({ url: u })} />;
+
+  let host = url;
+  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* keep the raw value */ }
+  const hasDesc = !!block.caption;
+  const thumb = block.image && thumbOk ? block.image : null;
+
+  return (
+    <a href={url} target="_blank" rel="noopener" className={cn("my-1 flex items-stretch gap-0 overflow-hidden hover:bg-[var(--chip)] transition-colors group/bookmark", card)}>
+      <div className="flex-1 min-w-0 p-3">
+        <div className="flex items-center gap-1.5">
+          <input
+            value={block.text}
+            onClick={(e) => e.preventDefault()}
+            onChange={(e) => onPatch({ text: e.target.value })}
+            placeholder="Title"
+            className="flex-1 min-w-0 w-full bg-transparent text-[15px] font-semibold text-[var(--text)] placeholder-[var(--faint)] focus:outline-none"
+          />
+          {loading && <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[var(--faint)]" />}
+        </div>
+        <input
+          value={block.caption ?? ""}
+          onClick={(e) => e.preventDefault()}
+          onChange={(e) => onPatch({ caption: e.target.value })}
+          placeholder="Add a description…"
+          aria-label="Bookmark description"
+          className={cn(
+            "w-full mt-1 bg-transparent text-[12.5px] leading-snug text-[var(--muted)] placeholder-[var(--faint)] focus:outline-none transition-opacity",
+            hasDesc ? "opacity-100" : "opacity-0 focus:opacity-100 group-hover/bookmark:opacity-100",
+          )}
+        />
+        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-[var(--faint)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} alt="" className="w-3.5 h-3.5 rounded-sm" />
+          <span className="truncate">{host}</span><ExternalLink className="w-3 h-3" />
+        </div>
+      </div>
+      {thumb && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumb} alt="" onError={() => setThumbOk(false)} className="w-[92px] shrink-0 object-cover border-l border-[var(--border)] bg-[var(--surface-2)]" />
+      )}
+    </a>
+  );
+}
+
 function UrlPrompt({ Icon, label, onSet, accept }: { Icon: typeof Globe; label: string; onSet: (url: string, file?: File) => void; accept?: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -428,21 +502,7 @@ export function ExtraBlock({ block, onPatch, allPages, currentPageId, pageBlocks
   const t = block.type;
 
   if (t === "bookmark") {
-    if (!block.url) return <UrlPrompt Icon={Bookmark} label="Paste a link to bookmark…" onSet={(url) => onPatch({ url })} />;
-    let host = block.url; try { host = new URL(block.url).hostname.replace(/^www\./, ""); } catch {}
-    return (
-      <a href={block.url} target="_blank" rel="noopener" className={cn("my-1 flex items-stretch overflow-hidden hover:bg-[var(--chip)] transition-colors", card)}>
-        <div className="flex-1 min-w-0 p-3">
-          <input value={block.text} onClick={(e) => e.preventDefault()} onChange={(e) => onPatch({ text: e.target.value })} placeholder="Title" className="w-full bg-transparent text-[13.5px] font-medium text-[var(--text)] placeholder-[var(--faint)] focus:outline-none" />
-          <input value={block.caption ?? ""} onClick={(e) => e.preventDefault()} onChange={(e) => onPatch({ caption: e.target.value })} placeholder="Description" className="w-full bg-transparent text-[12px] text-[var(--muted)] placeholder-[var(--faint)] focus:outline-none mt-0.5" />
-          <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-[var(--faint)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=32`} alt="" className="w-3.5 h-3.5 rounded-sm" />
-            <span className="truncate">{host}</span><ExternalLink className="w-3 h-3" />
-          </div>
-        </div>
-      </a>
-    );
+    return <BookmarkBlock block={block} onPatch={onPatch} />;
   }
 
   if (t === "embed" || t === "video" || t === "audio") {

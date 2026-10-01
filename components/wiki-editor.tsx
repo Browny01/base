@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { uid, cn } from "@/lib/utils";
+import { insertIndexAt as insertIndexFor, dropTargetIndex, moveBlockTo } from "@/lib/block-order";
 import type { WikiPage, WikiBlock, WikiBlockType } from "@/lib/store";
 import { TableBlock, BoardBlock, ChartBlock, ExtraBlock } from "@/components/wiki-blocks";
 import {
@@ -13,7 +14,7 @@ import {
   Link2, Eraser, Info, FileSymlink, ListTree, FileText, Pin, PinOff,
   Bookmark, Globe, Video, Music, Paperclip, Images, Columns2, PanelTop, ListCollapse,
   SeparatorHorizontal, Gauge, ListChecks, Hash, Timer, Star, Table2, Tags, Sigma,
-  Workflow, Pencil, StickyNote, MousePointerClick, Copy, Check,
+  Workflow, Pencil, StickyNote, MousePointerClick, Copy, Check, Undo2, Redo2,
 } from "lucide-react";
 
 const BLOCK_TYPES: { type: WikiBlockType; label: string; hint: string; Icon: typeof Type }[] = [
@@ -236,7 +237,11 @@ export function WikiEditor({
 
   const refs = useRef(new Map<string, HTMLDivElement>());
   const [focusReq, setFocusReq] = useState<FocusReq>(null);
+  const focusRef = useRef<FocusReq>(null);
+  useEffect(() => { focusRef.current = focusReq; }, [focusReq]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  const insertRef = useRef<(afterId: string) => void>(() => {});
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persist = useCallback(() => {
@@ -253,43 +258,253 @@ export function WikiEditor({
   // Flush pending edits only on unmount (switching pages).
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); persistRef.current(); }, []);
 
+  // ── Undo / redo ──────────────────────────────────────────────────────────
+  // Every block edit is immutable, so a snapshot only has to hold a reference to
+  // the previous state — no copying. Typing coalesces into one entry per burst
+  // instead of one per keystroke.
+  type Snap = { title: string; icon: string; description: string; blocks: WikiBlock[]; focus: FocusReq };
+  const past = useRef<Snap[]>([]);
+  const future = useRef<Snap[]>([]);
+  const lastEdit = useRef({ kind: "", at: 0 });
+  // Depth is mirrored into state so the buttons can render; the stacks stay in
+  // refs because undo/redo mutate them outside React's render cycle.
+  const [depth, setDepth] = useState({ past: 0, future: 0 });
+  const HISTORY_LIMIT = 120;
+  const COALESCE_MS = 700;
+
+  // Called before every mutation, so the snapshot captures the pre-edit state.
+  const markEdit = useCallback((kind: string) => {
+    const now = Date.now();
+    const l = lastEdit.current;
+    if (l.kind !== kind || now - l.at > COALESCE_MS) {
+      const c = latest.current;
+      past.current.push({ title: c.title, icon: c.icon, description: c.description, blocks: c.blocks, focus: focusRef.current });
+      if (past.current.length > HISTORY_LIMIT) past.current.shift();
+      future.current = [];
+      setDepth({ past: past.current.length, future: 0 });
+    }
+    lastEdit.current = { kind, at: now };
+  }, []);
+
+  const travel = useCallback((from: "past" | "future") => {
+    const src = from === "past" ? past.current : future.current;
+    const dst = from === "past" ? future.current : past.current;
+    const target = src.pop();
+    if (!target) return;
+    dst.push({ ...latest.current, focus: focusRef.current });
+    setTitle(target.title); setIcon(target.icon); setDescription(target.description); setBlocks(target.blocks);
+    // contentEditable is uncontrolled, so a restored snapshot has to push its HTML
+    // back into the DOM by hand. Blocks a redo re-adds initialise themselves on mount.
+    for (const b of target.blocks) {
+      const el = refs.current.get(b.id);
+      if (el && el.innerHTML !== (b.text || "")) el.innerHTML = b.text || "";
+    }
+    setFocusReq(target.focus);
+    lastEdit.current = { kind: "", at: 0 };
+    setDepth({ past: past.current.length, future: future.current.length });
+    scheduleSave();
+  }, [scheduleSave]);
+  const undo = useCallback(() => travel("past"), [travel]);
+  const redo = useCallback(() => travel("future"), [travel]);
+
+  // ── Drag to reorder (hold the ⠿ handle) ────────────────────────────────
+  const [drag, setDrag] = useState<{ id: string; over: number } | null>(null);
+  const swallowClick = useRef(false);
+  const scrollLoop = useRef<{ y: number; raf: number } | null>(null);
+
+  const insertIndexAt = (clientY: number) => {
+    const midpoints: number[] = [];
+    for (const b of blocks) {
+      const el = rowRefs.current.get(b.id);
+      if (!el) { midpoints.push(Number.NEGATIVE_INFINITY); continue; }
+      const r = el.getBoundingClientRect();
+      midpoints.push(r.top + r.height / 2);
+    }
+    return insertIndexFor(midpoints, clientY);
+  };
+
+  const scrollByEdge = (clientY: number) => {
+    const main = rootRef.current?.closest(".nx-main") as HTMLElement | null;
+    const EDGE = 64;
+    if (main && main.scrollHeight > main.clientHeight) {
+      const r = main.getBoundingClientRect();
+      if (clientY < r.top + EDGE) main.scrollTop -= Math.ceil((r.top + EDGE - clientY) / 5);
+      else if (clientY > r.bottom - EDGE) main.scrollTop += Math.ceil((clientY - (r.bottom - EDGE)) / 5);
+      return;
+    }
+    const H = window.innerHeight;
+    if (clientY < EDGE) window.scrollBy(0, -Math.ceil((EDGE - clientY) / 5));
+    else if (clientY > H - EDGE) window.scrollBy(0, Math.ceil((clientY - (H - EDGE)) / 5));
+  };
+
+  const startDrag = (e: React.PointerEvent, id: string) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    swallowClick.current = false;
+    const from = blocks.findIndex((b) => b.id === id);
+    if (from < 0) return;
+    const st = { id, from, over: from, startY: e.clientY, active: false };
+
+    const onMove = (ev: PointerEvent) => {
+      if (scrollLoop.current) scrollLoop.current.y = ev.clientY;
+      if (!st.active) {
+        // A small threshold keeps a plain click opening the menu rather than dragging.
+        if (Math.abs(ev.clientY - st.startY) < 4) return;
+        st.active = true;
+        swallowClick.current = true;
+        st.over = insertIndexAt(ev.clientY);
+        setDrag({ id: st.id, over: st.over });
+        return;
+      }
+      const over = insertIndexAt(ev.clientY);
+      if (over !== st.over) { st.over = over; setDrag({ id: st.id, over }); }
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      if (scrollLoop.current) { cancelAnimationFrame(scrollLoop.current.raf); scrollLoop.current = null; }
+      // `over` is measured with the dragged block still in the list, so shift it.
+      if (st.active) moveToIndex(st.id, dropTargetIndex(st.from, st.over, blocks.length));
+      setDrag(null);
+    };
+
+    const loop = () => {
+      if (!scrollLoop.current) return;
+      scrollByEdge(scrollLoop.current.y);
+      scrollLoop.current.raf = requestAnimationFrame(loop);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    scrollLoop.current = { y: e.clientY, raf: requestAnimationFrame(loop) };
+  };
+
   useEffect(() => {
     if (!focusReq) return;
     const el = refs.current.get(focusReq.id);
     if (el) placeCaret(el, focusReq.caret);
   }, [focusReq]);
 
+  // Which block the caret is in, for ⌘↵ / ⌘/ .
+  const caretBlockId = () => {
+    const el = document.activeElement as HTMLElement | null;
+    return el?.closest?.("[data-block-id]")?.getAttribute("data-block-id") ?? null;
+  };
+
+  // Editor-level shortcuts. Anything inside an input that manages its own text
+  // (table cells, board cards, bookmark title) keeps the browser's native undo,
+  // so the listener only claims events from the page fields and the blocks.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const t = e.target as HTMLElement | null;
+      const inScope = !!t?.closest?.("[data-undo-scope]");
+
+      if (!mod || e.altKey) return;
+      const k = e.key.toLowerCase();
+
+      if (k === "z" && inScope) {
+        e.preventDefault();
+        if (e.shiftKey) redo(); else undo();
+        return;
+      }
+      if (k === "y" && inScope) { e.preventDefault(); redo(); return; }
+
+      // These two also fire when nothing editable is focused, but never inside an
+      // input that manages its own text.
+      const editable = t?.tagName === "INPUT" || t?.tagName === "TEXTAREA" || !!t?.isContentEditable;
+      if (!inScope && (editable || !rootRef.current?.contains(t ?? null))) return;
+
+      if (k === "enter") {
+        e.preventDefault();
+        const id = caretBlockId() ?? latest.current.blocks[latest.current.blocks.length - 1]?.id;
+        if (id) insertRef.current(id);
+        return;
+      }
+      if (e.key === "/") {
+        e.preventDefault();
+        const id = caretBlockId() ?? latest.current.blocks[0]?.id;
+        if (!id) return;
+        const el = refs.current.get(id);
+        if (el && normalizeHTML(el.innerHTML) !== "") return; // only when the block is empty
+        if (el) el.innerHTML = "";
+        setSlash({ blockId: id, query: "", index: 0, viaPlus: true });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
+
   const commitBlocks = (next: WikiBlock[]) => { setBlocks(next); scheduleSave(); };
-  const setType = (id: string, type: WikiBlockType) =>
+  // `kind` groups consecutive edits so a run of keystrokes undoes as one action.
+  const setType = (id: string, type: WikiBlockType) => {
+    markEdit("type");
     commitBlocks(blocks.map((b) => (b.id === id ? withTypeDefaults({ ...b, type, text: type === "divider" ? "" : b.text }) : b)));
-  const patchBlock = (id: string, patch: Partial<WikiBlock>) => commitBlocks(blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-  const toggleCheck = (id: string) => commitBlocks(blocks.map((b) => (b.id === id ? { ...b, checked: !b.checked } : b)));
-  const setCaption = (id: string, caption: string) => commitBlocks(blocks.map((b) => (b.id === id ? { ...b, caption } : b)));
-  const setSrc = (id: string, src: string) => commitBlocks(blocks.map((b) => (b.id === id ? { ...b, src } : b)));
+  };
+  const patchBlock = (id: string, patch: Partial<WikiBlock>) => {
+    markEdit("patch");
+    commitBlocks(blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  };
+  const toggleCheck = (id: string) => {
+    markEdit("check");
+    commitBlocks(blocks.map((b) => (b.id === id ? { ...b, checked: !b.checked } : b)));
+  };
+  const setCaption = (id: string, caption: string) => {
+    markEdit("caption");
+    commitBlocks(blocks.map((b) => (b.id === id ? { ...b, caption } : b)));
+  };
+  const setSrc = (id: string, src: string) => {
+    markEdit("src");
+    commitBlocks(blocks.map((b) => (b.id === id ? { ...b, src } : b)));
+  };
 
   const removeBlock = (id: string) => {
     const idx = blocks.findIndex((b) => b.id === id);
     if (idx < 0) return;
     const next = blocks.filter((b) => b.id !== id);
     if (!next.length) next.push(newBlock());
+    markEdit("delete");
     commitBlocks(next);
     const tgt = next[Math.max(0, idx - 1)];
     if (tgt) setFocusReq({ id: tgt.id, caret: "end" });
   };
+  // Move a block to an absolute position (used by the Up/Down buttons and by drag).
+  const moveToIndex = (id: string, to: number) => {
+    const next = moveBlockTo(blocks, id, to);
+    if (next === blocks) return;
+    markEdit("move");
+    commitBlocks(next);
+  };
   const moveBlock = (id: string, dir: -1 | 1) => {
     const idx = blocks.findIndex((b) => b.id === id);
-    const j = idx + dir;
-    if (idx < 0 || j < 0 || j >= blocks.length) return;
-    const next = [...blocks]; [next[idx], next[j]] = [next[j], next[idx]]; commitBlocks(next);
+    if (idx < 0) return;
+    moveToIndex(id, idx + dir);
   };
   // The "+" gutter button inserts a new block and opens the block picker for it.
   const insertAndPick = (afterId: string) => {
     const idx = blocks.findIndex((b) => b.id === afterId);
     const nb = newBlock();
-    const next = [...blocks]; next.splice(idx + 1, 0, nb); commitBlocks(next);
+    const next = [...blocks]; next.splice(idx + 1, 0, nb);
+    markEdit("add");
+    commitBlocks(next);
     setFocusReq({ id: nb.id, caret: "start" });
     setSlash({ blockId: nb.id, query: "", index: 0, viaPlus: true });
   };
+  // ⌘↵ adds a plain line rather than opening the picker (that is ⌘/).
+  const insertPlain = (afterId: string) => {
+    const idx = blocks.findIndex((b) => b.id === afterId);
+    if (idx < 0) return;
+    const nb = newBlock();
+    const next = [...blocks]; next.splice(idx + 1, 0, nb);
+    markEdit("add");
+    commitBlocks(next);
+    setFocusReq({ id: nb.id, caret: "start" });
+  };
+  useEffect(() => { insertRef.current = insertPlain; });
 
   // ── Slash menu ─────────────────────────────────────────────────────────────
   const slashResults: typeof BLOCK_TYPES = slash ? (() => {
@@ -317,10 +532,13 @@ export function WikiEditor({
       const idx = blocks.findIndex((b) => b.id === blockId);
       const nb = newBlock();
       const next = blocks.map((b) => (b.id === blockId ? { ...b, type, text: "" } : b));
-      next.splice(idx + 1, 0, nb); commitBlocks(next);
+      next.splice(idx + 1, 0, nb);
+      markEdit("type");
+      commitBlocks(next);
       setFocusReq({ id: nb.id, caret: "start" });
       return;
     }
+    markEdit("type");
     commitBlocks(blocks.map((b) => (b.id === blockId ? withTypeDefaults({ ...b, type, text: "" }) : b)));
     if (!isVoid(type)) setFocusReq({ id: blockId, caret: "start" });
   };
@@ -329,7 +547,12 @@ export function WikiEditor({
   const handleInput = (block: WikiBlock, el: HTMLDivElement) => {
     if (normalizeHTML(el.innerHTML) === "") el.innerHTML = "";
     const tc = el.textContent ?? "";
-    const storeText = () => { const html = normalizeHTML(el.innerHTML); setBlocks((prev) => prev.map((b) => (b.id === block.id ? { ...b, text: html } : b))); scheduleSave(); };
+    const storeText = () => {
+      const html = normalizeHTML(el.innerHTML);
+      markEdit("type");
+      setBlocks((prev) => prev.map((b) => (b.id === block.id ? { ...b, text: html } : b)));
+      scheduleSave();
+    };
 
     if (block.type === "text") {
       // Block picker already open for this block → keep filtering by what's typed.
@@ -344,7 +567,7 @@ export function WikiEditor({
         "# ": "h1", "## ": "h2", "### ": "h3", "- ": "bulleted", "* ": "bulleted",
         "1. ": "numbered", "[] ": "todo", "[ ] ": "todo", "> ": "quote",
       };
-      if (SC[tc]) { el.innerHTML = ""; commitBlocks(blocks.map((b) => (b.id === block.id ? { ...b, type: SC[tc], text: "" } : b))); return; }
+      if (SC[tc]) { el.innerHTML = ""; markEdit("type"); commitBlocks(blocks.map((b) => (b.id === block.id ? { ...b, type: SC[tc], text: "" } : b))); return; }
       if (tc === "```") { el.innerHTML = ""; setType(block.id, "code"); return; }
       if (tc === "---" || tc === "***") { el.innerHTML = ""; pickSlash(block.id, "divider"); return; }
     }
@@ -393,7 +616,9 @@ export function WikiEditor({
       const nb: WikiBlock = { ...newBlock(isList ? block.type : "text", after), checked: false };
       const idx = blocks.findIndex((b) => b.id === block.id);
       const next = blocks.map((b) => (b.id === block.id ? { ...b, text: before } : b));
-      next.splice(idx + 1, 0, nb); commitBlocks(next);
+      next.splice(idx + 1, 0, nb);
+      markEdit("enter");
+      commitBlocks(next);
       setFocusReq({ id: nb.id, caret: "start" });
       return;
     }
@@ -405,12 +630,14 @@ export function WikiEditor({
         const prev = blocks[idx - 1];
         e.preventDefault();
         if (isVoid(prev.type)) {
+          markEdit("merge");
           commitBlocks(blocks.filter((b) => b.id !== prev.id));
           setFocusReq({ id: block.id, caret: "start" });
           return;
         }
         const merged = prev.text + '<span id="__caret__"></span>' + block.text;
         const next = blocks.map((b) => (b.id === prev.id ? { ...b, text: prev.text + block.text } : b)).filter((b) => b.id !== block.id);
+        markEdit("merge");
         commitBlocks(next);
         requestAnimationFrame(() => { const pe = refs.current.get(prev.id); if (pe) { pe.innerHTML = merged; placeCaretAtMarker(pe); } });
       }
@@ -536,6 +763,9 @@ export function WikiEditor({
     return { words, chars, mins: Math.max(1, Math.round(words / 200)) };
   }, [blocks]);
 
+  const canUndo = depth.past > 0;
+  const canRedo = depth.future > 0;
+
   // A page is "empty" when it has no title, description, or real block content.
   const documentEmpty = useMemo(() => {
     if (title.trim() || (description ?? "").trim()) return false;
@@ -551,10 +781,11 @@ export function WikiEditor({
     <div ref={rootRef} className={cn("relative mx-auto px-6 sm:px-12 py-10", fullWidth ? "max-w-none" : "max-w-[760px]", selectedAll && "nx-allsel")}>
       {/* Icon + title */}
       <div className="mb-5">
-        <EmojiButton value={icon} onChange={(e) => { setIcon(e); scheduleSave(); }} />
+        <EmojiButton value={icon} onChange={(e) => { markEdit("icon"); setIcon(e); scheduleSave(); }} />
         <textarea
           value={title}
-          onChange={(e) => { setTitle(e.target.value.replace(/\n/g, "")); scheduleSave(); }}
+          data-undo-scope=""
+          onChange={(e) => { markEdit("title"); setTitle(e.target.value.replace(/\n/g, "")); scheduleSave(); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (blocks[0]) setFocusReq({ id: blocks[0].id, caret: "start" }); } }}
           rows={1}
           placeholder="Untitled"
@@ -562,7 +793,8 @@ export function WikiEditor({
         />
         <textarea
           value={description}
-          onChange={(e) => { setDescription(e.target.value.replace(/\n/g, "")); scheduleSave(); }}
+          data-undo-scope=""
+          onChange={(e) => { markEdit("description"); setDescription(e.target.value.replace(/\n/g, "")); scheduleSave(); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (blocks[0]) setFocusReq({ id: blocks[0].id, caret: "start" }); } }}
           rows={1}
           placeholder="Add a description…"
@@ -572,11 +804,17 @@ export function WikiEditor({
 
       {/* Blocks */}
       <div className="space-y-0.5">
-        {blocks.map((block) => (
+        {blocks.map((block, i) => (
           <BlockRow
             key={block.id}
             block={block}
+            index={i}
             number={numbers.get(block.id)}
+            registerRow={(el) => { if (el) rowRefs.current.set(block.id, el); else rowRefs.current.delete(block.id); }}
+            dragging={drag?.id === block.id}
+            dropLine={!!drag && drag.over === i && drag.id !== block.id}
+            onGripDown={(e) => startDrag(e, block.id)}
+            onGripClick={(open) => { if (swallowClick.current) { swallowClick.current = false; return; } open(); }}
             allPages={allPages}
             currentPageId={page.id}
             pageBlocks={blocks}
@@ -602,12 +840,38 @@ export function WikiEditor({
         ))}
       </div>
 
+      {drag && drag.over >= blocks.length && (
+        <div className="h-0.5 rounded-full bg-[var(--text)] opacity-70 -my-px" />
+      )}
+
       {/* Empty-state hint — shows only when the page has no content yet */}
       {documentEmpty && (
         <p className="mt-2 w-full text-left px-1 py-2 text-[15px] text-[var(--faint)]/45 select-none">
           Click here to continue writing…
         </p>
       )}
+
+      {/* Undo / redo */}
+      <div className="fixed bottom-[68px] md:bottom-5 right-4 z-40 flex items-center gap-0.5 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-lg nx-pop">
+        <button
+          onClick={undo}
+          disabled={!canUndo}
+          title="Undo (⌘Z)"
+          aria-label="Undo"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors disabled:opacity-30 disabled:pointer-events-none"
+        >
+          <Undo2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={redo}
+          disabled={!canRedo}
+          title="Redo (⌘⇧Z)"
+          aria-label="Redo"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors disabled:opacity-30 disabled:pointer-events-none"
+        >
+          <Redo2 className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Stats footer */}
       {stats.words > 0 && (
@@ -780,7 +1044,14 @@ function FloatingImage({ block, onPatch, onUnpin, onDelete }: {
 function BlockRow({
   block, number, allPages, currentPageId, pageBlocks, onOpenPage, registerRef, onInput, onKeyDown, onPaste, onBlur, onToggleCheck, onSetType,
   onDelete, onMoveUp, onMoveDown, onAddBelow, onUploadImage, onCaption, onPatch, slashMenu,
+  index, registerRow, dragging, dropLine, onGripDown, onGripClick,
 }: {
+  index: number;
+  registerRow: (el: HTMLDivElement | null) => void;
+  dragging: boolean;
+  dropLine: boolean;
+  onGripDown: (e: React.PointerEvent) => void;
+  onGripClick: (open: () => void) => void;
   block: WikiBlock;
   number?: number;
   allPages: WikiPage[];
@@ -849,6 +1120,7 @@ function BlockRow({
     <div
       ref={setCe}
       data-block-id={block.id}
+      data-undo-scope=""
       data-ph={placeholder}
       contentEditable
       suppressContentEditableWarning
@@ -866,12 +1138,28 @@ function BlockRow({
   );
 
   return (
-    <div className="group relative flex items-start">
+    <div
+      ref={registerRow}
+      data-block-row={index}
+      className={cn(
+        "group relative flex items-start transition-opacity",
+        dragging && "opacity-40",
+      )}
+    >
+      {dropLine && <div className="absolute -top-[3px] left-0 right-0 h-0.5 rounded-full bg-[var(--text)] opacity-80 pointer-events-none" />}
       {/* Left gutter controls */}
       <div className="flex items-center gap-0.5 shrink-0 -ml-12 w-12 pt-1 pr-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={onAddBelow} title="Add block below" className="p-0.5 rounded text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)]"><Plus className="w-4 h-4" /></button>
         <div className="relative">
-          <button onClick={() => setMenuOpen((v) => !v)} title="Options" className="p-0.5 rounded text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] cursor-grab"><GripVertical className="w-4 h-4" /></button>
+          <button
+            onClick={() => onGripClick(() => setMenuOpen((v) => !v))}
+            onPointerDown={onGripDown}
+            title="Drag to move · click for options"
+            className={cn(
+              "p-0.5 rounded touch-none text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)]",
+              dragging ? "cursor-grabbing" : "cursor-grab",
+            )}
+          ><GripVertical className="w-4 h-4" /></button>
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
