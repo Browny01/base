@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { Keyboard } from "lucide-react";
 import { CommandBar } from "@/components/command-bar";
+import { openShortcutSheet } from "@/lib/shortcuts";
 
 export function TopBar() {
   return (
@@ -15,8 +17,16 @@ export function TopBar() {
           <CommandBar />
         </div>
 
-        {/* Right: account */}
-        <div className="flex items-center shrink-0">
+        {/* Right: shortcuts + account */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={openShortcutSheet}
+            title="Keyboard shortcuts (?)"
+            aria-label="Keyboard shortcuts"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+          >
+            <Keyboard className="w-[18px] h-[18px]" />
+          </button>
           <Link
             href="/settings"
             title="Settings"
