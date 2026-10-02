@@ -6,7 +6,52 @@ import { DEFAULT_AUTONOMY_SETTINGS, type AutonomySettings, type AutonomyState, t
 import { DEFAULT_NAV_PREFS, type NavPrefs } from "@/lib/nav-config";
 
 export type Priority = "P1" | "P2" | "P3";
-export type TaskTag = "@work" | "@personal" | "@money" | "@admin" | "@night-auto" | `@${string}`;
+
+// Categories are the area of life a task belongs to. Values are bare slugs:
+// the old "@work" style read badly in a badge, a tab and a native select.
+export type TaskTag =
+  | "work" | "build" | "personal" | "home" | "errands"
+  | "health" | "finance" | "admin" | "learning" | "other"
+  | "night-auto";
+
+export const TASK_TAGS: ReadonlyArray<{ value: TaskTag; label: string; emoji: string }> = [
+  { value: "work",     label: "Work",     emoji: "\u{1F4BC}" },
+  { value: "build",    label: "Build",    emoji: "\u{1F680}" },
+  { value: "personal", label: "Personal", emoji: "\u{1F331}" },
+  { value: "home",     label: "Home",     emoji: "\u{1F3E0}" },
+  { value: "errands",  label: "Errands",  emoji: "\u{1F6D2}" },
+  { value: "health",   label: "Health",   emoji: "\u{2764}\u{FE0F}" },
+  { value: "finance",  label: "Finance",  emoji: "\u{1F4B0}" },
+  { value: "admin",    label: "Admin",    emoji: "\u{1F4CB}" },
+  { value: "learning", label: "Learning", emoji: "\u{1F4DA}" },
+  { value: "other",    label: "Other",    emoji: "\u{1F4E6}" },
+];
+
+const TAG_SET = new Set<string>([...TASK_TAGS.map((t) => t.value), "night-auto"]);
+
+// Legacy @-prefixed tags and the "@money" → "finance" rename.
+const LEGACY_TAGS: Record<string, TaskTag> = {
+  "@work": "work",
+  "@personal": "personal",
+  "@money": "finance",
+  "@admin": "admin",
+  "@night-auto": "night-auto",
+};
+
+// Coerces anything (old data, an agent, a native client) onto a known tag.
+export function normalizeTaskTag(tag: unknown): TaskTag {
+  const raw = typeof tag === "string" ? tag : "";
+  const legacy = LEGACY_TAGS[raw];
+  if (legacy) return legacy;
+  const bare = raw.replace(/^@/, "");
+  return TAG_SET.has(bare) ? (bare as TaskTag) : "other";
+}
+
+export function taskTagLabel(tag: string): string {
+  const t = normalizeTaskTag(tag);
+  return TASK_TAGS.find((x) => x.value === t)?.label ?? "Other";
+}
+
 export type RecurringFreq = "daily" | "weekly" | "monthly" | null;
 export type HabitType = "button" | "input";
 
@@ -23,6 +68,7 @@ export interface Task {
   createdAt: string;
   completedAt?: string | null;
   projectId?: string;
+  order?: number;            // manual arrangement position (lower = higher up)
   subtasks?: SubTask[];
   nightPolicy?: "autonomous-v1" | string;
   executionState?: AutonomyState;
@@ -871,12 +917,26 @@ function watchExternalWrites() {
   });
 }
 
+// Drops the "@" prefix and folds legacy tags onto the current taxonomy so
+// existing tasks keep their category instead of collapsing into "Other".
+function migrateTaskTags(data: BridgeData): BridgeData {
+  if (!Array.isArray(data.tasks)) return data;
+  let changed = false;
+  const tasks = data.tasks.map((t) => {
+    const tag = normalizeTaskTag(t.tag);
+    if (tag === t.tag) return t;
+    changed = true;
+    return { ...t, tag };
+  });
+  return changed ? { ...data, tasks } : data;
+}
+
 // Normalises any record — from localStorage OR from the server — to the current
 // shape. Callers that inject data from outside localStorage must use this
 // explicitly: load() only re-parses on a cache miss, so previously-pulled
 // server data would otherwise sit unmigrated in the cache until a reload.
 export function migrateAll(data: BridgeData): BridgeData {
-  return purgeOldTrash(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data)))));
+  return purgeOldTrash(migrateTaskTags(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data))))));
 }
 
 function loadFromStorage(): BridgeData {

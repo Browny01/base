@@ -7,7 +7,8 @@ import { useConfirm } from "@/lib/confirm-context";
 import { prepareProjectLogo } from "@/lib/project-logo";
 import { prepareProjectFile } from "@/lib/project-file";
 import { uid, getToday } from "@/lib/utils";
-import type { Task, Priority, TaskTag, ProjectColor, MilestoneStatus, ProjectFile } from "@/lib/store";
+import { TASK_TAGS, normalizeTaskTag, taskTagLabel, type Task, type Priority, type TaskTag, type ProjectColor, type MilestoneStatus, type ProjectFile } from "@/lib/store";
+import { PRIORITY_META, priorityRank, priorityLabel } from "@/lib/task-sort";
 import {
   ArrowLeft, Plus, Trash2, Link2, FileText, CheckSquare,
   ExternalLink, Pencil, Check, X, Map, Circle, CircleDot, CheckCircle2,
@@ -34,8 +35,8 @@ const COLOR_BORDER: Record<ProjectColor, string> = {
   orange: "border-[var(--border-2)]", pink: "border-[var(--border-2)]",
 };
 
-const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
-const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
+const PRIORITIES = PRIORITY_META;
+const TAGS = TASK_TAGS;
 
 const MILESTONE_STATUS: { value: MilestoneStatus; label: string; icon: React.ReactNode; color: string }[] = [
   { value: "planned",     label: "Planned",     icon: <Circle className="w-4 h-4" />,      color: "text-[var(--muted)]" },
@@ -72,7 +73,7 @@ export function ProjectDetail({ id }: { id: string }) {
   // ── Tasks ────────────────────────────────────────────────────────────────────
   const [taskTitle, setTaskTitle] = useState("");
   const [taskPriority, setTaskPriority] = useState<Priority>("P2");
-  const [taskTag, setTaskTag] = useState<TaskTag>("@work");
+  const [taskTag, setTaskTag] = useState<TaskTag>("work");
   const [taskDue, setTaskDue] = useState("");
   const [showTaskForm, setShowTaskForm] = useState(false);
 
@@ -480,11 +481,11 @@ export function ProjectDetail({ id }: { id: string }) {
               <div className="flex gap-2 flex-wrap items-center">
                 <div className="flex gap-1">
                   {PRIORITIES.map((p) => (
-                    <button key={p} onClick={() => setTaskPriority(p)} className={cn("px-2 py-0.5 text-xs font-bold rounded transition-colors", taskPriority === p ? p === "P1" ? "bg-[var(--text)] text-[var(--bg)]" : p === "P2" ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--border)] text-[var(--text)]" : "bg-[var(--surface-2)] text-[var(--muted)] hover:bg-[var(--chip)]")}>{p}</button>
+                    <button key={p.value} onClick={() => setTaskPriority(p.value)} className={cn("px-2 py-0.5 text-xs font-medium rounded transition-colors", taskPriority === p.value ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--surface-2)] text-[var(--muted)] hover:bg-[var(--chip)]")}>{p.label}</button>
                   ))}
                 </div>
                 <select className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={taskTag} onChange={(e) => setTaskTag(e.target.value as TaskTag)}>
-                  {TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
                 </select>
                 <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} />
                 <button onClick={addTask} className="ml-auto px-3 py-1 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs rounded-lg transition-colors">Add</button>
@@ -495,7 +496,7 @@ export function ProjectDetail({ id }: { id: string }) {
             <p className="text-sm text-[var(--faint)] text-center py-8">No open tasks.</p>
           ) : (
             <div className="space-y-2">
-              {openTasks.sort((a, b) => ({ P1: 0, P2: 1, P3: 2 }[a.priority] - { P1: 0, P2: 1, P3: 2 }[b.priority])).map((task) => (
+              {openTasks.sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority)).map((task) => (
                 <TaskRow key={task.id} task={task} today={today} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />
               ))}
             </div>
@@ -782,8 +783,8 @@ export function ProjectDetail({ id }: { id: string }) {
   );
 }
 
-const PROJ_PRIORITIES: Priority[] = ["P1", "P2", "P3"];
-const PROJ_TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
+const PROJ_PRIORITIES = PRIORITY_META;
+const PROJ_TAGS = TASK_TAGS;
 
 function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
   task: Task; today: string;
@@ -792,10 +793,10 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
   onEdit: (id: string, updates: Partial<Task>) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: task.tag, dueDate: task.dueDate ?? "" });
+  const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: normalizeTaskTag(task.tag), dueDate: task.dueDate ?? "" });
 
   function saveEdit() {
-    onEdit(task.id, { title: editForm.title.trim() || task.title, priority: editForm.priority, tag: editForm.tag, dueDate: editForm.dueDate || null });
+    onEdit(task.id, { title: editForm.title.trim() || task.title, priority: editForm.priority, tag: normalizeTaskTag(editForm.tag), dueDate: editForm.dueDate || null });
     setEditing(false);
   }
 
@@ -806,11 +807,11 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
         <div className="flex gap-2 flex-wrap items-center">
           <div className="flex gap-1">
             {PROJ_PRIORITIES.map((p) => (
-              <button key={p} onClick={() => setEditForm((f) => ({ ...f, priority: p }))} className={cn("px-2 py-0.5 text-xs font-bold rounded transition-colors", editForm.priority === p ? p === "P1" ? "bg-[var(--text)] text-[var(--bg)]" : p === "P2" ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--border)] text-[var(--text)]" : "bg-[var(--surface-2)] text-[var(--muted)]")}>{p}</button>
+              <button key={p.value} onClick={() => setEditForm((f) => ({ ...f, priority: p.value }))} className={cn("px-2 py-0.5 text-xs font-medium rounded transition-colors", editForm.priority === p.value ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--surface-2)] text-[var(--muted)]")}>{p.label}</button>
             ))}
           </div>
           <select className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={editForm.tag} onChange={(e) => setEditForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
-            {PROJ_TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
+            {PROJ_TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
           </select>
           <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
           <div className="ml-auto flex gap-1">
@@ -830,8 +831,8 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
       <span className={cn("flex-1 text-sm", task.done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{task.title}</span>
       <div className="flex items-center gap-2 text-xs">
         {task.recurring && <RotateCcw className="w-3 h-3 text-[var(--text)]" />}
-        <span className="text-[var(--faint)]">{task.tag}</span>
-        <span className={cn("font-bold px-1.5 py-0.5 rounded", task.priority === "P1" ? "bg-[var(--chip)] text-[var(--text)]" : task.priority === "P2" ? "bg-[var(--chip)] text-[var(--text)]" : "bg-[var(--chip)] text-[var(--faint)]")}>{task.priority}</span>
+        <span className="text-[var(--faint)]">{taskTagLabel(task.tag)}</span>
+        <span className={cn("font-medium px-1.5 py-0.5 rounded", task.priority === "P1" ? "bg-[var(--chip)] text-[var(--text)]" : task.priority === "P2" ? "bg-[var(--chip)] text-[var(--text)]" : "bg-[var(--chip)] text-[var(--faint)]")}>{priorityLabel(task.priority)}</span>
         {task.dueDate && <span className={cn("text-xs", task.dueDate < today && !task.done ? "text-[var(--text)]" : "text-[var(--faint)]")}>{task.dueDate}</span>}
         <button onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Pencil className="w-3.5 h-3.5" /></button>
         <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Trash2 className="w-3.5 h-3.5" /></button>

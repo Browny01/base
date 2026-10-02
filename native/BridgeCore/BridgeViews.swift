@@ -302,7 +302,7 @@ private struct TasksView: View {
                         HStack(spacing: 8) {
                             Text(task.string("priority", default: "P2"))
                                 .foregroundColor(priorityColor(task.string("priority")))
-                            Text(task.string("tag", default: "@personal"))
+                            Text(taskTagLabel(task.string("tag", default: "personal")))
                             if !task.string("dueDate").isEmpty { Text(task.string("dueDate")) }
                         }
                         .font(.caption)
@@ -338,18 +338,18 @@ private struct AddTaskView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var priority = "P2"
-    @State private var tag = "@personal"
+    @State private var tag = "personal"
 
     var body: some View {
         NavigationView {
             Form {
                 TextField("Task", text: $title)
                 Picker("Priority", selection: $priority) {
-                    ForEach(["P1", "P2", "P3"], id: \.self) { Text($0) }
+                    ForEach(["P1", "P2", "P3"], id: \.self) { Text(priorityLabel($0)) }
                 }
                 .pickerStyle(.segmented)
                 Picker("Area", selection: $tag) {
-                    ForEach(["@work", "@personal", "@money", "@admin"], id: \.self) { Text($0) }
+                    ForEach(taskTagValues, id: \.self) { Text(taskTagLabel($0)) }
                 }
             }
             .navigationTitle("New Task")
@@ -730,7 +730,7 @@ private struct FocusView: View {
         let elapsed = max(1, Int(ceil(Double(minutes * 60 - remaining) / 60.0)))
         store.upsert(collection: "focusSessions", fields: [
             "id": .string(UUID().uuidString), "durationMins": .number(Double(elapsed)),
-            "tag": .string("@personal"), "notes": .string("Native focus session"), "date": .string(BridgeDate.now()),
+            "tag": .string("personal"), "notes": .string("Native focus session"), "date": .string(BridgeDate.now()),
         ])
         hasSaved = true
         endDate = nil
@@ -903,6 +903,39 @@ private struct EmptyState: View {
             Text(title).foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 72)
+    }
+}
+
+// Mirrors TASK_TAGS / PRIORITY_META in lib/store.ts and lib/task-sort.ts: the
+// stored codes stay P1/P2/P3 and bare slugs, but the UI shows readable names.
+private let taskTagValues = [
+    "work", "build", "personal", "home", "errands",
+    "health", "finance", "admin", "learning", "other",
+]
+
+private func taskTagLabel(_ tag: String) -> String {
+    let labels = [
+        "work": "Work", "build": "Build", "personal": "Personal", "home": "Home",
+        "errands": "Errands", "health": "Health", "finance": "Finance", "admin": "Admin",
+        "learning": "Learning", "other": "Other",
+    ]
+    if let label = labels[tag] { return label }
+    // Tasks written before the "@" removal still carry the old spelling.
+    switch tag {
+    case "@work": return "Work"
+    case "@money": return "Finance"
+    case "@admin": return "Admin"
+    case "@personal": return "Personal"
+    default: return "Other"
+    }
+}
+
+private func priorityLabel(_ priority: String) -> String {
+    switch priority {
+    case "P1": return "Urgent"
+    case "P2": return "Important"
+    case "P3": return "Later"
+    default: return "Important"
     }
 }
 

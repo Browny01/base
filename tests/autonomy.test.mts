@@ -20,7 +20,7 @@ const task = (overrides: Record<string, unknown> = {}): AutonomyTaskLike & Recor
   id: "task-1",
   title: "Research a market",
   priority: "P2",
-  tag: "@night-auto",
+  tag: "night-auto",
   dueDate: null,
   recurring: null,
   done: false,
@@ -33,8 +33,8 @@ const task = (overrides: Record<string, unknown> = {}): AutonomyTaskLike & Recor
 test("autonomyState normalizes legacy completed and blocked tasks", () => {
   assert.equal(autonomyState(task({ done: true, executionState: undefined })), "completed");
   assert.equal(autonomyState(task({ executionNote: "Source missing", executionState: undefined })), "blocked");
-  assert.equal(autonomyState(task({ tag: "@work", nightPolicy: undefined, executionState: undefined })), null);
-  assert.equal(autonomyState(task({ tag: "@work", nightPolicy: undefined, taskClass: undefined, executionState: "in_progress" })), "in_progress");
+  assert.equal(autonomyState(task({ tag: "work", nightPolicy: undefined, executionState: undefined })), null);
+  assert.equal(autonomyState(task({ tag: "work", nightPolicy: undefined, taskClass: undefined, executionState: "in_progress" })), "in_progress");
 });
 
 test("buildAutonomySummary counts actionable states without inventing runs", () => {
@@ -44,7 +44,7 @@ test("buildAutonomySummary counts actionable states without inventing runs", () 
     task({ id: "3", executionState: "awaiting_review" }),
     task({ id: "4", executionState: "blocked" }),
     task({ id: "5", done: true, executionState: "completed" }),
-    task({ id: "6", tag: "@work", nightPolicy: undefined, executionState: undefined }),
+    task({ id: "6", tag: "work", nightPolicy: undefined, executionState: undefined }),
   ]);
 
   assert.deepEqual(summary, {
@@ -76,7 +76,7 @@ test("eligibleAutonomyTasks ignores unrelated in-progress experiments when enfor
   const unrelatedExperiment = {
     id: "paper-trading",
     title: "Run paper-trading experiment",
-    tag: "@development",
+    tag: "build",
     taskClass: "experiment",
     executionState: "in_progress",
     done: false,
@@ -179,7 +179,7 @@ test("generic agent writes cannot bypass autonomy claiming or verification", () 
   const patch = sanitizeAutonomyAgentPatch(task({ executionState: "awaiting_review" }), { title: "Safe title", executionState: "completed", done: true, verifiedAt: "now", resultSummary: "forged", taskClass: "research", workspace: "Systemly", dependencyIds: [] });
   assert.deepEqual(patch, { title: "Safe title" });
 
-  const suggestion = prepareAutonomySuggestion({ id: "idea", title: "Agent idea", tag: "@night-auto", workspace: "Bridge", taskClass: "research", dependencyIds: ["source"], executionState: "completed", done: true, resultSummary: "forged" });
+  const suggestion = prepareAutonomySuggestion({ id: "idea", title: "Agent idea", tag: "night-auto", workspace: "Bridge", taskClass: "research", dependencyIds: ["source"], executionState: "completed", done: true, resultSummary: "forged" });
   assert.equal(suggestion.executionState, "suggested");
   assert.equal(suggestion.done, false);
   assert.equal(suggestion.workspace, "Bridge");

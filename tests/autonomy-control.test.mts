@@ -23,7 +23,7 @@ const SETTINGS = {
 const queued = {
   id: "task-1",
   title: "Research evidence",
-  tag: "@night-auto",
+  tag: "night-auto",
   nightPolicy: "autonomous-v1",
   taskClass: "research",
   workspace: "Dropshipping",
@@ -106,7 +106,7 @@ test("unrelated in-progress experiments do not consume autonomy worker capacity"
   const unrelatedExperiment = {
     id: "paper-trading",
     title: "Run paper-trading experiment",
-    tag: "@development",
+    tag: "build",
     taskClass: "experiment",
     executionState: "in_progress",
     executionStartedAt: "2026-08-09T07:30:00.000Z",

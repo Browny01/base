@@ -4,12 +4,15 @@ import { useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, getToday } from "@/lib/utils";
-import type { Task, Priority, TaskTag, RecurringFreq } from "@/lib/store";
-import { Plus, Trash2, RotateCcw, LayoutList, Columns3, Pencil, Check, X, ChevronDown, ChevronRight, Sparkles, Loader2 } from "lucide-react";
+import { TASK_TAGS, normalizeTaskTag, taskTagLabel, type Task, type Priority, type TaskTag, type RecurringFreq } from "@/lib/store";
+import { DEFAULT_TASK_SORT, PRIORITY_META, TASK_SORTS, isTaskSort, priorityLabel, sortTasks, type TaskSort } from "@/lib/task-sort";
+import { useStoredPref, writeStored } from "@/lib/prefs";
+import { Plus, Trash2, RotateCcw, LayoutList, Columns3, Pencil, Check, X, ChevronDown, ChevronRight, ChevronUp, GripVertical, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
-const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
+const PRIORITIES = PRIORITY_META;
+const TAGS = TASK_TAGS;
+const SORT_KEY = "bridge_tasks_sort";
 const RECURRING: { value: RecurringFreq; label: string }[] = [
   { value: null, label: "None" },
   { value: "daily", label: "Daily" },
@@ -17,11 +20,13 @@ const RECURRING: { value: RecurringFreq; label: string }[] = [
   { value: "monthly", label: "Monthly" },
 ];
 
-const PRIORITY_STYLE: Record<Priority, { badge: string; col: string; label: string }> = {
-  P1: { badge: "bg-[var(--chip)] text-[var(--text)]",    col: "border-[var(--border-2)]",    label: "Urgent" },
-  P2: { badge: "bg-[var(--chip)] text-[var(--text)]", col: "border-[var(--border-2)]", label: "Normal" },
-  P3: { badge: "bg-[var(--chip)] text-[var(--muted)]",   col: "border-[var(--border)]",  label: "Later"  },
-};
+function priorityBadge(priority: Priority) {
+  return priority === "P1"
+    ? "bg-[color-mix(in_srgb,var(--c-rose)_16%,transparent)] text-[var(--c-rose)]"
+    : priority === "P2"
+      ? "bg-[var(--chip)] text-[var(--text)]"
+      : "bg-[var(--chip)] text-[var(--faint)]";
+}
 
 export function TasksPage() {
   const { data, mutate } = useBridge();
@@ -29,9 +34,13 @@ export function TasksPage() {
   const [filter, setFilter] = useState<"all" | "today" | TaskTag>("all");
   const [view, setView] = useState<"list" | "kanban">("list");
   const [showForm, setShowForm] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const storedSort = useStoredPref(SORT_KEY, DEFAULT_TASK_SORT);
+  const sort: TaskSort = isTaskSort(storedSort) ? storedSort : DEFAULT_TASK_SORT;
   const [form, setForm] = useState<{
     title: string; priority: Priority; tag: TaskTag; dueDate: string; recurring: RecurringFreq;
-  }>({ title: "", priority: "P2", tag: "@work", dueDate: "", recurring: null });
+  }>({ title: "", priority: "P2", tag: "work", dueDate: "", recurring: null });
 
   const today = getToday();
 
@@ -44,14 +53,43 @@ export function TasksPage() {
     return t.tag === filter && !t.done;
   });
   const doneTasks = data.tasks.filter((t) => t.done);
+  const ordered = sortTasks(filtered, sort);
+
+  function setSort(next: TaskSort) { writeStored(SORT_KEY, next); }
+
+  // Dragging writes `order` values, so it only makes sense in the manual view.
+  const canReorder = sort === "custom";
+
+  // Drop `dragId` onto the slot held by `targetId`, then renumber the visible
+  // list so `order` stays dense and stable.
+  function moveTo(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const list = sortTasks(filtered, "custom");
+    const from = list.findIndex((t) => t.id === draggedId);
+    const to = list.findIndex((t) => t.id === targetId);
+    if (from < 0 || to < 0) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    const orderMap = new Map(list.map((t, idx) => [t.id, idx]));
+    mutate((d) => ({
+      ...d,
+      tasks: d.tasks.map((t) => (orderMap.has(t.id) ? { ...t, order: orderMap.get(t.id)! } : t)),
+    }));
+  }
+
+  function nudge(id: string, dir: -1 | 1) {
+    const idx = ordered.findIndex((t) => t.id === id);
+    const target = ordered[idx + dir];
+    if (target) moveTo(id, target.id);
+  }
 
   function addTask() {
     if (!form.title.trim()) return;
     mutate((d) => ({
       ...d,
-      tasks: [...d.tasks, { id: uid(), title: form.title.trim(), priority: form.priority, tag: form.tag, dueDate: form.dueDate || null, recurring: form.recurring, done: false, createdAt: new Date().toISOString() }],
+      tasks: [...d.tasks, { id: uid(), title: form.title.trim(), priority: form.priority, tag: normalizeTaskTag(form.tag), dueDate: form.dueDate || null, recurring: form.recurring, done: false, createdAt: new Date().toISOString(), order: d.tasks.length }],
     }));
-    setForm({ title: "", priority: "P2", tag: "@work", dueDate: "", recurring: null });
+    setForm({ title: "", priority: "P2", tag: "work", dueDate: "", recurring: null });
     setShowForm(false);
   }
 
@@ -79,7 +117,8 @@ export function TasksPage() {
   }
 
   function editTask(id: string, updates: Partial<Task>) {
-    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === id ? { ...t, ...updates } : t) }));
+    const patch = updates.tag !== undefined ? { ...updates, tag: normalizeTaskTag(updates.tag) } : updates;
+    mutate((d) => ({ ...d, tasks: d.tasks.map((t) => t.id === id ? { ...t, ...patch } : t) }));
   }
 
   return (
@@ -87,6 +126,7 @@ export function TasksPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-[var(--text)]">Tasks</h1>
         <div className="flex items-center gap-2">
+          <SortMenu value={sort} onChange={setSort} />
           {/* View toggle */}
           <div className="flex bg-[var(--surface)] border border-[var(--border)] rounded-lg p-1">
             <button onClick={() => setView("list")} className={cn("p-1.5 rounded-md transition-colors", view === "list" ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
@@ -105,29 +145,29 @@ export function TasksPage() {
       {/* Add Form */}
       {showForm && (
         <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-xl p-4 mb-6 space-y-3">
-          <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]" placeholder="Task title..." value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && addTask()} />
+          <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-base text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]" placeholder="Task title..." value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && addTask()} />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-[var(--muted)] mb-1 block">Priority</label>
               <div className="flex gap-1">
                 {PRIORITIES.map((p) => (
-                  <button key={p} onClick={() => setForm((f) => ({ ...f, priority: p }))} className={cn("flex-1 py-1 text-xs font-bold rounded transition-colors", form.priority === p ? p === "P1" ? "bg-[var(--text)] text-[var(--bg)]" : p === "P2" ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--chip)] text-[var(--text)]" : "bg-[var(--surface-2)] text-[var(--muted)] hover:bg-[var(--chip)]")}>{p}</button>
+                  <button key={p.value} onClick={() => setForm((f) => ({ ...f, priority: p.value }))} className={cn("flex-1 py-1.5 text-[13px] font-medium rounded-lg transition-colors", form.priority === p.value ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--surface-2)] text-[var(--muted)] hover:bg-[var(--chip)]")}>{p.label}</button>
                 ))}
               </div>
             </div>
             <div>
               <label className="text-xs text-[var(--muted)] mb-1 block">Tag</label>
-              <select className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={form.tag} onChange={(e) => setForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
-                {TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
+              <select className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={form.tag} onChange={(e) => setForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
+                {TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-[var(--muted)] mb-1 block">Due Date</label>
-              <input type="date" className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} />
+              <input type="date" className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} />
             </div>
             <div>
               <label className="text-xs text-[var(--muted)] mb-1 block">Recurring</label>
-              <select className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={form.recurring ?? ""} onChange={(e) => setForm((f) => ({ ...f, recurring: (e.target.value || null) as RecurringFreq }))}>
+              <select className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={form.recurring ?? ""} onChange={(e) => setForm((f) => ({ ...f, recurring: (e.target.value || null) as RecurringFreq }))}>
                 {RECURRING.map((r) => <option key={String(r.value)} value={r.value ?? ""}>{r.label}</option>)}
               </select>
             </div>
@@ -140,10 +180,10 @@ export function TasksPage() {
       )}
 
       {/* Filter Tabs */}
-      <div className="flex gap-1 mb-5 bg-[var(--surface)] p-1 rounded-lg w-fit border border-[var(--border)]">
-        {(["all", "today", ...TAGS] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-colors", filter === f ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
-            {f === "all" ? "All" : f === "today" ? "Today" : f}
+      <div className="flex gap-1 mb-5 bg-[var(--surface)] p-1 rounded-lg w-fit border border-[var(--border)] max-w-full overflow-x-auto">
+        {(["all", "today", ...TAGS.map((t) => t.value)] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={cn("px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors", filter === f ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
+            {f === "all" ? "All" : f === "today" ? "Today" : taskTagLabel(f)}
           </button>
         ))}
       </div>
@@ -151,20 +191,40 @@ export function TasksPage() {
       {/* ── List View ── */}
       {view === "list" && (
         <>
-          <div className="space-y-2 mb-8">
-            {filtered.length === 0 ? (
-              <p className="text-sm text-[var(--muted)] py-4 text-center">No tasks here. You&apos;re clear!</p>
+          <div className="space-y-2.5 mb-8 max-w-4xl">
+            {ordered.length === 0 ? (
+              <p className="text-base text-[var(--muted)] py-4 text-center">No tasks here. You&apos;re clear!</p>
             ) : (
-              filtered
-                .sort((a, b) => ({ P1: 0, P2: 1, P3: 2 }[a.priority] - { P1: 0, P2: 1, P3: 2 }[b.priority]))
-                .map((task) => <TaskRow key={task.id} task={task} today={today} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />)
+              ordered.map((task, idx) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  index={idx}
+                  lastIndex={ordered.length - 1}
+                  today={today}
+                  canReorder={canReorder}
+                  dragId={dragId}
+                  overId={overId}
+                  onToggle={toggleTask}
+                  onDelete={deleteTask}
+                  onEdit={editTask}
+                  onDragStart={setDragId}
+                  onDragOver={setOverId}
+                  onDragLeave={(id) => setOverId((o) => (o === id ? null : o))}
+                  onDragEnd={() => { setDragId(null); setOverId(null); }}
+                  onNudge={nudge}
+                  onDrop={(targetId) => { if (dragId) moveTo(dragId, targetId); setDragId(null); setOverId(null); }}
+                />
+              ))
             )}
           </div>
           {doneTasks.length > 0 && (
             <div>
               <h2 className="text-xs text-[var(--muted)] uppercase tracking-wider mb-3">Completed ({doneTasks.length})</h2>
-              <div className="space-y-2">
-                {doneTasks.slice(0, 10).map((task) => <TaskRow key={task.id} task={task} today={today} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />)}
+              <div className="space-y-2.5 max-w-4xl">
+                {doneTasks.slice(0, 10).map((task) => (
+                  <TaskRow key={task.id} task={task} today={today} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />
+                ))}
               </div>
             </div>
           )}
@@ -186,6 +246,45 @@ export function TasksPage() {
   );
 }
 
+function SortMenu({ value, onChange }: { value: TaskSort; onChange: (s: TaskSort) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Sort tasks"
+        className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+      >
+        <ArrowUpDown className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">{TASK_SORTS.find((o) => o.value === value)?.label ?? value}</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute right-0 top-full mt-1 z-50 w-56 bg-[var(--surface)] border border-[var(--border-2)] rounded-xl shadow-xl p-1.5 nx-pop">
+            {TASK_SORTS.map((opt) => (
+              <button
+                key={opt.value}
+                role="menuitemradio"
+                aria-checked={opt.value === value}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={cn(
+                  "w-full px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors",
+                  opt.value === value ? "bg-[var(--chip)] text-[var(--text)] font-medium" : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Kanban Board ────────────────────────────────────────────────────────────────
 
 function KanbanBoard({ filtered, doneTasks, today, onToggle, onDelete, onEdit }: {
@@ -193,26 +292,25 @@ function KanbanBoard({ filtered, doneTasks, today, onToggle, onDelete, onEdit }:
   onToggle: (id: string) => void; onDelete: (id: string) => void;
   onEdit: (id: string, updates: Partial<Task>) => void;
 }) {
-  const columns: { priority: Priority | "done"; label: string; tasks: Task[] }[] = [
-    { priority: "P1", label: "Urgent", tasks: filtered.filter((t) => t.priority === "P1") },
-    { priority: "P2", label: "Normal", tasks: filtered.filter((t) => t.priority === "P2") },
-    { priority: "P3", label: "Later",  tasks: filtered.filter((t) => t.priority === "P3") },
-    { priority: "done", label: "Done", tasks: doneTasks },
+  const columns: { key: Priority | "done"; tasks: Task[] }[] = [
+    { key: "P1", tasks: filtered.filter((t) => t.priority === "P1") },
+    { key: "P2", tasks: filtered.filter((t) => t.priority === "P2") },
+    { key: "P3", tasks: filtered.filter((t) => t.priority === "P3") },
+    { key: "done", tasks: doneTasks },
   ];
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
-      {columns.map(({ priority, label, tasks }) => {
-        const style = priority === "done"
-          ? { header: "text-[var(--text)]", border: "border-[var(--border-2)]", colBg: "bg-[var(--chip)]" }
-          : { header: `${PRIORITY_STYLE[priority as Priority].badge.split(" ")[1]}`, border: PRIORITY_STYLE[priority as Priority].col, colBg: "bg-[var(--chip)]" };
+      {columns.map(({ key, tasks }) => {
+        const label = key === "done" ? "Done" : priorityLabel(key);
+        const border = key === "done" || key === "P1" || key === "P2" ? "border-[var(--border-2)]" : "border-[var(--border)]";
 
         return (
-          <div key={priority} className={cn("flex flex-col w-72 shrink-0 rounded-xl border p-3", style.border, style.colBg)}>
+          <div key={key} className={cn("flex flex-col w-80 sm:w-96 shrink-0 rounded-xl border bg-[var(--chip)] p-3.5", border)}>
             {/* Column header */}
             <div className="flex items-center gap-2 mb-3 px-1">
-              <span className={cn("text-sm font-semibold", priority === "done" ? "text-[var(--text)]" : priority === "P1" ? "text-[var(--text)]" : priority === "P2" ? "text-[var(--text)]" : "text-[var(--muted)]")}>{label}</span>
-              <span className="text-xs text-[var(--faint)] bg-[var(--chip)] px-2 py-0.5 rounded-full">{tasks.length}</span>
+              <span className={cn("text-[15px] font-semibold", key === "P3" ? "text-[var(--muted)]" : "text-[var(--text)]")}>{label}</span>
+              <span className="text-xs text-[var(--faint)] bg-[var(--surface)] px-2 py-0.5 rounded-full tabular">{tasks.length}</span>
             </div>
 
             {/* Cards */}
@@ -238,27 +336,27 @@ function KanbanCard({ task, today, onToggle, onDelete, onEdit }: {
   onEdit: (id: string, updates: Partial<Task>) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: task.tag, dueDate: task.dueDate ?? "" });
+  const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: normalizeTaskTag(task.tag), dueDate: task.dueDate ?? "" });
 
   function saveEdit() {
-    onEdit(task.id, { title: editForm.title.trim() || task.title, priority: editForm.priority, tag: editForm.tag, dueDate: editForm.dueDate || null });
+    onEdit(task.id, { title: editForm.title.trim() || task.title, priority: editForm.priority, tag: normalizeTaskTag(editForm.tag), dueDate: editForm.dueDate || null });
     setEditing(false);
   }
 
   if (editing) {
     return (
-      <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-lg p-3 space-y-2">
+      <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-xl p-3.5 space-y-2.5">
         <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1.5 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && saveEdit()} />
         <div className="flex gap-1">
           {PRIORITIES.map((p) => (
-            <button key={p} onClick={() => setEditForm((f) => ({ ...f, priority: p }))} className={cn("flex-1 py-0.5 text-xs font-bold rounded transition-colors", editForm.priority === p ? p === "P1" ? "bg-[var(--text)] text-[var(--bg)]" : p === "P2" ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--border)] text-[var(--text)]" : "bg-[var(--surface-2)] text-[var(--muted)]")}>{p}</button>
+            <button key={p.value} onClick={() => setEditForm((f) => ({ ...f, priority: p.value }))} className={cn("flex-1 py-1 text-xs font-medium rounded transition-colors", editForm.priority === p.value ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--surface-2)] text-[var(--muted)]")}>{p.label}</button>
           ))}
         </div>
         <div className="flex gap-2">
-          <select className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={editForm.tag} onChange={(e) => setEditForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
-            {TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
+          <select className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.tag} onChange={(e) => setEditForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
+            {TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
           </select>
-          <input type="date" className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
+          <input type="date" className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
         </div>
         <div className="flex gap-1 justify-end">
           <button onClick={() => setEditing(false)} className="p-1 text-[var(--muted)] hover:text-[var(--text)] transition-colors"><X className="w-3.5 h-3.5" /></button>
@@ -269,21 +367,21 @@ function KanbanCard({ task, today, onToggle, onDelete, onEdit }: {
   }
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-3 group hover:border-[var(--border)] transition-colors">
-      <div className="flex items-start gap-2">
-        <button onClick={() => onToggle(task.id)} className={cn("w-4 h-4 mt-0.5 rounded border flex items-center justify-center shrink-0 transition-colors", task.done ? "bg-[var(--text)] border-[var(--border-2)]" : "border-[var(--border)] hover:border-[var(--border-2)]")}>
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5 group hover:border-[var(--border)] transition-colors">
+      <div className="flex items-start gap-2.5">
+        <button onClick={() => onToggle(task.id)} aria-label={task.done ? `Mark ${task.title} as not done` : `Mark ${task.title} as done`} className={cn("w-4 h-4 mt-1 rounded border flex items-center justify-center shrink-0 transition-colors", task.done ? "bg-[var(--text)] border-[var(--border-2)]" : "border-[var(--border-2)] hover:bg-[var(--chip)]")}>
           {task.done && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-[var(--text)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
         </button>
-        <p className={cn("flex-1 text-sm leading-snug min-w-0", task.done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{task.title}</p>
+        <p className={cn("flex-1 text-[15px] leading-snug min-w-0", task.done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{task.title}</p>
         <div className="opacity-0 group-hover:opacity-100 flex shrink-0 gap-0.5">
-          <button onClick={() => setEditing(true)} className="p-0.5 text-[var(--faint)] hover:text-[var(--text)] transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
-          <button onClick={() => onDelete(task.id)} className="p-0.5 text-[var(--faint)] hover:text-[var(--text)] transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setEditing(true)} title="Edit task" aria-label={`Edit ${task.title}`} className="p-0.5 text-[var(--faint)] hover:text-[var(--text)] transition-colors"><Pencil className="w-4 h-4" /></button>
+          <button onClick={() => onDelete(task.id)} title="Delete task" aria-label={`Delete ${task.title}`} className="p-0.5 text-[var(--faint)] hover:text-[var(--text)] transition-colors"><Trash2 className="w-4 h-4" /></button>
         </div>
       </div>
-      <div className="flex items-center gap-2 mt-2 text-xs text-[var(--faint)]">
-        <span>{task.tag}</span>
+      <div className="flex items-center gap-2 mt-2.5 text-[13px] text-[var(--faint)]">
+        <span>{taskTagLabel(task.tag)}</span>
         {task.dueDate && <span className={cn(task.dueDate < today && !task.done ? "text-[var(--text)]" : "")}>{task.dueDate}</span>}
-        {task.recurring && <RotateCcw className="w-3 h-3 text-[var(--text)]" />}
+        {task.recurring && <RotateCcw className="w-3.5 h-3.5 text-[var(--text)]" />}
       </div>
     </div>
   );
@@ -291,39 +389,44 @@ function KanbanCard({ task, today, onToggle, onDelete, onEdit }: {
 
 // ── List Row ────────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
+function TaskRow({ task, today, onToggle, onDelete, onEdit, index, lastIndex, canReorder = false, dragId = null, overId = null, onDragStart, onDragOver, onDragLeave, onDragEnd, onDrop, onNudge }: {
   task: Task; today: string;
   onToggle: (id: string) => void; onDelete: (id: string) => void;
   onEdit: (id: string, updates: Partial<Task>) => void;
+  index?: number; lastIndex?: number;
+  canReorder?: boolean; dragId?: string | null; overId?: string | null;
+  onDragStart?: (id: string) => void; onDragOver?: (id: string) => void;
+  onDragLeave?: (id: string | null) => void; onDragEnd?: () => void;
+  onDrop?: (targetId: string) => void;
+  onNudge?: (id: string, dir: -1 | 1) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [newSub, setNewSub] = useState("");
-  const [breaking, setBreaking] = useState(false);
-  const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: task.tag, dueDate: task.dueDate ?? "" });
+  const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: normalizeTaskTag(task.tag), dueDate: task.dueDate ?? "" });
 
   function saveEdit() {
-    onEdit(task.id, { title: editForm.title.trim() || task.title, priority: editForm.priority, tag: editForm.tag, dueDate: editForm.dueDate || null });
+    onEdit(task.id, { title: editForm.title.trim() || task.title, priority: editForm.priority, tag: normalizeTaskTag(editForm.tag), dueDate: editForm.dueDate || null });
     setEditing(false);
   }
 
   if (editing) {
     return (
-      <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-lg p-3 space-y-2">
-        <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none focus:border-[var(--border-2)]" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && saveEdit()} />
+      <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-xl p-4 space-y-3">
+        <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-base text-[var(--text)] focus:outline-none focus:border-[var(--border-2)]" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && saveEdit()} />
         <div className="flex gap-2 flex-wrap items-center">
           <div className="flex gap-1">
             {PRIORITIES.map((p) => (
-              <button key={p} onClick={() => setEditForm((f) => ({ ...f, priority: p }))} className={cn("px-2 py-0.5 text-xs font-bold rounded transition-colors", editForm.priority === p ? p === "P1" ? "bg-[var(--text)] text-[var(--bg)]" : p === "P2" ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--border)] text-[var(--text)]" : "bg-[var(--surface-2)] text-[var(--muted)]")}>{p}</button>
+              <button key={p.value} onClick={() => setEditForm((f) => ({ ...f, priority: p.value }))} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", editForm.priority === p.value ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--surface-2)] text-[var(--muted)]")}>{p.label}</button>
             ))}
           </div>
-          <select className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={editForm.tag} onChange={(e) => setEditForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
-            {TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
+          <select className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.tag} onChange={(e) => setEditForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
+            {TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
           </select>
-          <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
+          <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
           <div className="ml-auto flex gap-1">
-            <button onClick={() => setEditing(false)} className="px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors flex items-center gap-1"><X className="w-3 h-3" /> Cancel</button>
-            <button onClick={saveEdit} className="px-3 py-1 text-xs bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] rounded-lg transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Save</button>
+            <button onClick={() => setEditing(false)} className="px-2.5 py-1 text-sm text-[var(--muted)] hover:text-[var(--text)] transition-colors flex items-center gap-1"><X className="w-3.5 h-3.5" /> Cancel</button>
+            <button onClick={saveEdit} className="px-3 py-1 text-sm bg-[var(--text)] hover:text-[var(--text-hover)] text-[var(--bg)] rounded-lg transition-colors flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Save</button>
           </div>
         </div>
       </div>
@@ -334,48 +437,78 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
   const subDone = subs.filter((s) => s.done).length;
   const setSubs = (next: typeof subs) => onEdit(task.id, { subtasks: next });
   const addSub = () => { const t = newSub.trim(); if (!t) return; setSubs([...subs, { id: uid(), title: t, done: false }]); setNewSub(""); };
-  const breakDown = async () => {
-    setBreaking(true);
-    try {
-      const res = await fetch("/api/tasks/breakdown", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: task.title }) });
-      const j = await res.json();
-      if (j.ok && Array.isArray(j.subtasks)) { setSubs([...subs, ...j.subtasks.map((t: string) => ({ id: uid(), title: t, done: false }))]); setExpanded(true); }
-    } catch { /* ignore */ }
-    setBreaking(false);
-  };
+  const draggable = Boolean(canReorder && onDragStart && onDragOver && onDragEnd && onDrop);
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg group hover:border-[var(--border)] transition-colors">
-      <div className="flex items-center gap-3 px-4 py-3">
-        <button onClick={() => onToggle(task.id)} className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors", task.done ? "bg-[var(--text)] border-[var(--border-2)]" : "border-[var(--border)] hover:border-[var(--border-2)]")}>
-          {task.done && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-[var(--text)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+    <div
+      draggable={draggable}
+      onDragStart={(e) => { if (!draggable) return; e.dataTransfer.effectAllowed = "move"; onDragStart!(task.id); }}
+      onDragEnd={() => { if (draggable) onDragEnd!(); }}
+      onDragOver={(e) => { if (!draggable) return; e.preventDefault(); onDragOver!(task.id); }}
+      onDragLeave={() => { if (draggable) onDragLeave?.(null); }}
+      onDrop={(e) => { if (!draggable) return; e.preventDefault(); onDrop!(task.id); }}
+      className={cn(
+        "bg-[var(--surface)] border rounded-xl group transition-colors",
+        overId === task.id ? "border-[var(--text)]" : "border-[var(--border)]",
+        dragId === task.id && "opacity-40",
+      )}
+    >
+      <div className="flex items-center gap-4 px-4 sm:px-5 py-3.5">
+        {/* Drag handle + keyboard reorder */}
+        {draggable ? (
+          <div className="flex flex-col items-center shrink-0 -my-1">
+            <button
+              onClick={() => onNudge?.(task.id, -1)}
+              disabled={index === 0}
+              aria-label={`Move ${task.title} up`}
+              className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+            <GripVertical className="w-4 h-4 text-[var(--faint)] cursor-grab active:cursor-grabbing" />
+            <button
+              onClick={() => onNudge?.(task.id, 1)}
+              disabled={lastIndex !== undefined && index === lastIndex}
+              aria-label={`Move ${task.title} down`}
+              className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="w-4 shrink-0" />
+        )}
+
+        <button onClick={() => onToggle(task.id)} aria-label={task.done ? `Mark ${task.title} as not done` : `Mark ${task.title} as done`} className={cn("w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors", task.done ? "bg-[var(--text)] border-[var(--border-2)]" : "border-[var(--border-2)] hover:bg-[var(--chip)]")}>
+          {task.done && <svg viewBox="0 0 12 12" className="w-3 h-3 text-[var(--text)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
         </button>
-        <span className={cn("flex-1 text-sm min-w-0 truncate", task.done ? "text-[var(--muted)] line-through" : "text-[var(--text)]")}>{task.title}</span>
-        <div className="flex items-center gap-2 text-xs shrink-0">
+
+        <span className={cn("flex-1 text-[15px] leading-snug min-w-0 truncate", task.done ? "text-[var(--muted)] line-through" : "text-[var(--text)]")}>{task.title}</span>
+
+        <div className="flex items-center gap-2.5 text-[13px] shrink-0">
           {subs.length > 0 && <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1 text-[var(--faint)] hover:text-[var(--text)]">{expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}<span className="tabular">{subDone}/{subs.length}</span></button>}
-          {task.recurring && <RotateCcw className="w-3 h-3 text-[var(--text)]" />}
-          <span className="text-[var(--muted)] hidden sm:inline">{task.tag}</span>
-          <span className={cn("font-bold px-1.5 py-0.5 rounded", task.priority === "P1" ? "bg-[var(--chip)] text-[var(--text)]" : task.priority === "P2" ? "bg-[var(--chip)] text-[var(--text)]" : "bg-[var(--chip)] text-[var(--muted)]")}>{task.priority}</span>
+          {task.recurring && <RotateCcw className="w-3.5 h-3.5 text-[var(--text)]" />}
+          <span className="text-[var(--muted)] hidden sm:inline">{taskTagLabel(task.tag)}</span>
+          <span className={cn("font-medium px-2 py-0.5 rounded-md", priorityBadge(task.priority))}>{priorityLabel(task.priority)}</span>
           {task.dueDate && <span className={cn("hidden sm:inline", task.dueDate < today && !task.done ? "text-[var(--text)]" : "text-[var(--muted)]")}>{task.dueDate}</span>}
-          <button onClick={breakDown} disabled={breaking} title="Break into subtasks with AI" className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--accent)] transition-all disabled:opacity-100">{breaking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}</button>
-          <button onClick={() => setExpanded((v) => !v)} title="Subtasks" className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Plus className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Pencil className="w-3.5 h-3.5" /></button>
-          <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setExpanded((v) => !v)} title="Subtasks" aria-label={`Subtasks for ${task.title}`} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Plus className="w-4 h-4" /></button>
+          <button onClick={() => setEditing(true)} title="Edit task" aria-label={`Edit ${task.title}`} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Pencil className="w-4 h-4" /></button>
+          <button onClick={() => onDelete(task.id)} title="Delete task" aria-label={`Delete ${task.title}`} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[var(--faint)] hover:text-[var(--text)] transition-all"><Trash2 className="w-4 h-4" /></button>
         </div>
       </div>
       {expanded && (
-        <div className="px-4 pb-3 pl-11 space-y-1.5">
-          {subs.length > 0 && <div className="w-full bg-[var(--chip)] rounded-full h-1 overflow-hidden mb-1"><div className="h-1 rounded-full bg-[var(--accent)] transition-all" style={{ width: `${subs.length ? (subDone / subs.length) * 100 : 0}%` }} /></div>}
+        <div className="px-4 sm:px-5 pb-4 pl-[4.5rem] space-y-2">
+          {subs.length > 0 && <div className="w-full bg-[var(--chip)] rounded-full h-1 overflow-hidden mb-2"><div className="h-1 rounded-full bg-[var(--accent)] transition-all" style={{ width: `${subs.length ? (subDone / subs.length) * 100 : 0}%` }} /></div>}
           {subs.map((s) => (
             <div key={s.id} className="flex items-center gap-2 group/sub">
-              <button onClick={() => setSubs(subs.map((x) => x.id === s.id ? { ...x, done: !x.done } : x))} className={cn("w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0", s.done ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-2)]")}>{s.done && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}</button>
-              <span className={cn("flex-1 text-[13px]", s.done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{s.title}</span>
-              <button onClick={() => setSubs(subs.filter((x) => x.id !== s.id))} className="opacity-0 group-hover/sub:opacity-100 text-[var(--faint)] hover:text-red-500"><X className="w-3 h-3" /></button>
+              <button onClick={() => setSubs(subs.map((x) => x.id === s.id ? { ...x, done: !x.done } : x))} aria-label={`Toggle subtask ${s.title}`} className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0", s.done ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-2)]")}>{s.done && <Check className="w-3 h-3 text-white" strokeWidth={3} />}</button>
+              <span className={cn("flex-1 text-sm", s.done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{s.title}</span>
+              <button onClick={() => setSubs(subs.filter((x) => x.id !== s.id))} aria-label={`Remove subtask ${s.title}`} className="opacity-0 group-hover/sub:opacity-100 text-[var(--faint)] hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
             </div>
           ))}
           <div className="flex items-center gap-2 pt-0.5">
-            <Plus className="w-3.5 h-3.5 text-[var(--faint)] shrink-0" />
-            <input value={newSub} onChange={(e) => setNewSub(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSub()} placeholder="Add subtask…" className="flex-1 bg-transparent text-[13px] text-[var(--text)] placeholder-[var(--faint)] focus:outline-none" />
+            <Plus className="w-4 h-4 text-[var(--faint)] shrink-0" />
+            <input value={newSub} onChange={(e) => setNewSub(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSub()} placeholder="Add subtask…" aria-label="Add subtask" className="flex-1 bg-transparent text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none" />
           </div>
         </div>
       )}

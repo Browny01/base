@@ -3,17 +3,16 @@ import { Redis } from "@upstash/redis";
 import { readCurrentData } from "@/lib/bridge-data";
 import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
 import { bridgeAgentToken } from "@/lib/env";
-import type { BridgeData as StoreBridgeData } from "@/lib/store";
+import { normalizeTaskTag, type BridgeData as StoreBridgeData } from "@/lib/store";
 
 type Priority = "P1" | "P2" | "P3";
-type TaskTag = "@work" | "@personal" | "@money" | "@admin";
 type RecurringFreq = "daily" | "weekly" | "monthly" | null;
 
 interface Task {
   id: string;
   title: string;
   priority: Priority;
-  tag: TaskTag;
+  tag: string;
   dueDate: string | null;
   recurring: RecurringFreq;
   done: boolean;
@@ -29,7 +28,6 @@ interface BridgeData {
 }
 
 const PRIORITIES = new Set(["P1", "P2", "P3"]);
-const TAGS = new Set(["@work", "@personal", "@money", "@admin"]);
 const RECURRING = new Set(["daily", "weekly", "monthly"]);
 
 function getRedis(): Redis | null {
@@ -74,9 +72,9 @@ function parseTaskInput(input: Record<string, unknown>, existing?: Task): Task {
     ? input.priority as Priority
     : existing?.priority ?? "P2";
 
-  const tag = typeof input.tag === "string" && TAGS.has(input.tag)
-    ? input.tag as TaskTag
-    : existing?.tag ?? "@personal";
+  const tag = input.tag !== undefined
+    ? normalizeTaskTag(input.tag)
+    : normalizeTaskTag(existing?.tag ?? "personal");
 
   const recurring = typeof input.recurring === "string" && RECURRING.has(input.recurring)
     ? input.recurring as Exclude<RecurringFreq, null>
