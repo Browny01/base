@@ -3,9 +3,10 @@
 import { useId, useRef, useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday } from "@/lib/utils";
-import type { Priority, Task, TaskTag, BridgeData, Bookmark } from "@/lib/store";
+import { TASK_TAGS, type Priority, type Task, type TaskTag, type BridgeData, type Bookmark } from "@/lib/store";
+import { PRIORITY_META, priorityLabel } from "@/lib/task-sort";
 import { useConfirm } from "@/lib/confirm-context";
-import { Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, Grip, SlidersHorizontal, RotateCcw, X, Check, Timer, NotebookText, CreditCard, Pencil, Trash2, Globe, ImagePlus } from "lucide-react";
+import { Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, X, Timer, NotebookText, CreditCard, Pencil, Trash2, Globe, ImagePlus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
@@ -14,8 +15,8 @@ import { Responsive, noCompactor, useContainerWidth, type Layout, type Responsiv
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
-const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
+const PRIORITIES = PRIORITY_META;
+const TAGS = TASK_TAGS;
 const PRIO_RANK: Record<Priority, number> = { P1: 0, P2: 1, P3: 2 };
 
 type DashboardBreakpoint = "lg" | "md" | "sm" | "xs" | "xxs";
@@ -37,8 +38,6 @@ const DEFAULT_WIDGET_IDS: WidgetId[] = ["tasks-metric", "revenue-metric", "tasks
 
 const BREAKPOINTS: Record<DashboardBreakpoint, number> = { lg: 1180, md: 900, sm: 680, xs: 420, xxs: 0 };
 const GRID_COLUMNS: Record<DashboardBreakpoint, number> = { lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 };
-const DASHBOARD_LAYOUT_KEY = "bridge_dashboard_layout_v1";
-const DASHBOARD_LAYOUT_VERSION = 3;
 
 const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
   lg: [
@@ -92,40 +91,6 @@ function stackedLayout(cols: number): Layout {
 DEFAULT_LAYOUTS.sm = stackedLayout(GRID_COLUMNS.sm);
 DEFAULT_LAYOUTS.xs = stackedLayout(GRID_COLUMNS.xs);
 DEFAULT_LAYOUTS.xxs = stackedLayout(GRID_COLUMNS.xxs);
-
-function migrateDashboardPreferences(saved: {
-  version?: number;
-  layouts?: ResponsiveLayouts<DashboardBreakpoint>;
-  visibleWidgets?: WidgetId[];
-}) {
-  if ((saved.version ?? 1) >= DASHBOARD_LAYOUT_VERSION) return saved;
-
-  // v3: the dashboard was reorganised into a fixed, purpose-built arrangement
-  // (metrics → priority tasks + news → projects → bookmarks). Drop stale custom
-  // layouts so everyone lands on the new default; widgets can still be re-arranged.
-  return { version: DASHBOARD_LAYOUT_VERSION, layouts: DEFAULT_LAYOUTS, visibleWidgets: DEFAULT_WIDGET_IDS };
-}
-
-function loadSavedDashboard() {
-  try {
-    const raw = localStorage.getItem(DASHBOARD_LAYOUT_KEY);
-    if (!raw) return null;
-    const saved = JSON.parse(raw) as {
-      version?: number;
-      layouts?: ResponsiveLayouts<DashboardBreakpoint>;
-      visibleWidgets?: WidgetId[];
-    };
-    const preferences = migrateDashboardPreferences(saved);
-    if (!preferences?.layouts || !preferences?.visibleWidgets) return null;
-    const valid = preferences.visibleWidgets.filter((id) => WIDGETS.some((widget) => widget.id === id));
-    if (preferences !== saved) {
-      localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(preferences));
-    }
-    return { layouts: preferences.layouts, visibleWidgets: valid };
-  } catch {
-    return null;
-  }
-}
 
 const COLOR_DOT: Record<string, string> = {
   indigo: "bg-[var(--c-indigo)]", cyan: "bg-[var(--c-cyan)]", emerald: "bg-[var(--c-emerald)]",
@@ -202,63 +167,12 @@ export function Dashboard() {
 
   const [quickTitle, setQuickTitle] = useState("");
   const [quickPriority, setQuickPriority] = useState<Priority>("P2");
-  const [quickTag, setQuickTag] = useState<TaskTag>("@work");
+  const [quickTag, setQuickTag] = useState<TaskTag>("work");
   const [showQuickForm, setShowQuickForm] = useState(false);
   const [revenuePeriod, setRevenuePeriod] = useState<"day" | "week" | "month">("day");
-  const [editing, setEditing] = useState(false);
-  const savedDashboard = loadSavedDashboard();
-  const [layouts, setLayouts] = useState<ResponsiveLayouts<DashboardBreakpoint>>(savedDashboard?.layouts ?? DEFAULT_LAYOUTS);
-  const [visibleWidgets, setVisibleWidgets] = useState<WidgetId[]>(savedDashboard?.visibleWidgets ?? DEFAULT_WIDGET_IDS);
-  const [showWidgetPicker, setShowWidgetPicker] = useState(false);
+  // The dashboard is intentionally fixed: no saved layout to read, no width to
+  // measure, so it paints on first render instead of waiting on a layout pass.
   const { width: gridWidth, containerRef: gridContainerRef, mounted: gridMounted } = useContainerWidth({ measureBeforeMount: true });
-
-  useEffect(() => {
-    if (!editing) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setEditing(false);
-        setShowWidgetPicker(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editing]);
-
-  function persistDashboard(nextLayouts: ResponsiveLayouts<DashboardBreakpoint>, nextVisible = visibleWidgets) {
-    localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify({ version: DASHBOARD_LAYOUT_VERSION, layouts: nextLayouts, visibleWidgets: nextVisible }));
-  }
-
-  function removeWidget(id: WidgetId) {
-    const nextVisible = visibleWidgets.filter((widgetId) => widgetId !== id);
-    setVisibleWidgets(nextVisible);
-    persistDashboard(layouts, nextVisible);
-  }
-
-  function addWidget(id: WidgetId) {
-    if (visibleWidgets.includes(id)) return;
-    const nextVisible = [...visibleWidgets, id];
-    const nextLayouts = Object.fromEntries(
-      (Object.keys(GRID_COLUMNS) as DashboardBreakpoint[]).map((breakpoint) => {
-        const existing = [...(layouts[breakpoint] || [])];
-        if (!existing.some((item) => item.i === id)) {
-          const source = DEFAULT_LAYOUTS[breakpoint]?.find((item) => item.i === id);
-          const bottom = existing.reduce((max, item) => Math.max(max, item.y + item.h), 0);
-          existing.push({ ...(source || { i: id, x: 0, y: bottom, w: GRID_COLUMNS[breakpoint], h: 6 }), y: bottom });
-        }
-        return [breakpoint, existing];
-      }),
-    ) as ResponsiveLayouts<DashboardBreakpoint>;
-    setVisibleWidgets(nextVisible);
-    setLayouts(nextLayouts);
-    persistDashboard(nextLayouts, nextVisible);
-  }
-
-  function resetDashboard() {
-    const nextVisible = DEFAULT_WIDGET_IDS;
-    setLayouts(DEFAULT_LAYOUTS);
-    setVisibleWidgets(nextVisible);
-    persistDashboard(DEFAULT_LAYOUTS, nextVisible);
-  }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const todayTasks = data.tasks.filter((t) => !t.done && (t.dueDate === today || !t.dueDate));
@@ -374,8 +288,8 @@ export function Dashboard() {
               <div className="space-y-2">
                 <input autoFocus className="field w-full px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--faint)]" placeholder="New task for today..." value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addQuickTask(); if (event.key === "Escape") setShowQuickForm(false); }} />
                 <div className="flex gap-2 items-center">
-                  <div className="flex gap-1">{PRIORITIES.map((priority) => <button key={priority} onClick={() => setQuickPriority(priority)} className={cn("px-2 py-0.5 text-xs font-bold rounded-lg transition-colors", quickPriority === priority ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--chip)] text-[var(--faint)] hover:text-[var(--text)]")}>{priority}</button>)}</div>
-                  <select className="field flex-1 px-2 py-1 text-xs text-[var(--text)]" value={quickTag} onChange={(event) => setQuickTag(event.target.value as TaskTag)}>{TAGS.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
+                  <div className="flex gap-1">{PRIORITIES.map((p) => <button key={p.value} onClick={() => setQuickPriority(p.value)} className={cn("px-2 py-0.5 text-xs font-medium rounded-lg transition-colors", quickPriority === p.value ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--chip)] text-[var(--faint)] hover:text-[var(--text)]")}>{p.label}</button>)}</div>
+                  <select className="field flex-1 px-2 py-1 text-xs text-[var(--text)]" value={quickTag} onChange={(event) => setQuickTag(event.target.value as TaskTag)}>{TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}</select>
                   <button onClick={addQuickTask} className="btn-primary px-3 py-1 text-xs">Add</button>
                 </div>
               </div>
@@ -447,82 +361,35 @@ export function Dashboard() {
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
-      {/* ── Greeting — sits directly on the canvas, subtle watermark on the right ── */}
+      {/* ── Greeting ── */}
       <header className="relative mb-6">
-        <img
-          src="/base-mark.png"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none select-none absolute right-0 -top-2 w-40 sm:w-56 opacity-[0.045] dark:opacity-[0.06]"
-        />
         <p className="text-[13px] text-[var(--muted)] font-medium mb-1.5">{formatDate(now)}</p>
         <h1 className="text-[2rem] sm:text-[2.6rem] font-bold text-[var(--text)] leading-[1.05] tracking-tight">
           Good {greetText}, Lucas.
         </h1>
       </header>
 
-      <div ref={gridContainerRef} className={cn("dashboard-grid -mx-3", editing && "is-editing")}>
+      <div ref={gridContainerRef} className="dashboard-grid -mx-3">
         {gridMounted && (
           <Responsive<DashboardBreakpoint>
             width={gridWidth}
-            layouts={layouts}
+            layouts={DEFAULT_LAYOUTS}
             breakpoints={BREAKPOINTS}
             cols={GRID_COLUMNS}
             rowHeight={24}
             margin={[12, 12]}
             containerPadding={[12, 0]}
             compactor={noCompactor}
-            dragConfig={{ enabled: editing, handle: ".dashboard-drag-handle", bounded: true }}
-            resizeConfig={{ enabled: editing, handles: ["n", "s", "e", "w", "ne", "nw", "se", "sw"] }}
-            onLayoutChange={(_current, nextLayouts) => {
-              const normalized = nextLayouts as ResponsiveLayouts<DashboardBreakpoint>;
-              setLayouts(normalized);
-              persistDashboard(normalized);
-            }}
           >
-            {visibleWidgets.map((id) => {
-              const widget = WIDGETS.find((item) => item.id === id)!;
-              return (
-                <div key={id} className="dashboard-widget">
-                  {editing && (
-                    <div className="dashboard-widget-controls">
-                      <button className="dashboard-drag-handle" aria-label={`Move ${widget.label}`} title="Drag to move"><Grip className="w-3.5 h-3.5" /><span>{widget.label}</span></button>
-                      <button onClick={() => removeWidget(id)} aria-label={`Remove ${widget.label}`} title="Remove widget" className="dashboard-remove-widget"><X className="w-3.5 h-3.5" /></button>
-                    </div>
-                  )}
-                  <div className="dashboard-widget-content">{renderWidget(id)}</div>
-                </div>
-              );
-            })}
+            {DEFAULT_WIDGET_IDS.map((id) => (
+              <div key={id} className="dashboard-widget">
+                <div className="dashboard-widget-content">{renderWidget(id)}</div>
+              </div>
+            ))}
           </Responsive>
         )}
-        {editing && <div className="dashboard-edit-runway" aria-hidden="true"><span>Keep resizing — the canvas extends with you</span></div>}
       </div>
 
-      <div className={cn("dashboard-editor-toolbar relative mt-8 mb-4 flex justify-center", editing && "is-editing")}>
-        {editing && showWidgetPicker && (
-          <div className="absolute bottom-full mb-3 w-[min(440px,calc(100vw-2rem))] max-h-[min(70vh,560px)] overflow-y-auto elevated card p-4 nx-pop z-40">
-            <div className="flex items-center justify-between mb-3">
-              <div><p className="text-sm font-semibold text-[var(--text)]">Widget library</p><p className="text-[11.5px] text-[var(--faint)] mt-0.5">Build the dashboard around what matters today.</p></div>
-              <button onClick={() => setShowWidgetPicker(false)} className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {WIDGETS.map((widget) => {
-                const added = visibleWidgets.includes(widget.id);
-                return <button key={widget.id} disabled={added} onClick={() => addWidget(widget.id)} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-left text-xs font-medium text-[var(--text)] hover:border-[var(--border-2)] disabled:opacity-45"><span>{widget.label}</span>{added ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}</button>;
-              })}
-            </div>
-          </div>
-        )}
-
-        <div className="glass glass-edge flex items-center gap-1.5 rounded-full border border-[var(--border)] p-1.5">
-          {editing && <button onClick={() => setShowWidgetPicker((value) => !value)} className="pill h-9 border-0 bg-transparent"><Plus className="w-3.5 h-3.5" /> Add widget</button>}
-          {editing && <button onClick={resetDashboard} className="pill h-9 border-0 bg-transparent"><RotateCcw className="w-3.5 h-3.5" /> Reset</button>}
-          <button onClick={() => { setEditing((value) => !value); setShowWidgetPicker(false); }} className={cn("h-9 rounded-full px-4 inline-flex items-center gap-2 text-xs font-semibold transition-colors", editing ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]")}>
-            {editing ? <Check className="w-3.5 h-3.5" /> : <SlidersHorizontal className="w-3.5 h-3.5" />}{editing ? "Done" : "Edit dashboard"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -555,11 +422,11 @@ function WidgetEmpty({ children }: { children: React.ReactNode }) {
 
 function PriorityBadge({ priority }: { priority: Priority }) {
   return (
-    <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 tabular",
+    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0",
       priority === "P1" ? "bg-[color-mix(in_srgb,var(--c-rose)_16%,transparent)] text-[var(--c-rose)]"
       : priority === "P2" ? "bg-[var(--chip)] text-[var(--muted)]"
       : "bg-[var(--chip)] text-[var(--faint)]"
-    )}>{priority}</span>
+    )}>{priorityLabel(priority)}</span>
   );
 }
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
+import { useStoredPref, writeStored } from "@/lib/prefs";
 import type { BridgeData } from "@/lib/store";
 import {
   DEFAULT_LIST_SORT, LIST_SORTS, isListSort, sortItems, sortLabel, type ListSort,
@@ -108,38 +109,6 @@ const DENSITIES: ReadonlyArray<{ value: ListDensity; label: string; Icon: Lucide
   { value: "compact", label: "Compact", Icon: Rows3 },
   { value: "roomy",   label: "Roomy",   Icon: Rows2 },
 ];
-
-// Density and sort are view preferences, not synced data, so they live in
-// localStorage instead of bloating the shared payload. Reading them through
-// useSyncExternalStore keeps the server snapshot and the first client render in
-// agreement, which reading localStorage into useState would not.
-const prefListeners = new Set<() => void>();
-
-function emitPrefs() {
-  for (const l of prefListeners) l();
-}
-
-function subscribePrefs(cb: () => void) {
-  prefListeners.add(cb);
-  return () => { prefListeners.delete(cb); };
-}
-
-function readStored(key: string): string | null {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-
-function writeStored(key: string, value: string) {
-  try { localStorage.setItem(key, value); } catch {}
-  emitPrefs();
-}
-
-function useStoredPref(key: string, fallback: string) {
-  return useSyncExternalStore(
-    subscribePrefs,
-    () => readStored(key) ?? fallback,
-    () => fallback,
-  );
-}
 
 function ItemIcon({ cfg, item, size = "sm" }: { cfg: ListPageConfig; item: LazyItem; size?: "sm" | "lg" | "xl" }) {
   const dim =

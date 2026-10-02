@@ -12,8 +12,8 @@ queue edits without a connection, and merge those edits when the internet return
 - **Overview dashboard** - a full-width command center with greeting,
   task/project summaries, revenue target progress, portfolio trend data, and
   news briefing cards.
-- **Tasks** - priority/tagged tasks, due dates, recurring settings, subtasks, AI
-  task breakdowns, completion tracking, and native offline creation.
+- **Tasks** - priority/categorised tasks, due dates, recurring settings, manual
+  arrangement, subtasks, completion tracking, and native offline creation.
 - **Calendar** - editable all-day and timed events, recurring series, month and
   agenda views, plus dated tasks, milestones, payments, exams, workouts, and
   optional Cal.com bookings in one schedule.
@@ -118,7 +118,7 @@ variables depending on the feature set you want enabled:
 | `KV_URL`, `REDIS_URL` | Upstash Redis/KV compatibility URLs |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN` | Redis REST access |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob file uploads |
-| `GEMINI_API_KEY` | AI chat, learning, summaries, and task breakdowns |
+| `GEMINI_API_KEY` | AI chat, learning, and summaries |
 | `PERPLEXITY_API_KEY` | Web search and live news lookups |
 | `STRIPE_SECRET_KEY` | Stripe revenue/business stats |
 | `CALCOM_API_KEY` | Cal.com bookings |

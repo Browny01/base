@@ -10,6 +10,13 @@ export const AUTONOMY_STATES = [
 ] as const;
 
 export type AutonomyState = typeof AUTONOMY_STATES[number];
+
+// lib/store.ts imports this module, so the night-task check stays local rather
+// than calling normalizeTaskTag (which would make the two modules circular).
+// Tasks written before the "@" removal still carry the old spelling.
+function isNightTaskTag(tag: unknown): boolean {
+  return tag === "night-auto" || tag === "@night-auto";
+}
 export type AutonomyTaskClass = "research" | "planning" | "implementation" | "review" | "operations";
 
 export interface AutonomySettings {
@@ -140,7 +147,7 @@ const AUTONOMY_AGENT_PROTECTED_FIELDS = new Set([
 ]);
 
 function recordLooksAutonomous(record: Record<string, unknown>): boolean {
-  return record.tag === "@night-auto" || record.nightPolicy === "autonomous-v1" || (typeof record.executionState === "string" && (AUTONOMY_STATES as readonly string[]).includes(record.executionState));
+  return isNightTaskTag(record.tag) || record.nightPolicy === "autonomous-v1" || (typeof record.executionState === "string" && (AUTONOMY_STATES as readonly string[]).includes(record.executionState));
 }
 
 export function sanitizeAutonomyAgentPatch(current: AutonomyTaskLike, patch: Record<string, unknown>): Record<string, unknown> {
@@ -178,7 +185,7 @@ export interface AutonomySummary {
 const PRIORITY_ORDER = { P1: 0, P2: 1, P3: 2 } as const;
 
 export function isAutonomyTask(task: AutonomyTaskLike): boolean {
-  return task.tag === "@night-auto" || task.nightPolicy === "autonomous-v1" || AUTONOMY_STATES.includes(task.executionState as AutonomyState);
+  return isNightTaskTag(task.tag) || task.nightPolicy === "autonomous-v1" || AUTONOMY_STATES.includes(task.executionState as AutonomyState);
 }
 
 export function autonomyState(task: AutonomyTaskLike): AutonomyState | null {

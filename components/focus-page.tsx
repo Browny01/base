@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, getToday, formatTime } from "@/lib/utils";
-import type { TaskTag } from "@/lib/store";
+import { TASK_TAGS, taskTagLabel, type TaskTag } from "@/lib/store";
 import { Play, Pause, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ const MODES = [
   { label: "Deep", mins: 90 },
 ];
 
-const TAGS: TaskTag[] = ["@work", "@personal", "@money", "@admin"];
+const TAGS = TASK_TAGS;
 
 export function FocusPage() {
   const { data, mutate } = useBridge();
@@ -21,7 +21,7 @@ export function FocusPage() {
   const [seconds, setSeconds] = useState(MODES[0].mins * 60);
   const [running, setRunning] = useState(false);
   const [immersive, setImmersive] = useState(false);
-  const [tag, setTag] = useState<TaskTag>("@work");
+  const [tag, setTag] = useState<TaskTag>("work");
   const [notes, setNotes] = useState("");
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -195,16 +195,17 @@ export function FocusPage() {
               <div className="flex gap-1 flex-wrap">
                 {TAGS.map((t) => (
                   <button
-                    key={t}
-                    onClick={() => setTag(t)}
+                    key={t.value}
+                    onClick={() => setTag(t.value)}
                     className={cn(
-                      "px-2.5 py-1 text-xs rounded-full border transition-colors",
-                      tag === t
+                      "flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors",
+                      tag === t.value
                         ? "bg-[var(--chip)] border-[var(--border-2)] text-[var(--text)]"
                         : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--border)]"
                     )}
                   >
-                    {t}
+                    <span aria-hidden="true">{t.emoji}</span>
+                    {t.label}
                   </button>
                 ))}
               </div>
@@ -230,7 +231,7 @@ export function FocusPage() {
                 <div key={s.id} className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-sm">
                   <span className="text-[var(--text)]">{s.notes || "—"}</span>
                   <div className="flex items-center gap-3 text-[var(--muted)]">
-                    <span>{s.tag}</span>
+                    <span>{taskTagLabel(s.tag)}</span>
                     <span className="font-mono text-[var(--text)]">{s.durationMins}m</span>
                   </div>
                 </div>
