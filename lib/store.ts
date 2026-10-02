@@ -140,7 +140,7 @@ export interface ShoppingListItem {
   createdAt: string;
   icon?: string;         // custom emoji, or a data-URL / http(s) image URL — overrides the category emoji
   url?: string;          // optional link to the product page
-  order?: number;        // manual sort position within the wish list (lower = higher up)
+  order?: number;        // manual sort position within the list (lower = higher up)
 }
 
 // ── Bookmarks (dashboard quick-links) ───────────────────────────────────────

@@ -5,11 +5,14 @@ import { ShoppingCart } from "lucide-react";
 
 const CONFIG: ListPageConfig = {
   dataKey: "shoppingList",
-  title: "Wish List",
+  title: "Shopping List",
   addLabel: "Add Item",
   namePlaceholder: "What do you want?…",
   emptyIcon: ShoppingCart,
-  emptyText: "Your wish list is empty. Start adding things you want!",
+  emptyText: "Your shopping list is empty. Start adding things you want!",
+  sortOptions: true,
+  densityOptions: true,
+  defaultDensity: "roomy",
   gotLabel: (n) => `Got (${n})`,
   categories: [
     { value: "clothing",    label: "Clothing",    emoji: "👔" },

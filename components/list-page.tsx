@@ -1,13 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import type { BridgeData } from "@/lib/store";
 import {
+  DEFAULT_LIST_SORT, LIST_SORTS, isListSort, sortItems, sortLabel, type ListSort,
+} from "@/lib/list-sort";
+import {
   Plus, Trash2, Check, ChevronDown, ChevronUp,
   ArrowUp, ArrowRight, ArrowDown, GripVertical, Pencil, ExternalLink,
-  ImagePlus, X, type LucideIcon,
+  ImagePlus, X, ArrowUpDown, Rows2, Rows3, type LucideIcon,
 } from "lucide-react";
 
 export type ListPriority = 1 | 2 | 3;
@@ -39,6 +42,9 @@ export interface ListPageConfig {
   categories: ReadonlyArray<{ value: string; label: string; emoji: string }>;
   extraFields?: ListExtraField[];
   extraFieldsPlaceholder?: string; // sub-caption under the extra field caption
+  sortOptions?: boolean;           // show the sort menu
+  densityOptions?: boolean;        // show the compact/roomy toggle
+  defaultDensity?: ListDensity;    // density before anything is stored (default "compact")
 }
 
 const PRIORITIES: { value: ListPriority; label: string; icon: typeof ArrowUp; color: string }[] = [
@@ -53,17 +59,6 @@ function getCategoryInfo(cfg: ListPageConfig, cat: string) {
 
 function getPriorityInfo(p: ListPriority) {
   return PRIORITIES.find((pr) => pr.value === p) ?? PRIORITIES[2];
-}
-
-function prioritySort(a: LazyItem, b: LazyItem) {
-  return a.priority - b.priority || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-}
-
-// Manual order first; items without a saved order fall back to priority/age.
-function orderSort(a: LazyItem, b: LazyItem) {
-  const ao = a.order ?? Number.MAX_SAFE_INTEGER;
-  const bo = b.order ?? Number.MAX_SAFE_INTEGER;
-  return ao !== bo ? ao - bo : prioritySort(a, b);
 }
 
 function formatPrice(amount: number) {
@@ -107,8 +102,50 @@ async function fileToIcon(file: File): Promise<string> {
   return canvas.toDataURL("image/webp", 0.8);
 }
 
-function ItemIcon({ cfg, item, size = "sm" }: { cfg: ListPageConfig; item: LazyItem; size?: "sm" | "lg" }) {
-  const dim = size === "lg" ? "w-9 h-9 text-2xl" : "w-5 h-5 text-sm";
+export type ListDensity = "compact" | "roomy";
+
+const DENSITIES: ReadonlyArray<{ value: ListDensity; label: string; Icon: LucideIcon }> = [
+  { value: "compact", label: "Compact", Icon: Rows3 },
+  { value: "roomy",   label: "Roomy",   Icon: Rows2 },
+];
+
+// Density and sort are view preferences, not synced data, so they live in
+// localStorage instead of bloating the shared payload. Reading them through
+// useSyncExternalStore keeps the server snapshot and the first client render in
+// agreement, which reading localStorage into useState would not.
+const prefListeners = new Set<() => void>();
+
+function emitPrefs() {
+  for (const l of prefListeners) l();
+}
+
+function subscribePrefs(cb: () => void) {
+  prefListeners.add(cb);
+  return () => { prefListeners.delete(cb); };
+}
+
+function readStored(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function writeStored(key: string, value: string) {
+  try { localStorage.setItem(key, value); } catch {}
+  emitPrefs();
+}
+
+function useStoredPref(key: string, fallback: string) {
+  return useSyncExternalStore(
+    subscribePrefs,
+    () => readStored(key) ?? fallback,
+    () => fallback,
+  );
+}
+
+function ItemIcon({ cfg, item, size = "sm" }: { cfg: ListPageConfig; item: LazyItem; size?: "sm" | "lg" | "xl" }) {
+  const dim =
+    size === "xl" ? "w-20 h-20 sm:w-24 sm:h-24 text-5xl rounded-lg"
+    : size === "lg" ? "w-9 h-9 text-2xl"
+    : "w-5 h-5 text-sm";
   if (isImageIcon(item.icon)) {
     return <img src={item.icon} alt="" className={cn("rounded object-cover shrink-0", dim)} />;
   }
@@ -343,6 +380,72 @@ function ItemForm({
   );
 }
 
+function SortMenu({ value, onChange }: { value: ListSort; onChange: (s: ListSort) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Sort items"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-1.5 h-8 pl-2.5 pr-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+      >
+        <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
+        <span className="max-w-[10rem] truncate">{sortLabel(value)}</span>
+        <ChevronDown className={cn("w-3 h-3 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div role="menu" className="absolute left-0 top-full mt-1 z-50 w-60 bg-[var(--surface)] border border-[var(--border-2)] rounded-xl shadow-xl p-1.5 nx-pop">
+            {LIST_SORTS.map((opt) => (
+              <button
+                key={opt.value}
+                role="menuitemradio"
+                aria-checked={opt.value === value}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={cn(
+                  "w-full px-2.5 py-1.5 rounded-lg text-xs text-left transition-colors",
+                  opt.value === value
+                    ? "bg-[var(--chip)] text-[var(--text)] font-medium"
+                    : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DensityMenu({ value, onChange }: { value: ListDensity; onChange: (d: ListDensity) => void }) {
+  return (
+    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+      {DENSITIES.map(({ value: d, label, Icon }) => (
+        <button
+          key={d}
+          onClick={() => onChange(d)}
+          title={`${label} items`}
+          aria-label={`${label} items`}
+          aria-pressed={d === value}
+          className={cn(
+            "p-1.5 rounded-md transition-colors",
+            d === value
+              ? "bg-[var(--chip)] text-[var(--text)]"
+              : "text-[var(--faint)] hover:text-[var(--text)]",
+          )}
+        >
+          <Icon className="w-3.5 h-3.5" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   const { data, mutate } = useBridge();
   const items = (data[cfg.dataKey] as unknown as LazyItem[]) ?? [];
@@ -352,6 +455,20 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   const [showCompleted, setShowCompleted] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const sortKey = `bridge_list_sort_${cfg.dataKey}`;
+  const densityKey = `bridge_list_density_${cfg.dataKey}`;
+
+  const storedSort = useStoredPref(sortKey, DEFAULT_LIST_SORT);
+  const storedDensity = useStoredPref(densityKey, cfg.defaultDensity ?? "compact");
+  const sort: ListSort = isListSort(storedSort) ? storedSort : DEFAULT_LIST_SORT;
+  const density: ListDensity = storedDensity === "roomy" ? "roomy" : "compact";
+
+  const roomy = density === "roomy";
+  // Dragging writes `order` values, so it only makes sense in the manual view.
+  const canReorder = sort === "custom";
+
+  function changeSort(next: ListSort) { writeStored(sortKey, next); }
+  function changeDensity(next: ListDensity) { writeStored(densityKey, next); }
 
   function write(next: LazyItem[]) {
     mutate((d) => ({ ...d, [cfg.dataKey]: next }) as BridgeData);
@@ -418,7 +535,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   // unchecked list so `order` stays dense and stable.
   function moveTo(draggedId: string, targetId: string) {
     if (draggedId === targetId) return;
-    const ordered = items.filter((i) => !i.checked).sort(orderSort);
+    const ordered = sortItems(items.filter((i) => !i.checked), "custom");
     const from = ordered.findIndex((i) => i.id === draggedId);
     const to = ordered.findIndex((i) => i.id === targetId);
     if (from < 0 || to < 0) return;
@@ -435,8 +552,8 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
     if (target) moveTo(id, target);
   }
 
-  const unchecked = items.filter((i) => !i.checked).sort(orderSort);
-  const checked = items.filter((i) => i.checked);
+  const unchecked = sortItems(items.filter((i) => !i.checked), sort);
+  const checked = sortItems(items.filter((i) => i.checked), sort);
   const totalCost = unchecked.reduce((sum, i) => sum + i.price, 0);
 
   return (
@@ -461,7 +578,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
       </div>
 
       {/* Progress bar */}
-      <div className="w-full bg-[var(--chip)] rounded-full h-1.5 mb-7">
+      <div className="w-full bg-[var(--chip)] rounded-full h-1.5 mb-4">
         <div
           className="bg-[var(--text)] h-1.5 rounded-full transition-all"
           style={{
@@ -469,6 +586,14 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
           }}
         />
       </div>
+
+      {/* Sort + density */}
+      {(cfg.sortOptions || cfg.densityOptions) && (
+        <div className="flex items-center gap-2 mb-4">
+          {cfg.sortOptions && <SortMenu value={sort} onChange={changeSort} />}
+          {cfg.densityOptions && <DensityMenu value={density} onChange={changeDensity} />}
+        </div>
+      )}
 
       {/* New item form */}
       {showForm && (
@@ -487,7 +612,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
 
       {/* Unchecked items */}
       {unchecked.length > 0 && (
-        <div className="space-y-1.5">
+        <div className={roomy ? "space-y-3" : "space-y-1.5"}>
           {unchecked.map((item, idx) => {
             if (editingId === item.id) {
               return (
@@ -509,54 +634,60 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
             return (
               <div
                 key={item.id}
-                draggable
+                draggable={canReorder}
                 onDragStart={(e) => {
+                  if (!canReorder) return;
                   setDragId(item.id);
                   e.dataTransfer.effectAllowed = "move";
                 }}
                 onDragEnd={() => { setDragId(null); setOverId(null); }}
                 onDragOver={(e) => {
+                  if (!canReorder) return;
                   e.preventDefault();
                   if (dragId && dragId !== item.id) setOverId(item.id);
                 }}
                 onDragLeave={() => setOverId((o) => (o === item.id ? null : o))}
                 onDrop={(e) => {
                   e.preventDefault();
-                  if (dragId) moveTo(dragId, item.id);
+                  if (dragId && canReorder) moveTo(dragId, item.id);
                   setDragId(null);
                   setOverId(null);
                 }}
                 className={cn(
-                  "bg-[var(--surface)] border rounded-xl px-3 py-3 flex items-center gap-2.5 transition-colors",
+                  "bg-[var(--surface)] border flex items-center transition-colors",
+                  roomy ? "rounded-2xl p-4 gap-4 sm:gap-5" : "rounded-xl px-3 py-3 gap-2.5",
                   overId === item.id ? "border-[var(--text)]" : "border-[var(--border)]",
                   dragId === item.id && "opacity-40"
                 )}
               >
                 {/* Drag handle + keyboard reorder */}
-                <div className="flex flex-col items-center shrink-0 -my-1">
+                <div className={cn("flex flex-col items-center shrink-0 -my-1", !canReorder && "opacity-30")}>
                   <button
                     onClick={() => nudge(item.id, -1)}
-                    disabled={idx === 0}
+                    disabled={!canReorder || idx === 0}
                     className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors"
-                    title="Move up"
+                    title={canReorder ? "Move up" : "Switch to Custom Arrangement to rearrange"}
                   >
-                    <ChevronUp className="w-3.5 h-3.5" />
+                    <ChevronUp className={roomy ? "w-4 h-4" : "w-3.5 h-3.5"} />
                   </button>
-                  <GripVertical className="w-3.5 h-3.5 text-[var(--faint)] cursor-grab active:cursor-grabbing" />
+                  <GripVertical className={cn("text-[var(--faint)] cursor-grab active:cursor-grabbing", roomy ? "w-4 h-4" : "w-3.5 h-3.5")} />
                   <button
                     onClick={() => nudge(item.id, 1)}
-                    disabled={idx === unchecked.length - 1}
+                    disabled={!canReorder || idx === unchecked.length - 1}
                     className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors"
-                    title="Move down"
+                    title={canReorder ? "Move down" : "Switch to Custom Arrangement to rearrange"}
                   >
-                    <ChevronDown className="w-3.5 h-3.5" />
+                    <ChevronDown className={roomy ? "w-4 h-4" : "w-3.5 h-3.5"} />
                   </button>
                 </div>
 
                 {/* Checkbox */}
                 <button
                   onClick={() => toggleItem(item.id)}
-                  className="w-5 h-5 rounded-md border border-[var(--border-2)] shrink-0 flex items-center justify-center transition-all hover:bg-[var(--chip)]"
+                  className={cn(
+                    "border border-[var(--border-2)] shrink-0 flex items-center justify-center transition-all hover:bg-[var(--chip)]",
+                    roomy ? "w-6 h-6 rounded-lg" : "w-5 h-5 rounded-md",
+                  )}
                 />
 
                 {/* Priority toggle */}
@@ -568,11 +699,11 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
                   title={pri.label}
                   className="shrink-0"
                 >
-                  <PriIcon className={cn("w-4 h-4", pri.color)} />
+                  <PriIcon className={cn(roomy ? "w-5 h-5" : "w-4 h-4", pri.color)} />
                 </button>
 
                 {/* Icon */}
-                <ItemIcon cfg={cfg} item={item} />
+                <ItemIcon cfg={cfg} item={item} size={roomy ? "xl" : "sm"} />
 
                 {/* Name + author (link if a URL is set) */}
                 <div className="flex-1 min-w-0">
@@ -581,20 +712,20 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-[var(--text)] truncate hover:underline"
+                      className={cn("flex items-center gap-1 text-[var(--text)] truncate hover:underline", roomy ? "text-base font-medium" : "text-sm")}
                     >
                       <span className="truncate">{item.name}</span>
                       <ExternalLink className="w-3 h-3 text-[var(--faint)] shrink-0" />
                     </a>
                   ) : (
-                    <p className="truncate text-sm text-[var(--text)]">{item.name}</p>
+                    <p className={cn("truncate text-[var(--text)]", roomy ? "text-base font-medium" : "text-sm")}>{item.name}</p>
                   )}
-                  {item.author && <p className="truncate text-[11px] text-[var(--faint)]">{item.author}</p>}
+                  {item.author && <p className={cn("truncate text-[var(--faint)]", roomy ? "text-xs" : "text-[11px]")}>{item.author}</p>}
                 </div>
 
                 {/* Price */}
                 {priceStr && (
-                  <span className="text-sm font-medium tabular text-[var(--muted)] shrink-0">
+                  <span className={cn("tabular text-[var(--muted)] shrink-0", roomy ? "text-base font-semibold" : "text-sm font-medium")}>
                     {priceStr}
                   </span>
                 )}
@@ -612,8 +743,9 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
                 <button
                   onClick={() => deleteItem(item.id)}
                   className="text-[var(--faint)] hover:text-[var(--text)] transition-colors shrink-0"
+                  title="Delete"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className={roomy ? "w-4 h-4" : "w-3.5 h-3.5"} />
                 </button>
               </div>
             );
@@ -645,35 +777,42 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
           </button>
 
           {showCompleted && (
-            <div className="space-y-1.5">
-              {checked.sort(orderSort).map((item) => {
+            <div className={roomy ? "space-y-3" : "space-y-1.5"}>
+              {checked.map((item) => {
                 const priceStr = formatPrice(item.price);
                 return (
                   <div
                     key={item.id}
-                    className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 flex items-center gap-3 transition-colors opacity-50"
+                    className={cn(
+                      "bg-[var(--surface)] border border-[var(--border)] flex items-center transition-colors opacity-50",
+                      roomy ? "rounded-2xl p-4 gap-4 sm:gap-5" : "rounded-xl px-4 py-3 gap-3",
+                    )}
                   >
                     <button
                       onClick={() => toggleItem(item.id)}
-                      className="w-5 h-5 rounded-md bg-[var(--text)] border shrink-0 flex items-center justify-center transition-all border-[var(--text)]"
+                      className={cn(
+                        "bg-[var(--text)] border border-[var(--text)] shrink-0 flex items-center justify-center transition-all",
+                        roomy ? "w-6 h-6 rounded-lg" : "w-5 h-5 rounded-md",
+                      )}
                     >
-                      <Check className="w-3 h-3 text-[var(--bg)]" strokeWidth={3} />
+                      <Check className={cn("text-[var(--bg)]", roomy ? "w-3.5 h-3.5" : "w-3 h-3")} strokeWidth={3} />
                     </button>
                     <ItemIcon cfg={cfg} item={item} />
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-sm text-[var(--text)] line-through">{item.name}</p>
-                      {item.author && <p className="truncate text-[11px] text-[var(--faint)]">{item.author}</p>}
+                      {item.author && <p className={cn("truncate text-[var(--faint)]", roomy ? "text-xs" : "text-[11px]")}>{item.author}</p>}
                     </div>
                     {priceStr && (
-                      <span className="text-sm font-medium tabular text-[var(--muted)] shrink-0">
+                      <span className={cn("tabular text-[var(--muted)] shrink-0", roomy ? "text-base font-semibold" : "text-sm font-medium")}>
                         {priceStr}
                       </span>
                     )}
                     <button
                       onClick={() => deleteItem(item.id)}
                       className="text-[var(--faint)] hover:text-[var(--text)] transition-colors shrink-0"
+                      title="Delete"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className={roomy ? "w-4 h-4" : "w-3.5 h-3.5"} />
                     </button>
                   </div>
                 );

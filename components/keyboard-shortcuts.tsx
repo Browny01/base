@@ -14,7 +14,7 @@ const NAV: { key: string; href: string; label: string }[] = [
   { key: "n", href: "/notes",       label: "Notes" },
   { key: "a", href: "/calendar",    label: "Calendar" },
   { key: "t", href: "/tasks",       label: "Tasks" },
-  { key: "w", href: "/shopping-list", label: "Wish List" },
+  { key: "w", href: "/shopping-list", label: "Shopping List" },
   { key: "e", href: "/reading-list", label: "Reading List" },
   { key: "m", href: "/watch-list",  label: "Watch List" },
   { key: "o", href: "/focus",       label: "Focus" },
