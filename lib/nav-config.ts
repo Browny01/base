@@ -22,7 +22,7 @@ export interface NavPage {
 
 export const ALL_PAGES: NavPage[] = [
   { key: "dashboard",   href: "/",             label: "Dashboard",   icon: LayoutDashboard, section: "Command",  keywords: "home overview" },
-  { key: "wishlist",    href: "/shopping-list", label: "Wish List",   icon: ShoppingCart,   section: "Personal", keywords: "shopping wishlist clothes tech gear buy want" },
+  { key: "wishlist",    href: "/shopping-list", label: "Shopping List", icon: ShoppingCart,  section: "Personal", keywords: "shopping wishlist wish list clothes tech gear buy want" },
   { key: "readinglist", href: "/reading-list", label: "Reading List", icon: BookOpen,       section: "Personal", keywords: "books reading to-read library" },
   { key: "watchlist",   href: "/watch-list",  label: "Watch List",   icon: Play,           section: "Personal", keywords: "movies shows films watchlist" },
   { key: "projects",    href: "/projects",    label: "Projects",     icon: FolderKanban,   section: "Build",    keywords: "roadmap docs kanban" },
