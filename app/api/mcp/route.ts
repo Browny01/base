@@ -56,12 +56,11 @@ const COLLECTIONS = [
   "tasks", "focusSessions", "incomeEntries", "subscriptions", "habits", "habitLogs",
   "projects", "projectNotes", "projectLinks", "wallets", "portfolioSnapshots", "milestones",
   "projectDocuments", "projectFiles", "exams", "schoolNotes", "playerSkills", "goals",
-  "workouts", "socialStats", "businessKPIs", "chatThreads", "chatFolders",
-  "chatSkills", "courses", "wikiFolders",
+  "workouts", "socialStats", "businessKPIs", "courses", "wikiFolders",
 ] as const;
 type Collection = typeof COLLECTIONS[number];
 const isCollection = (value: unknown): value is Collection => typeof value === "string" && (COLLECTIONS as readonly string[]).includes(value);
-const SETTINGS = ["dailyRevenueTarget", "timetable", "bodyMetrics", "chatSettings", "newsPrefs", "autonomySettings"] as const;
+const SETTINGS = ["dailyRevenueTarget", "timetable", "bodyMetrics", "aiSettings", "newsPrefs", "autonomySettings", "profile"] as const;
 type Setting = typeof SETTINGS[number];
 const isSetting = (value: unknown): value is Setting => typeof value === "string" && (SETTINGS as readonly string[]).includes(value);
 const DRAW_TOOLS: DrawTool[] = ["pen", "line", "arrow", "rect", "ellipse"];
@@ -107,7 +106,6 @@ function publicOverview(d: BridgeData) {
     calendarEvents: d.calendarEvents?.length ?? 0,
     boards: d.boards?.length ?? 0,
     workouts: d.workouts?.length ?? 0,
-    chats: d.chatThreads?.length ?? 0,
     briefs: d.briefs?.length ?? 0,
     notes: { readable: notes.length, locked_hidden: "protected" },
   };
@@ -266,7 +264,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_collection",
-    description: "Read one editable Base collection, such as tasks, projects, habits, chats, finance entries, or wikiFolders.",
+    description: "Read one editable Base collection, such as tasks, projects, habits, finance entries, or wikiFolders.",
     inputSchema: obj({ collection: { type: "string", enum: COLLECTIONS } }, ["collection"]),
     run: (args, state) => isCollection(args.collection) ? collectionData(state, args.collection) : error("Unknown collection."),
   },

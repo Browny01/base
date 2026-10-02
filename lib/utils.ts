@@ -31,8 +31,17 @@ export function formatTime(seconds: number): string {
   return `${m}:${s}`;
 }
 
-export function getToday(): string {
-  return new Date().toISOString().split("T")[0];
+// "Today" in the user's own timezone — onboarding records it, because a UTC date
+// rolls over at a different moment for everyone (and the cron snapshot that
+// feeds streak maths still uses UTC on purpose).
+export function getToday(timezone?: string): string {
+  const now = new Date();
+  if (!timezone || timezone === "UTC") return now.toISOString().split("T")[0];
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  } catch {
+    return now.toISOString().split("T")[0];
+  }
 }
 
 export function calcStreak(logs: { date: string; completed: boolean }[], today = getToday()): number {

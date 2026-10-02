@@ -93,7 +93,6 @@ final class WebModel: NSObject, ObservableObject {
 
     func openNewTask() { runHandoff("bridge_open_new_task", path: "/tasks") }
     func openNewProject() { runHandoff("bridge_open_new_project", path: "/projects") }
-    func openNewChat() { openPath("/chat") }
     func zoomIn() { webView.pageZoom += 0.1 }
     func zoomOut() { webView.pageZoom = max(0.3, webView.pageZoom - 0.1) }
     func zoomReset() { webView.pageZoom = 1.0 }

@@ -3,6 +3,7 @@
 import { useId, useRef, useState, useEffect } from "react";
 import { useBridge } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday } from "@/lib/utils";
+import { firstName } from "@/lib/profile";
 import { TASK_TAGS, type Priority, type Task, type TaskTag, type BridgeData, type Bookmark } from "@/lib/store";
 import { PRIORITY_META, priorityLabel } from "@/lib/task-sort";
 import { useConfirm } from "@/lib/confirm-context";
@@ -163,7 +164,7 @@ async function fileToIcon(file: File): Promise<string> {
 export function Dashboard() {
   const { data, mutate } = useBridge();
   const now = new Date();
-  const today = getToday();
+  const today = getToday(data.profile?.timezone);
 
   const [quickTitle, setQuickTitle] = useState("");
   const [quickPriority, setQuickPriority] = useState<Priority>("P2");
@@ -231,7 +232,8 @@ export function Dashboard() {
     }));
   }
 
-  const greetText = greeting(now);
+  const greetText = greeting(now, data.profile?.timezone);
+  const greetName = firstName(data.profile);
   const overviewProjects = data.projects.filter((p) => !p.archived);
   const todayFocusSessions = data.focusSessions.filter((session) => session.date === today);
   const todayFocusMinutes = todayFocusSessions.reduce((sum, session) => sum + session.durationMins, 0);
@@ -365,7 +367,7 @@ export function Dashboard() {
       <header className="relative mb-6">
         <p className="text-[13px] text-[var(--muted)] font-medium mb-1.5">{formatDate(now)}</p>
         <h1 className="text-[2rem] sm:text-[2.6rem] font-bold text-[var(--text)] leading-[1.05] tracking-tight">
-          Good {greetText}, Lucas.
+          {`Good ${greetText}${greetName ? `, ${greetName}` : ""}.`}
         </h1>
       </header>
 
@@ -736,9 +738,11 @@ function BookmarksWidget({ data, mutate }: { data: BridgeData; mutate: (updater:
   );
 }
 
-function greeting(d: Date): string {
-  const h = d.getHours();
-  if (h < 12) return "morning";
-  if (h < 17) return "afternoon";
+function greeting(d: Date, timezone?: string): string {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: timezone || "UTC" }).format(d),
+  );
+  if (Number.isNaN(hour) || hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
   return "evening";
 }

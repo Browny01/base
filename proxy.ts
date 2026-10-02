@@ -51,7 +51,9 @@ export async function proxy(request: NextRequest) {
   // (these expose only public blockchain/FX data — no private user data).
   if (
     pathname.startsWith("/login") ||
+    pathname.startsWith("/onboarding") || // first-run wizard: it has to work before auth
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/setup") ||
     pathname.startsWith("/api/mcp") ||   // MCP server does its own Bearer-token auth
     pathname.startsWith("/api/widget") || // iOS widget summary — does its own token auth
     pathname.startsWith("/api/cron") ||

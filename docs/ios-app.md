@@ -45,7 +45,7 @@ identifier must remain prefixed by the app bundle identifier when changing IDs.
 - Cached news briefing with online refresh
 - WidgetKit home-screen widget
 
-AI chat, live news generation, market APIs, and other cloud integrations still
+Live news generation, market APIs, and other cloud integrations still
 require a connection. Previously downloaded data and the last news briefing remain
 available offline.
 

@@ -33,8 +33,6 @@ const COLLECTIONS = new Set([
   "boardDrawings",
   "wikiPages",
   "wikiFolders",
-  "chatThreads",
-  "chatFolders",
   "courses",
 ]);
 

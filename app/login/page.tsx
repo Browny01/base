@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -9,7 +10,17 @@ export default function LoginPage() {
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const router = useRouter();
+
+  // A 503 means the server has no password at all — offer setup instead of a
+  // dead end.
+  useEffect(() => {
+    fetch("/api/setup")
+      .then((r) => r.json())
+      .then((j) => setNeedsSetup(Boolean(j?.needsPassword)))
+      .catch(() => setNeedsSetup(false));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,6 +102,16 @@ export default function LoginPage() {
         <p className="text-center text-xs text-[var(--faint)] mt-6">
           Session lasts 30 days
         </p>
+
+        {/* An install with no password yet has nothing to sign in to. */}
+        {needsSetup && (
+          <Link
+            href="/onboarding"
+            className="mt-4 block rounded-xl border border-[var(--border)] p-3 text-center text-[13px] font-medium text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
+          >
+            First time here? Set up Base
+          </Link>
+        )}
       </div>
     </div>
   );

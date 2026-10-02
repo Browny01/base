@@ -1,4 +1,4 @@
-// Lightweight, XSS-safe markdown → HTML for chat replies.
+// Lightweight, XSS-safe markdown → HTML for AI-written text (news briefing, summaries).
 // Everything is HTML-escaped first, so only the tags we generate are emitted.
 
 const esc = (s: string) => s

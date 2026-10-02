@@ -118,7 +118,7 @@ variables depending on the feature set you want enabled:
 | `KV_URL`, `REDIS_URL` | Upstash Redis/KV compatibility URLs |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN` | Redis REST access |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob file uploads |
-| `GEMINI_API_KEY` | AI chat, learning, and summaries |
+| `GEMINI_API_KEY` | News briefing, learning, and summaries |
 | `PERPLEXITY_API_KEY` | Web search and live news lookups |
 | `STRIPE_SECRET_KEY` | Stripe revenue/business stats |
 | `CALCOM_API_KEY` | Cal.com bookings |
@@ -219,8 +219,7 @@ native clients use the deployed API for synchronization and news refreshes.
   an Apple Watch companion for quick capture and glanceable summaries.
 - **Multi-workspace** - multiple Base documents per account with per-workspace
   settings, themes, and sharing/read-only invites.
-- **On-device privacy mode** - a local mode backed by Upstash edges and an
-  optional self-hosted Ollama relay where chat and summaries never hit external
-  AI providers.
+- **On-device privacy mode** - a local mode backed by Upstash edges where
+  summaries never leave your own deployment.
 - **Server-side image pipeline** - thumbnail generation, format optimization, and
   restore/trash-friendly image handling for the vision board and projects.

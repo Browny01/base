@@ -4,8 +4,12 @@ import Link from "next/link";
 import { Keyboard } from "lucide-react";
 import { CommandBar } from "@/components/command-bar";
 import { openShortcutSheet } from "@/lib/shortcuts";
+import { useBridge } from "@/lib/hooks";
+import { initialOf } from "@/lib/profile";
 
 export function TopBar() {
+  const { data } = useBridge();
+
   return (
     <header
       className="sticky top-0 z-30 bg-[var(--bg)]/80 backdrop-blur-xl border-b border-[var(--border)]"
@@ -29,10 +33,10 @@ export function TopBar() {
           </button>
           <Link
             href="/settings"
-            title="Settings"
+            title={data.profile?.name ? `Settings — ${data.profile.name}` : "Settings"}
             className="w-8 h-8 rounded-full bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center text-[12px] font-semibold text-[var(--text)] hover:border-[var(--border-2)] transition-colors"
           >
-            L
+            {initialOf(data.profile)}
           </Link>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { bridgePassword, bridgePasswordHash } from "@/lib/env";
+import { readStoredVerifier, verifyStoredPassword } from "@/lib/auth-store";
 import { signSession } from "@/lib/session";
 
 const COOKIE = "bridge_auth";
@@ -47,7 +48,9 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 // Verify a candidate password against BRIDGE_PASSWORD_HASH (scrypt) when set,
-// otherwise against the plaintext BRIDGE_PASSWORD env value.
+// then the plaintext BRIDGE_PASSWORD env value, and finally the password chosen
+// during onboarding (stored in Redis as a browser-side PBKDF2/AES-GCM verifier).
+// Env values come first: an operator's deployment config is authoritative.
 async function verifyPassword(password: string): Promise<boolean> {
   const hashSpec = bridgePasswordHash();
   if (hashSpec) {
@@ -64,8 +67,14 @@ async function verifyPassword(password: string): Promise<boolean> {
     }
   }
   const correct = bridgePassword();
-  return correct !== undefined && safeEqual(password, correct);
+  if (correct !== undefined) return safeEqual(password, correct);
+
+  const stored = await readStoredVerifier();
+  return stored ? verifyStoredPassword(password, stored) : false;
 }
+
+const authConfigured = async (): Promise<boolean> =>
+  bridgePassword() !== undefined || bridgePasswordHash() !== undefined || Boolean(await readStoredVerifier());
 
 // Reject cross-site login POSTs (CSRF). Browsers send an Origin header on
 // cross-origin POSTs; same-origin fetches must match the app's host.
@@ -82,10 +91,9 @@ function originAllowed(req: NextRequest): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const configured = bridgePassword() !== undefined || bridgePasswordHash() !== undefined;
-  if (!configured) {
+  if (!(await authConfigured())) {
     return NextResponse.json(
-      { error: "Login is not configured — set BRIDGE_PASSWORD in deployment env vars." },
+      { error: "Login is not configured — set BRIDGE_PASSWORD in deployment env vars, or finish onboarding." },
       { status: 503 }
     );
   }

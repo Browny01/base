@@ -21,8 +21,8 @@ const FREQUENCIES: { value: SubscriptionFrequency; label: string; monthlyFactor:
   { value: "yearly", label: "Yearly", monthlyFactor: 1 / 12 },
 ];
 
-function daysUntil(date: string) {
-  const today = new Date(`${getToday()}T00:00:00`);
+function daysUntil(date: string, timezone?: string) {
+  const today = new Date(`${getToday(timezone)}T00:00:00`);
   const target = new Date(`${date}T00:00:00`);
   return Math.ceil((target.getTime() - today.getTime()) / 86400000);
 }
@@ -43,14 +43,14 @@ export function FinancePage() {
   const [form, setForm] = useState({
     source: "",
     amount: "",
-    date: getToday(),
+    date: getToday(data.profile?.timezone),
     type: "income" as IncomeType,
     client: "",
   });
   const [subForm, setSubForm] = useState({
     name: "",
     amount: "",
-    dueDate: getToday(),
+    dueDate: getToday(data.profile?.timezone),
     frequency: "monthly" as SubscriptionFrequency,
     category: "",
     notes: "",
@@ -58,7 +58,7 @@ export function FinancePage() {
   const [targetEdit, setTargetEdit] = useState(false);
   const [targetInput, setTargetInput] = useState(String(data.dailyRevenueTarget));
 
-  const today = getToday();
+  const today = getToday(data.profile?.timezone);
 
   const todayEarned = data.incomeEntries
     .filter((e) => e.date === today && e.type === "income")
@@ -97,7 +97,7 @@ export function FinancePage() {
         },
       ],
     }));
-    setForm({ source: "", amount: "", date: getToday(), type: "income", client: "" });
+    setForm({ source: "", amount: "", date: getToday(data.profile?.timezone), type: "income", client: "" });
     setShowForm(false);
   }
 
@@ -124,7 +124,7 @@ export function FinancePage() {
         },
       ],
     }));
-    setSubForm({ name: "", amount: "", dueDate: getToday(), frequency: "monthly", category: "", notes: "" });
+    setSubForm({ name: "", amount: "", dueDate: getToday(data.profile?.timezone), frequency: "monthly", category: "", notes: "" });
     setShowSubForm(false);
   }
 
@@ -151,7 +151,7 @@ export function FinancePage() {
   const subscriptions = [...(data.subscriptions ?? [])].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const activeSubscriptions = subscriptions.filter((sub) => sub.active);
   const monthlySubscriptions = activeSubscriptions.reduce((sum, sub) => sum + monthlyEquivalent(sub), 0);
-  const dueSoon = activeSubscriptions.filter((sub) => daysUntil(sub.dueDate) <= 7).length;
+  const dueSoon = activeSubscriptions.filter((sub) => daysUntil(sub.dueDate, data.profile?.timezone) <= 7).length;
 
   return (
     <div className="p-4 sm:p-6">
@@ -223,7 +223,7 @@ export function FinancePage() {
             {subscriptions.length === 0 ? (
               <p className="lg:col-span-2 text-sm text-[var(--muted)] text-center py-8">No subscriptions tracked yet.</p>
             ) : subscriptions.map((sub) => {
-              const remaining = daysUntil(sub.dueDate);
+              const remaining = daysUntil(sub.dueDate, data.profile?.timezone);
               const dueLabel = remaining < 0 ? `${Math.abs(remaining)}d overdue` : remaining === 0 ? "Due today" : `${remaining}d left`;
               return (
                 <div key={sub.id} className={cn("group rounded-lg border bg-[var(--bg)] p-3", sub.active ? "border-[var(--border)]" : "border-[var(--border)] opacity-55")}>

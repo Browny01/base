@@ -383,7 +383,7 @@ html.dark .glass-edge {
 .nx-marquee-row:hover .nx-marquee { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .nx-marquee { animation: none; } .nx-marquee-row { overflow-x: auto; } }
 
-/* ── rendered markdown in chat replies ──────────────────────────────────── */
+/* ── rendered markdown in AI-written text ────────────────────────────────── */
 .nx-md { font-size: 14.5px; line-height: 1.6; color: var(--text); }
 .nx-md > *:first-child { margin-top: 0; }
 .nx-md > *:last-child { margin-bottom: 0; }
