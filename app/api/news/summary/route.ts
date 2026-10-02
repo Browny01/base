@@ -1,15 +1,31 @@
+import { createHash } from "crypto";
+import type { NextRequest } from "next/server";
 import { getArticles } from "../route";
 import { callModel } from "@/lib/ai-generate";
+import { DEFAULT_BRIEFING_MODEL, providerOfModel, type AiProvider } from "@/lib/ai-settings";
 import { mcpRedis } from "@/lib/mcp-data";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = "gemini-3.1-flash-lite";
+// The model comes from the user's briefing settings. The key is never stored
+// here: it's decrypted in the browser and passed for this one request (see
+// lib/vault.ts), so it only exists in this function's arguments.
+interface BriefingRequest {
+  model?: unknown;
+  apiKey?: unknown;
+}
 
-export async function GET() {
+async function summarize(request: BriefingRequest) {
+  const model = typeof request.model === "string" && request.model.length < 64 ? request.model : DEFAULT_BRIEFING_MODEL;
+  const apiKey = typeof request.apiKey === "string" && request.apiKey.length <= 512 ? request.apiKey : undefined;
+  const provider: AiProvider = providerOfModel(model);
+
   const hour = new Date().toISOString().slice(0, 13); // YYYY-MM-DDTHH — one summary per hour
-  const key = `bridge:news:summary:v4:${hour}`;
+  // Keyed by a digest of the caller's key, so two accounts never share a cached
+  // briefing but the key itself is not part of the Redis key.
+  const who = apiKey ? createHash("sha256").update(apiKey).digest("hex").slice(0, 8) : "env";
+  const key = `bridge:news:summary:v5:${provider}:${model}:${who}:${hour}`;
   const redis = mcpRedis();
 
   if (redis) {
@@ -46,11 +62,27 @@ Headlines:
 ${list}`;
 
   let summary = "";
-  try { const r = await callModel(MODEL, prompt, { maxTokens: 2048, thinkingBudget: 0 }); summary = r.text.trim(); }
+  try { const r = await callModel(model, prompt, { maxTokens: 2048, thinkingBudget: 0, apiKey }); summary = r.text.trim(); }
   catch (e) { return Response.json({ ok: false, error: String((e as Error).message || e) }, { status: 500 }); }
   if (!summary) return Response.json({ ok: false, error: "The model returned an empty summary." }, { status: 502 });
 
-  const payload = { summary, generatedAt: new Date().toISOString(), articleCount: articles.length, model: MODEL };
+  const payload = { summary, generatedAt: new Date().toISOString(), articleCount: articles.length, model, provider };
   if (redis) { try { await redis.set(key, payload, { ex: 7200 }); } catch { /* ignore */ } }
   return Response.json({ ok: true, cached: false, ...payload });
+}
+
+// GET keeps the default (server env key) behaviour; POST lets the browser hand
+// over its own decrypted provider key.
+export async function GET() {
+  return summarize({});
+}
+
+export async function POST(req: NextRequest) {
+  let body: BriefingRequest = {};
+  try {
+    body = (await req.json()) as BriefingRequest;
+  } catch {
+    /* empty body is fine */
+  }
+  return summarize(body);
 }

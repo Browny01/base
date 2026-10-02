@@ -190,7 +190,7 @@ export function WalletSection({ onTotalUpdate }: Props) {
 
     onTotalRef.current?.(grandTotal);
 
-    const today = getToday();
+    const today = getToday(data.profile?.timezone);
     mutate((d) => {
       const snapshots = [...(d.portfolioSnapshots ?? [])];
       const idx = snapshots.findIndex((s) => s.date === today);

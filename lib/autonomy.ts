@@ -40,12 +40,13 @@ export const DEFAULT_AUTONOMY_SETTINGS: AutonomySettings = {
   dailyRunLimit: 6,
   maxCorrectionAttempts: 1,
   allowedTaskClasses: ["research", "planning", "implementation", "review", "operations"],
-  allowedWorkspaces: ["Bridge", "Dropshipping", "Systemly", "ProductDeck", "StreamSpark"],
+  // Empty of anyone else's projects: add your own in Settings → Autonomy.
+  allowedWorkspaces: ["Base"],
   requireApprovalForImplementation: true,
   workingHoursStart: "09:00",
   workingHoursEnd: "23:00",
-  timezoneOffsetMinutes: 480,
-  currentBusinessFocus: "Dropshipping",
+  timezoneOffsetMinutes: 0,
+  currentBusinessFocus: "",
 };
 
 export interface AutonomyTaskLike {

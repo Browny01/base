@@ -1,6 +1,7 @@
 "use client";
 
-import { DEFAULT_CHAT_SETTINGS, type ChatSettings } from "@/lib/chat-models";
+import { DEFAULT_AI_SETTINGS, normalizeAiSettings, type AiSettings } from "@/lib/ai-settings";
+import { DEFAULT_PROFILE, type UserProfile } from "@/lib/profile";
 import { DEFAULT_NEWS_PREFS, type NewsPrefs } from "@/lib/news-prefs";
 import { DEFAULT_AUTONOMY_SETTINGS, type AutonomySettings, type AutonomyState, type AutonomyTaskClass } from "@/lib/autonomy";
 import { DEFAULT_NAV_PREFS, type NavPrefs } from "@/lib/nav-config";
@@ -401,58 +402,6 @@ export interface PlayerSkill {
   history?: SkillLog[];
 }
 
-// ── AI Chat ──────────────────────────────────────────────────────────────────────
-
-export type ChatRole = "user" | "assistant";
-
-export type ChatAttachmentKind = "image" | "pdf" | "text";
-export interface ChatAttachment {
-  id: string;
-  name: string;
-  mime: string;
-  kind: ChatAttachmentKind;
-  size: number;
-  url?: string;    // hosted Blob URL (images / pdfs)
-  text?: string;   // inline text content (markdown / code / plain text)
-}
-
-export interface ChatMessage {
-  id: string;
-  role: ChatRole;
-  content: string;
-  createdAt: string;
-  attachments?: ChatAttachment[];
-  sources?: string[];       // cited URLs (web-search results)
-}
-
-export interface ChatFolder {
-  id: string;
-  name: string;
-  createdAt: string;
-}
-
-export interface ChatSkill {
-  id: string;
-  name: string;
-  instructions: string;     // appended to the system prompt when enabled
-  enabled: boolean;
-}
-
-export interface ChatThread {
-  id: string;
-  title: string;
-  model: string;            // e.g. "gemini-2.5-flash"
-  messages: ChatMessage[];
-  pinned?: boolean;
-  folderId?: string | null; // groups chats under a sidebar folder
-  projectId?: string | null; // links a chat to a Base project
-  deletedAt?: string | null; // soft-deleted to Trash (purged after 14 days)
-  locked?: boolean;         // requires a passcode to open
-  lockPass?: string;        // the passcode (client-side soft lock)
-  createdAt: string;
-  updatedAt: string;
-}
-
 // ── Learning / Research (AI-generated interactive courses) ──────────────────────
 
 export interface QuizQuestion {
@@ -713,10 +662,8 @@ export interface BridgeData {
   boardDrawings: BoardDrawing[];
   wikiPages: WikiPage[];
   wikiFolders: WikiFolder[];
-  chatThreads: ChatThread[];
-  chatFolders: ChatFolder[];
-  chatSkills: ChatSkill[];
-  chatSettings: ChatSettings;
+  profile: UserProfile;
+  aiSettings: AiSettings;
   courses: Course[];
   newsPrefs: NewsPrefs;
   autonomySettings: AutonomySettings;
@@ -775,10 +722,8 @@ export const DEFAULT: BridgeData = {
   boardDrawings: [],
   wikiPages: [],
   wikiFolders: [],
-  chatThreads: [],
-  chatFolders: [],
-  chatSkills: [],
-  chatSettings: DEFAULT_CHAT_SETTINGS,
+  profile: DEFAULT_PROFILE,
+  aiSettings: DEFAULT_AI_SETTINGS,
   courses: [],
   newsPrefs: DEFAULT_NEWS_PREFS,
   autonomySettings: DEFAULT_AUTONOMY_SETTINGS,
@@ -884,12 +829,6 @@ function purgeOldTrash(data: BridgeData): BridgeData {
     if (kept.length !== pages.length) out = { ...out, wikiPages: kept };
   }
 
-  const chats = data.chatThreads ?? [];
-  if (chats.some((c) => c.deletedAt)) {
-    const kept = chats.filter((c) => !expired(c.deletedAt));
-    if (kept.length !== chats.length) out = { ...out, chatThreads: kept };
-  }
-
   return out;
 }
 
@@ -931,12 +870,50 @@ function migrateTaskTags(data: BridgeData): BridgeData {
   return changed ? { ...data, tasks } : data;
 }
 
+// The AI Chat feature is gone (the news briefing is the only AI left), so the
+// stored chat threads/folders/skills are dropped here rather than left to rot
+// in every install's blob. The old `chatSettings` model becomes the briefing's
+// starting pick, so an existing user doesn't have to choose one again.
+function migrateAwayChat(data: BridgeData): BridgeData {
+  const legacy = data as unknown as Record<string, unknown>;
+  const hasLegacyChat = ["chatThreads", "chatFolders", "chatSkills", "chatSettings"].some((key) => key in legacy);
+  const missingProfile = !data.profile;
+  const missingAi = !data.aiSettings;
+  if (!hasLegacyChat && !missingProfile && !missingAi) return data;
+
+  const out = { ...legacy };
+  if (hasLegacyChat) {
+    const previous = (legacy.chatSettings ?? {}) as { model?: string };
+    out.aiSettings = normalizeAiSettings({ briefingEnabled: true, model: previous.model });
+    for (const key of ["chatThreads", "chatFolders", "chatSkills", "chatSettings"]) delete out[key];
+  }
+  out.profile = { ...DEFAULT_PROFILE, ...((legacy.profile ?? {}) as Partial<UserProfile>) };
+  return out as unknown as BridgeData;
+}
+
+// An install that already has data predates onboarding, so it counts as set up —
+// otherwise every existing copy would be nagged into the wizard on first visit.
+// A genuinely new install has an empty shell and still gets the wizard.
+function migrateExistingInstall(data: BridgeData): BridgeData {
+  if (data.profile?.onboardedAt) return data;
+  const used =
+    (data.tasks?.length ?? 0) > 0 ||
+    (data.projects?.length ?? 0) > 0 ||
+    (data.wikiPages?.length ?? 0) > 0 ||
+    (data.incomeEntries?.length ?? 0) > 0 ||
+    (data.habits?.length ?? 0) > 0 ||
+    (data.shoppingList?.length ?? 0) > 0 ||
+    (data.calendarEvents?.length ?? 0) > 0;
+  if (!used) return data;
+  return { ...data, profile: { ...DEFAULT_PROFILE, ...data.profile, onboardedAt: new Date(0).toISOString() } };
+}
+
 // Normalises any record — from localStorage OR from the server — to the current
 // shape. Callers that inject data from outside localStorage must use this
 // explicitly: load() only re-parses on a cache miss, so previously-pulled
 // server data would otherwise sit unmigrated in the cache until a reload.
 export function migrateAll(data: BridgeData): BridgeData {
-  return purgeOldTrash(migrateTaskTags(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data))))));
+  return migrateExistingInstall(migrateAwayChat(purgeOldTrash(migrateTaskTags(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data))))))));
 }
 
 function loadFromStorage(): BridgeData {

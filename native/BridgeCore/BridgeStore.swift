@@ -188,8 +188,7 @@ final class BridgeStore: ObservableObject {
             "tasks", "focusSessions", "incomeEntries", "subscriptions", "habits", "habitLogs",
             "projects", "projectNotes", "projectLinks", "milestones", "projectDocuments",
             "exams", "schoolNotes", "goals", "workouts", "socialStats", "businessKPIs", "briefs",
-            "boards", "boardItems", "boardDrawings", "wikiPages", "wikiFolders", "chatThreads",
-            "chatFolders", "courses",
+            "boards", "boardItems", "boardDrawings", "wikiPages", "wikiFolders", "courses",
         ]
         return Dictionary(uniqueKeysWithValues: collections.map { ($0, JSONValue.array([])) })
     }()

@@ -77,7 +77,7 @@ export function FocusPage() {
       ...d,
       focusSessions: [
         ...d.focusSessions,
-        { id: uid(), durationMins, tag, notes, date: getToday() },
+        { id: uid(), durationMins, tag, notes, date: getToday(data.profile?.timezone) },
       ],
     }));
   }
@@ -92,7 +92,7 @@ export function FocusPage() {
   const circumference = 2 * Math.PI * 110;
   const dash = circumference * (1 - progress / 100);
 
-  const todaySessions = data.focusSessions.filter((s) => s.date === getToday());
+  const todaySessions = data.focusSessions.filter((s) => s.date === getToday(data.profile?.timezone));
   const todayMins = todaySessions.reduce((s, f) => s + f.durationMins, 0);
 
   return (

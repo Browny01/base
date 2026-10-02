@@ -8,6 +8,7 @@ import { NavModeProvider } from "@/lib/nav-mode-context";
 import { ToastProvider } from "@/lib/toast-context";
 import { ConfirmProvider } from "@/lib/confirm-context";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { FirstRunRedirect } from "@/components/first-run-redirect";
 
 // Desktop nav (sidebar vs dock) is chosen by the `data-nav` attribute on <html> +
 // CSS in globals.css, so switching modes never flashes. Both are always rendered.
@@ -18,6 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
        <ToastProvider>
         <ConfirmProvider>
         <KeyboardShortcuts />
+        <FirstRunRedirect />
         <div className="flex h-full bg-[var(--bg)]">
           {/* Sidebar — desktop, when nav mode = sidebar */}
           <div className="nx-desktop-sidebar hidden md:flex shrink-0">

@@ -42,7 +42,7 @@ export function TasksPage() {
     title: string; priority: Priority; tag: TaskTag; dueDate: string; recurring: RecurringFreq;
   }>({ title: "", priority: "P2", tag: "work", dueDate: "", recurring: null });
 
-  const today = getToday();
+  const today = getToday(data.profile?.timezone);
 
   // ⌘K → "New task" opens the form on arrival
   useEffect(() => { try { if (localStorage.getItem("bridge_open_new_task")) { localStorage.removeItem("bridge_open_new_task"); setShowForm(true); } } catch {} }, []);
@@ -191,7 +191,7 @@ export function TasksPage() {
       {/* ── List View ── */}
       {view === "list" && (
         <>
-          <div className="space-y-2.5 mb-8 max-w-4xl">
+          <div className="space-y-2.5 mb-8">
             {ordered.length === 0 ? (
               <p className="text-base text-[var(--muted)] py-4 text-center">No tasks here. You&apos;re clear!</p>
             ) : (
@@ -221,7 +221,7 @@ export function TasksPage() {
           {doneTasks.length > 0 && (
             <div>
               <h2 className="text-xs text-[var(--muted)] uppercase tracking-wider mb-3">Completed ({doneTasks.length})</h2>
-              <div className="space-y-2.5 max-w-4xl">
+              <div className="space-y-2.5">
                 {doneTasks.slice(0, 10).map((task) => (
                   <TaskRow key={task.id} task={task} today={today} onToggle={toggleTask} onDelete={deleteTask} onEdit={editTask} />
                 ))}

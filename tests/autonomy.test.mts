@@ -81,11 +81,11 @@ test("eligibleAutonomyTasks ignores unrelated in-progress experiments when enfor
     executionState: "in_progress",
     done: false,
   } as unknown as ReturnType<typeof task>;
-  const queued = task({ id: "dropshipping-research", workspace: "Dropshipping", taskClass: "research" });
+  const queued = task({ id: "market-research", workspace: "Base", taskClass: "research" });
 
   assert.deepEqual(
     eligibleAutonomyTasks([unrelatedExperiment, queued], { ...DEFAULT_AUTONOMY_SETTINGS, maxConcurrentWorkers: 1 }).map((item) => item.id),
-    ["dropshipping-research"],
+    ["market-research"],
   );
   assert.equal(buildAutonomySummary([unrelatedExperiment]).running, 0);
 });
@@ -118,7 +118,9 @@ test("normalizeAutonomySettings clamps unsafe control values", () => {
   assert.equal(settings.maxCorrectionAttempts, 1);
   assert.deepEqual(settings.allowedTaskClasses, ["research"]);
   assert.deepEqual(settings.allowedWorkspaces, ["Bridge"]);
-  assert.equal(settings.currentBusinessFocus, "Dropshipping");
+  // A fresh install has no business context to assume — it starts empty.
+  assert.equal(settings.currentBusinessFocus, "");
+  assert.deepEqual(DEFAULT_AUTONOMY_SETTINGS.allowedWorkspaces, ["Base"]);
 });
 
 test("computeAutonomyMetrics reports grounded rates and timings without inventing missing values", () => {

@@ -1,14 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Bot, Check, Layers, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Eye, EyeOff, KeyRound, Layers, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNavMode } from "@/lib/nav-mode-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAccent, ACCENTS } from "@/lib/accent-context";
 import { useBridge } from "@/lib/hooks";
-import { CHAT_MODELS, configuredChatModels, DEFAULT_CHAT_SETTINGS, type ChatSettings } from "@/lib/chat-models";
+import {
+  DEFAULT_AI_SETTINGS,
+  PROVIDER_INFO,
+  hasSavedKey,
+  modelLabel,
+  modelsForProvider,
+  providerLabel,
+  type AiProvider,
+  type AiSettings,
+} from "@/lib/ai-settings";
+import { decryptSecret, encryptSecret, clearSessionSecret, sessionSecret, setSessionSecret } from "@/lib/vault";
 import {
   CATEGORY_LABEL,
   DEFAULT_NEWS_PREFS,
@@ -164,78 +174,193 @@ function SourceManager({ prefs, setPrefs }: { prefs: NewsPrefs; setPrefs: (prefs
   );
 }
 
-function ChatModelManager({ settings, setSettings }: { settings: ChatSettings; setSettings: (settings: ChatSettings) => void }) {
-  const enabled = new Set(settings.enabledModelIds);
-  const hidden = new Set(settings.hiddenModelIds ?? []);
-  const visible = new Map(configuredChatModels(settings).map((model) => [model.id, model.enabled]));
+// The news briefing is the only AI left in Base, so this is where its provider,
+// model and (optional) API key live. The key is encrypted with the login
+// password before it touches storage — see lib/vault.ts — and the password
+// itself is never saved by this page.
+function BriefingManager({ settings, setSettings }: { settings: AiSettings; setSettings: (settings: AiSettings) => void }) {
+  const [password, setPassword] = useState("");
+  const [draftKey, setDraftKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  function toggleModel(id: string) {
-    const model = CHAT_MODELS.find((item) => item.id === id);
-    const automaticallyVisible = model?.provider === "anthropic" || model?.provider === "openai";
-    if (automaticallyVisible) {
-      const nextHidden = new Set(hidden);
-      if (nextHidden.has(id)) nextHidden.delete(id); else nextHidden.add(id);
-      setSettings({ ...settings, hiddenModelIds: [...nextHidden] });
+  const models = modelsForProvider(settings.provider);
+  const saved = hasSavedKey(settings);
+  const info = PROVIDER_INFO.find((p) => p.value === settings.provider) ?? PROVIDER_INFO[0];
+
+  async function unlock() {
+    if (!password) return;
+    const plain = await decryptSecret(settings.keyCipher!, settings.keySalt!, password);
+    if (plain === null) {
+      setNote("That password doesn't match the one this key was encrypted with.");
       return;
     }
-    const next = new Set(enabled);
-    if (next.has(id)) {
-      if (next.size <= 1) return;
-      next.delete(id);
-    } else {
-      next.add(id);
+    setSessionSecret(password);
+    setDraftKey(plain);
+    setUnlocked(true);
+    setNote(null);
+  }
+
+  async function saveKey() {
+    const trimmed = draftKey.trim();
+    if (!trimmed) return;
+    const secret = sessionSecret() ?? password;
+    if (!secret) {
+      setNote("Unlock the saved key (or type your login password) before saving a new one.");
+      return;
     }
-    setSettings({ ...settings, enabledModelIds: [...next] });
+    setBusy(true);
+    try {
+      const { cipher, salt, iterations } = await encryptSecret(trimmed, secret);
+      setSettings({ ...settings, keyCipher: cipher, keySalt: salt, keyIterations: iterations });
+      setSessionSecret(secret);
+      setDraftKey("");
+      setPassword("");
+      setUnlocked(false);
+      setNote("Key encrypted and saved.");
+    } catch {
+      setNote("Couldn't encrypt that key in this browser.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function forgetKey() {
+    clearSessionSecret();
+    setSettings({ ...settings, keyCipher: undefined, keySalt: undefined, keyIterations: undefined });
+    setDraftKey("");
+    setPassword("");
+    setUnlocked(false);
+    setNote(null);
   }
 
   return (
     <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 lg:col-span-2">
-      <div className="flex items-center gap-2 mb-5">
-        <Bot className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
-        <h2 className="text-sm font-bold text-[var(--text)]">AI Chat</h2>
+      <div className="flex items-center gap-2 mb-1">
+        <Rss className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
+        <h2 className="text-sm font-bold text-[var(--text)]">News briefing</h2>
       </div>
+      <p className="mb-4 text-[11px] text-[var(--faint)]">
+        The only AI in Base. It writes the briefing at the top of the News page from the same headlines.
+      </p>
 
-      <div>
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
-          <p className="mb-1 text-sm font-bold text-[var(--text)]">Models</p>
-          <p className="mb-3 text-[11px] text-[var(--faint)]">Only enabled models appear in the chat &amp; learning model pickers. Web-search / tools now live on the Chat page.</p>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {CHAT_MODELS.map((model) => {
-              const active = visible.get(model.id) ?? false;
-              return (
-                <button
-                  key={model.id}
-                  onClick={() => toggleModel(model.id)}
-                  className={cn(
-                    "flex min-h-16 items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
-                    active
-                      ? "border-[var(--border-2)] bg-[var(--surface-2)] text-[var(--text)]"
-                      : "border-[var(--border)] bg-transparent text-[var(--muted)] hover:text-[var(--text)]"
-                  )}
-                >
-                  <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-md border", active ? "border-[var(--text)] bg-[var(--text)] text-[var(--bg)]" : "border-[var(--border-2)]")}>
-                    {active && <Check className="h-3.5 w-3.5" />}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold leading-tight">{model.label}</span>
-                    <span className="block text-[11px] text-[var(--faint)]">{model.note ?? model.provider}</span>
-                  </span>
-                </button>
-              );
-            })}
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4 space-y-4">
+        <label className="flex items-start gap-3">
+          <Toggle on={settings.briefingEnabled} onClick={() => setSettings({ ...settings, briefingEnabled: !settings.briefingEnabled })} />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-[var(--text)]">Generate the briefing</span>
+            <span className="block text-[11px] text-[var(--faint)]">Off means the News page shows headlines only, and no provider is called.</span>
+          </span>
+        </label>
+
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Provider</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PROVIDER_INFO.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setSettings({ ...settings, provider: p.value as AiProvider, model: p.defaultModel })}
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-left transition-colors",
+                  settings.provider === p.value
+                    ? "border-[var(--border-2)] bg-[var(--surface-2)]"
+                    : "border-[var(--border)] hover:border-[var(--border-2)]",
+                )}
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                  {settings.provider === p.value && <Check className="h-3.5 w-3.5" />}
+                  {p.label}
+                </span>
+                <span className="block text-[11px] text-[var(--faint)]">{p.blurb}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
-          <p className="mb-1 text-sm font-bold text-[var(--text)]">Memory</p>
-          <p className="mb-2 text-[11px] text-[var(--faint)]">Persistent facts the AI remembers in every chat — who you are, preferences, ongoing context.</p>
-          <textarea
-            value={settings.chatMemory ?? ""}
-            onChange={(e) => setSettings({ ...settings, chatMemory: e.target.value })}
-            rows={4}
-            placeholder="e.g. My name is Lucas. I run Systemly (WA lead-gen). Prefer concise answers. Building Base in Next.js…"
-            className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]"
-          />
+        <div>
+          <label htmlFor="briefing-model" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Model</label>
+          <select
+            id="briefing-model"
+            value={settings.model}
+            onChange={(e) => setSettings({ ...settings, model: e.target.value })}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text)] focus:border-[var(--border-2)] focus:outline-none"
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>{m.label} · {m.note}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-[var(--faint)]">
+            Currently using {modelLabel(settings.model)} via {providerLabel(settings.provider)}.
+          </p>
+        </div>
+
+        <div className="border-t border-[var(--border)] pt-4">
+          <p className="mb-1 text-sm font-bold text-[var(--text)]">API key</p>
+          <p className="mb-3 text-[11px] text-[var(--faint)]">
+            {saved
+              ? "A key is saved, encrypted with your login password. Only this browser can unlock it."
+              : `No key saved — the server falls back to its own ${info.envKeys[0]} env var. Add one at ${info.keyHint} to use your own.`}
+          </p>
+
+          {saved && !unlocked && (
+            <div className="flex flex-wrap items-end gap-2">
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") unlock(); }}
+                placeholder="Login password to unlock"
+                className="flex-1 min-w-[180px] rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text)] placeholder-[var(--faint)] focus:border-[var(--border-2)] focus:outline-none"
+              />
+              <button onClick={unlock} className="rounded-lg bg-[var(--text)] px-3 py-2 text-[13px] font-medium text-[var(--bg)] hover:bg-[var(--text-hover)]">
+                Unlock
+              </button>
+              <button onClick={forgetKey} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] text-[var(--muted)] hover:text-[var(--text)]">
+                Remove saved key
+              </button>
+            </div>
+          )}
+
+          {(unlocked || !saved) && (
+            <div className="space-y-2">
+              <div className="flex items-end gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showKey ? "text" : "password"}
+                    value={draftKey}
+                    onChange={(e) => setDraftKey(e.target.value)}
+                    placeholder={`Paste your ${info.label} API key`}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 pr-9 text-[13px] text-[var(--text)] placeholder-[var(--faint)] focus:border-[var(--border-2)] focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey((v) => !v)}
+                    aria-label={showKey ? "Hide key" : "Show key"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--faint)] hover:text-[var(--text)]"
+                  >
+                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <button
+                  onClick={saveKey}
+                  disabled={busy || !draftKey.trim()}
+                  className="rounded-lg bg-[var(--text)] px-3 py-2 text-[13px] font-medium text-[var(--bg)] hover:bg-[var(--text-hover)] disabled:opacity-50"
+                >
+                  {saved ? "Replace key" : "Save encrypted key"}
+                </button>
+              </div>
+              <p className="flex items-center gap-1.5 text-[11px] text-[var(--faint)]">
+                <KeyRound className="h-3 w-3" />
+                Encrypted in this browser with AES-GCM, keyed by your password. Sent only when a briefing is generated.
+              </p>
+            </div>
+          )}
+
+          {note && <p className="mt-2 text-[11px] text-[var(--muted)]">{note}</p>}
         </div>
       </div>
     </section>
@@ -412,10 +537,10 @@ export function SettingsPage() {
   const { mode, setMode } = useNavMode();
   const { data, mutate } = useBridge();
   const newsPrefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
-  const chatSettings = data.chatSettings ?? DEFAULT_CHAT_SETTINGS;
+  const aiSettings = data.aiSettings ?? DEFAULT_AI_SETTINGS;
   const navPrefs = data.navPrefs ?? DEFAULT_NAV_PREFS;
   const setNewsPrefs = (prefs: NewsPrefs) => mutate((d) => ({ ...d, newsPrefs: prefs }));
-  const setChatSettings = (settings: ChatSettings) => mutate((d) => ({ ...d, chatSettings: settings }));
+  const setAiSettings = (settings: AiSettings) => mutate((d) => ({ ...d, aiSettings: settings }));
   const setNavPrefs = (prefs: NavPrefs) => mutate((d) => ({ ...d, navPrefs: prefs }));
 
   return (
@@ -541,7 +666,7 @@ export function SettingsPage() {
         </section>
 
         <SourceManager prefs={newsPrefs} setPrefs={setNewsPrefs} />
-        <ChatModelManager settings={chatSettings} setSettings={setChatSettings} />
+        <BriefingManager settings={aiSettings} setSettings={setAiSettings} />
         <NavigationManager prefs={navPrefs} setPrefs={setNavPrefs} />
       </div>
     </div>

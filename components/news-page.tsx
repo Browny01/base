@@ -13,6 +13,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { mdToHtml } from "@/lib/markdown";
+import { DEFAULT_AI_SETTINGS, hasSavedKey, normalizeAiSettings } from "@/lib/ai-settings";
+import { decryptSecret, sessionSecret } from "@/lib/vault";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useBridge } from "@/lib/hooks";
@@ -425,15 +427,45 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
   );
 }
 function NewsBriefing() {
+  const { data } = useBridge();
+  const settings = normalizeAiSettings(data.aiSettings ?? DEFAULT_AI_SETTINGS);
   const [state, setState] = useState<{ loading: boolean; summary?: string; generatedAt?: string; error?: string }>({ loading: true });
-  const load = () => {
+
+  const load = async () => {
     setState((s) => ({ ...s, loading: true }));
-    fetch("/api/news/summary")
-      .then((r) => r.json())
-      .then((j) => setState(j.ok ? { loading: false, summary: j.summary, generatedAt: j.generatedAt } : { loading: false, error: j.error || "Couldn't load the briefing." }))
-      .catch((e) => setState({ loading: false, error: String(e) }));
+    try {
+      // The saved key is AES-GCM ciphertext, so it can only be unlocked here in
+      // the browser. No key in this session means we call the provider the
+      // server has credentials for (or ask for the password).
+      let apiKey: string | undefined;
+      if (hasSavedKey(settings)) {
+        const password = sessionSecret();
+        if (!password) {
+          setState({ loading: false, error: "Your briefing key is locked. Unlock it in Settings → News briefing." });
+          return;
+        }
+        apiKey = (await decryptSecret(settings.keyCipher!, settings.keySalt!, password)) ?? undefined;
+      }
+      const res = await fetch("/api/news/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: settings.model, apiKey }),
+      });
+      const j = await res.json();
+      setState(j.ok ? { loading: false, summary: j.summary, generatedAt: j.generatedAt } : { loading: false, error: j.error || "Couldn't load the briefing." });
+    } catch (e) {
+      setState({ loading: false, error: String((e as Error)?.message || e) });
+    }
   };
-  useEffect(load, []);
+
+  useEffect(() => {
+    if (settings.briefingEnabled) load();
+    else setState({ loading: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.briefingEnabled, settings.model]);
+
+  if (!settings.briefingEnabled) return null;
+
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-3 flex items-center justify-between">

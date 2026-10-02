@@ -1,8 +1,27 @@
-// Server-side, non-streaming model calls that return text (usually JSON) plus any
-// web-search sources. Shared by the Learning course + interactive-artifact routes.
-import { providerOf } from "@/lib/chat-models";
+// Server-side, non-streaming model calls that return text (usually markdown)
+// plus any web-search sources. Used by the news briefing, the Learning routes
+// and note/wiki summaries.
+//
+// `opts.apiKey` lets the browser pass a decrypted, user-supplied key for a single
+// request; when it's absent each provider falls back to its env var. Keys are
+// never written to Redis — only the AES-GCM ciphertext lives in settings.
+import { providerOfModel, type AiProvider } from "@/lib/ai-settings";
 
-export interface GenOpts { jsonMode?: boolean; webSearch?: boolean; maxTokens?: number; thinkingBudget?: number }
+export interface GenOpts {
+  jsonMode?: boolean;
+  webSearch?: boolean;
+  maxTokens?: number;
+  thinkingBudget?: number;
+  apiKey?: string;
+}
+
+const firstEnv = (names: string[]): string | undefined => {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+};
 
 export function extractJson(text: string): Record<string, unknown> | null {
   if (!text) return null;
@@ -13,26 +32,51 @@ export function extractJson(text: string): Record<string, unknown> | null {
   return null;
 }
 
-async function callGemini(model: string, prompt: string, o: GenOpts): Promise<{ text: string; sources: string[] }> {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!key) throw new Error("No GEMINI_API_KEY set.");
+export interface GenResult {
+  text: string;
+  sources: string[];
+}
+
+async function callGemini(model: string, prompt: string, o: GenOpts): Promise<GenResult> {
+  const key = o.apiKey || firstEnv(["GEMINI_API_KEY", "GOOGLE_API_KEY"]);
+  if (!key) throw new Error("No Google AI key available. Add one in Settings → News briefing.");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`;
   const generationConfig: Record<string, unknown> = { temperature: 0.6, maxOutputTokens: o.maxTokens ?? 8192 };
   if (o.jsonMode) generationConfig.responseMimeType = "application/json";
-  // Gemini 2.5 "thinking" spends output tokens before the answer — disable it (budget 0)
-  // for short-answer calls so the response isn't truncated by hidden reasoning.
+  // Gemini 2.5+ "thinking" spends output tokens before the answer — disable it
+  // (budget 0) for short-answer calls so the response isn't truncated.
   if (o.thinkingBudget !== undefined) generationConfig.thinkingConfig = { thinkingBudget: o.thinkingBudget };
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig }) });
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig }),
+  });
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const j = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   return { text: (j.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join(""), sources: [] };
 }
 
-async function callAnthropic(model: string, prompt: string, o: GenOpts): Promise<{ text: string; sources: string[] }> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error("No ANTHROPIC_API_KEY set.");
+async function callOpenAI(model: string, prompt: string, o: GenOpts): Promise<GenResult> {
+  const key = o.apiKey || firstEnv(["OPENAI_API_KEY"]);
+  if (!key) throw new Error("No OpenAI key available. Add one in Settings → News briefing.");
+  const body: Record<string, unknown> = { model, messages: [{ role: "user", content: prompt }], max_completion_tokens: o.maxTokens ?? 8192 };
+  if (o.jsonMode) body.response_format = { type: "json_object" };
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const j = await res.json() as { choices?: { message?: { content?: string } }[] };
+  return { text: j.choices?.[0]?.message?.content ?? "", sources: [] };
+}
+
+async function callAnthropic(model: string, prompt: string, o: GenOpts): Promise<GenResult> {
+  const key = o.apiKey || firstEnv(["ANTHROPIC_API_KEY"]);
+  if (!key) throw new Error("No Anthropic key available. Add one in Settings → News briefing.");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({ model, max_tokens: o.maxTokens ?? 8192, messages: [{ role: "user", content: prompt }] }),
   });
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -40,15 +84,20 @@ async function callAnthropic(model: string, prompt: string, o: GenOpts): Promise
   return { text: (j.content ?? []).map((c) => c.text ?? "").join(""), sources: [] };
 }
 
-async function callPerplexity(model: string, prompt: string, o: GenOpts): Promise<{ text: string; sources: string[] }> {
-  const key = process.env.PERPLEXITY_API_KEY;
-  if (!key) throw new Error("No PERPLEXITY_API_KEY set.");
+async function callPerplexity(model: string, prompt: string, o: GenOpts): Promise<GenResult> {
+  const key = o.apiKey || firstEnv(["PERPLEXITY_API_KEY"]);
+  if (!key) throw new Error("No Perplexity key available. Add one in Settings → News briefing.");
   const body: Record<string, unknown> = { model, input: prompt };
   if (o.webSearch) body.tools = [{ type: "web_search", search_context_size: "high" }];
-  const res = await fetch("https://api.perplexity.ai/v1/agent", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body: JSON.stringify(body) });
+  const res = await fetch("https://api.perplexity.ai/v1/agent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify(body),
+  });
   const raw = await res.text();
   if (!res.ok) throw new Error(`Perplexity ${res.status}: ${raw.slice(0, 300)}`);
-  let text = ""; const urls = new Set<string>();
+  let text = "";
+  const urls = new Set<string>();
   try {
     const json = JSON.parse(raw) as { output_text?: unknown; output?: unknown };
     const acc: string[] = [];
@@ -65,10 +114,15 @@ async function callPerplexity(model: string, prompt: string, o: GenOpts): Promis
   return { text, sources: [...urls].slice(0, 20) };
 }
 
-export async function callModel(model: string, prompt: string, opts: GenOpts = {}): Promise<{ text: string; sources: string[] }> {
-  const provider = providerOf(model);
-  if (provider === "gemini") return callGemini(model, prompt, opts);
-  if (provider === "anthropic") return callAnthropic(model, prompt, opts);
-  if (provider === "perplexity") return callPerplexity(model, prompt, opts);
-  throw new Error("Only Gemini, Perplexity and Claude models can generate here (local models can't be reached by the server).");
+const PROVIDER_ORDER: AiProvider[] = ["gemini", "openai", "anthropic", "perplexity"];
+
+export async function callModel(model: string, prompt: string, opts: GenOpts = {}): Promise<GenResult> {
+  const provider = providerOfModel(model);
+  if (PROVIDER_ORDER.includes(provider)) {
+    if (provider === "gemini") return callGemini(model, prompt, opts);
+    if (provider === "openai") return callOpenAI(model, prompt, opts);
+    if (provider === "anthropic") return callAnthropic(model, prompt, opts);
+    return callPerplexity(model, prompt, opts);
+  }
+  throw new Error("Unsupported model.");
 }
