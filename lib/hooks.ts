@@ -1,23 +1,23 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import { getData, updateData, migrateAll, DEFAULT, type BridgeData } from "./store";
+import { getData, updateData, migrateAll, DEFAULT, type BaseData } from "./store";
 
 const SYNC_DELAY_MS = 2500;
 
-async function serverGet(): Promise<BridgeData | null> {
+async function serverGet(): Promise<BaseData | null> {
   try {
     const res = await fetch("/api/data", { cache: "no-store" });
     if (!res.ok) return null;
     const { data } = await res.json();
     if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-    return data as BridgeData;
+    return data as BaseData;
   } catch {
     return null;
   }
 }
 
-async function serverSet(data: BridgeData): Promise<void> {
+async function serverSet(data: BaseData): Promise<void> {
   try {
     await fetch("/api/data", {
       method: "POST",
@@ -29,16 +29,16 @@ async function serverSet(data: BridgeData): Promise<void> {
   }
 }
 
-// ── One store shared by every useBridge() consumer ─────────────────────────────
+// ── One store shared by every useBase() consumer ─────────────────────────────
 //
-// useBridge() used to own per-component state: each of the six consumers
+// useBase() used to own per-component state: each of the six consumers
 // mounted app-wide (Sidebar, CommandBar, Dock, BottomNav, KeyboardShortcuts and
 // the page itself) ran its own hydration — its own getData() and its own
-// fetch of the entire dataset — and then registered its own bridge_update
+// fetch of the entire dataset — and then registered its own base_update
 // listener. Every mutation therefore woke all six, each re-reading the whole
 // record, and each kept its own debounce timer that could POST the full
 // dataset again. Sharing one snapshot removes that N-fold work.
-let snapshot: BridgeData = DEFAULT;
+let snapshot: BaseData = DEFAULT;
 let hydrated = false;
 let hydration: Promise<void> | null = null;
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,7 +48,7 @@ function emit() {
   for (const l of listeners) l();
 }
 
-function setSnapshot(next: BridgeData) {
+function setSnapshot(next: BaseData) {
   if (next === snapshot) return;
   snapshot = next;
   emit();
@@ -56,7 +56,7 @@ function setSnapshot(next: BridgeData) {
 
 // Keep local listeners in step with writes made by any part of the app.
 if (typeof window !== "undefined") {
-  window.addEventListener("bridge_update", () => setSnapshot(getData()));
+  window.addEventListener("base_update", () => setSnapshot(getData()));
 }
 
 function hydrate() {
@@ -104,11 +104,11 @@ function subscribe(fn: () => void) {
 const getServerData = () => DEFAULT;
 const getServerLoaded = () => false;
 
-export function useBridge() {
+export function useBase() {
   const data = useSyncExternalStore(subscribe, getSnapshotOfData, getServerData);
   const loaded = useSyncExternalStore(subscribe, getLoaded, getServerLoaded);
 
-  const mutate = useCallback((updater: (d: BridgeData) => BridgeData) => {
+  const mutate = useCallback((updater: (d: BaseData) => BaseData) => {
     const next = updateData((d) => ({ ...updater(d), updatedAt: Date.now() }));
     setSnapshot(next);
 

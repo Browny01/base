@@ -1,10 +1,10 @@
 "use client";
 
 import { useId, useRef, useState, useEffect } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday } from "@/lib/utils";
 import { firstName } from "@/lib/profile";
-import { TASK_TAGS, type Priority, type Task, type TaskTag, type BridgeData, type Bookmark } from "@/lib/store";
+import { TASK_TAGS, type Priority, type Task, type TaskTag, type BaseData, type Bookmark } from "@/lib/store";
 import { PRIORITY_META, priorityLabel } from "@/lib/task-sort";
 import { useConfirm } from "@/lib/confirm-context";
 import { Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, X, Timer, NotebookText, CreditCard, Pencil, Trash2, Globe, ImagePlus } from "lucide-react";
@@ -69,13 +69,15 @@ const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
 function stackedLayout(cols: number): Layout {
   const metricWidth = cols >= 4 ? Math.floor(cols / 2) : cols;
   const metricsPerRow = Math.max(1, Math.floor(cols / metricWidth));
-  const contentStart = Math.ceil(4 / metricsPerRow) * 4;
+  const metricHeight = 5;
+  const metricCount = WIDGETS.filter(({ id }) => id.endsWith("metric")).length;
+  const contentStart = Math.ceil(metricCount / metricsPerRow) * metricHeight;
   let contentY = contentStart;
   return WIDGETS.map(({ id }, index) => {
     const isMetric = id.endsWith("metric");
     const metricIndex = WIDGETS.slice(0, index).filter((widget) => widget.id.endsWith("metric")).length;
     const height = isMetric ? 5 : id === "news" ? 10 : id === "tasks" || id === "projects" || id === "bookmarks" ? 11 : 8;
-    const y = isMetric ? Math.floor(metricIndex / metricsPerRow) * 4 : contentY;
+    const y = isMetric ? Math.floor(metricIndex / metricsPerRow) * metricHeight : contentY;
     if (!isMetric) contentY += height;
     return {
       i: id,
@@ -162,7 +164,7 @@ async function fileToIcon(file: File): Promise<string> {
 }
 
 export function Dashboard() {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const now = new Date();
   const today = getToday(data.profile?.timezone);
 
@@ -346,7 +348,7 @@ export function Dashboard() {
         return (
           <WidgetPanel title="Recent notes" icon={<NotebookText className="w-[15px] h-[15px]" />} href="/notes">
             {recentNotes.length === 0 ? <WidgetEmpty>Your recently edited notes will appear here.</WidgetEmpty> : (
-              <div className="space-y-1">{recentNotes.slice(0, 7).map((page) => <Link key={page.id} href="/notes" onClick={() => localStorage.setItem("bridge_wiki_active", page.id)} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><span className="text-base shrink-0">{page.icon || "📄"}</span><span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text)] truncate">{page.title || "Untitled"}</span><span className="text-[10.5px] text-[var(--faint)] shrink-0">{new Date(page.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></Link>)}</div>
+              <div className="space-y-1">{recentNotes.slice(0, 7).map((page) => <Link key={page.id} href="/notes" onClick={() => localStorage.setItem("base_wiki_active", page.id)} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><span className="text-base shrink-0">{page.icon || "📄"}</span><span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text)] truncate">{page.title || "Untitled"}</span><span className="text-[10.5px] text-[var(--faint)] shrink-0">{new Date(page.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></Link>)}</div>
             )}
           </WidgetPanel>
         );
@@ -382,6 +384,8 @@ export function Dashboard() {
             margin={[12, 12]}
             containerPadding={[12, 0]}
             compactor={noCompactor}
+            dragConfig={{ enabled: false }}
+            resizeConfig={{ enabled: false }}
           >
             {DEFAULT_WIDGET_IDS.map((id) => (
               <div key={id} className="dashboard-widget">
@@ -619,7 +623,7 @@ function BookmarkForm({
   );
 }
 
-function BookmarksWidget({ data, mutate }: { data: BridgeData; mutate: (updater: (d: BridgeData) => BridgeData) => void }) {
+function BookmarksWidget({ data, mutate }: { data: BaseData; mutate: (updater: (d: BaseData) => BaseData) => void }) {
   const confirm = useConfirm();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ────────────────────────────────────────────────────────────────────────────────
-// Base local bridge — lets the Base web app talk to CLIs on YOUR machine
+// Base local relay — lets the Base web app talk to CLIs on YOUR machine
 // (Claude Code with your Claude Pro/Max plan, or Codex with your ChatGPT plan).
 //
 // The browser calls this server directly; nothing goes through Vercel, and your
@@ -9,13 +9,13 @@
 // SECURITY
 //   • Binds to 127.0.0.1 only — not exposed on your LAN. Reach it remotely via
 //     `tailscale serve` (HTTPS, tailnet-only), never a raw public port.
-//   • If BRIDGE_CLI_TOKEN is set, every request must send
+//   • If BASE_CLI_TOKEN is set, every request must send
 //     `Authorization: Bearer <token>`. Set it in Base → Settings.
-//   • CORS is limited to the Base origin (BRIDGE_ALLOWED_ORIGIN).
+//   • CORS is limited to the Base origin (BASE_ALLOWED_ORIGIN).
 //
 // USAGE
-//   BRIDGE_CLI_TOKEN=<secret> node scripts/bridge-cli.mjs      # port 8787
-//   PORT=8787 BRIDGE_CLI_TOKEN=<secret> node scripts/bridge-cli.mjs
+//   BASE_CLI_TOKEN=<secret> node scripts/base-cli.mjs       # port 8787
+//   PORT=8787 BASE_CLI_TOKEN=<secret> node scripts/base-cli.mjs
 //
 //   Uses your personal subscriptions via their official CLIs. Single-user use.
 // ────────────────────────────────────────────────────────────────────────────────
@@ -25,13 +25,13 @@ import { spawn, spawnSync } from "node:child_process";
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = "127.0.0.1";
-const TOKEN = process.env.BRIDGE_CLI_TOKEN || "";
+const TOKEN = process.env.BASE_CLI_TOKEN || process.env.BRIDGE_CLI_TOKEN || "";
 const DEFAULT_ORIGIN = "https://base.lucasbrown.xyz";
-const ALLOWED = (process.env.BRIDGE_ALLOWED_ORIGIN || DEFAULT_ORIGIN).split(",").map((s) => s.trim());
-// Local Ollama the bridge proxies to. The browser can't reach http://localhost from
+const ALLOWED = (process.env.BASE_ALLOWED_ORIGIN || process.env.BRIDGE_ALLOWED_ORIGIN || DEFAULT_ORIGIN).split(",").map((s) => s.trim());
+// Local Ollama this relay proxies to. The browser can't reach http://localhost from
 // the HTTPS site, and Ollama rejects non-loopback Host headers (DNS-rebind guard) — so
 // we forward here with the Host rewritten to loopback. Tailnet-only; Ollama has no auth.
-const OLLAMA_TARGET = process.env.BRIDGE_OLLAMA_URL || "http://127.0.0.1:11434";
+const OLLAMA_TARGET = process.env.BASE_OLLAMA_URL || process.env.BRIDGE_OLLAMA_URL || "http://127.0.0.1:11434";
 
 function corsHeaders(req) {
   const origin = req.headers.origin || "";
@@ -103,7 +103,7 @@ const server = createServer((req, res) => {
 
   if (!authed(req)) {
     res.writeHead(401, { "Content-Type": "application/json", ...cors });
-    return res.end(JSON.stringify({ error: "Unauthorized — set the bridge token in Base." }));
+    return res.end(JSON.stringify({ error: "Unauthorized — set the CLI token in Base." }));
   }
 
   if (req.method === "GET" && req.url.startsWith("/models")) {
@@ -129,7 +129,7 @@ const server = createServer((req, res) => {
 
       child.stdout.on("data", (d) => res.write(d));
       child.stderr.on("data", (d) => process.stderr.write(d));
-      child.on("error", (e) => res.end(`\n[bridge error: ${e.message}. Is "${runner.cmd}" installed and on PATH?]`));
+      child.on("error", (e) => res.end(`\n[base-cli error: ${e.message}. Is "${runner.cmd}" installed and on PATH?]`));
       child.on("close", () => res.end());
       req.on("close", () => { try { child.kill(); } catch {} });
 
@@ -139,13 +139,13 @@ const server = createServer((req, res) => {
     return;
   }
 
-  res.writeHead(404, cors); res.end("Base bridge. Try GET /models or POST /chat.");
+  res.writeHead(404, cors); res.end("Base local relay. Try GET /models or POST /chat.");
 });
 
 server.listen(PORT, HOST, () => {
   const found = models();
-  console.log(`\n  Base bridge → http://${HOST}:${PORT}  (localhost only)`);
-  console.log(`  Auth: ${TOKEN ? "token required ✓" : "OPEN (no BRIDGE_CLI_TOKEN set — set one!)"}`);
+  console.log(`\n  Base relay → http://${HOST}:${PORT}  (localhost only)`);
+  console.log(`  Auth: ${TOKEN ? "token required ✓" : "OPEN (no BASE_CLI_TOKEN set — set one!)"}`);
   console.log(`  CLIs: ${found.length ? found.map((m) => m.id).join(", ") : "none (install `claude` / `codex` and log in)"}`);
   console.log(`  Ollama proxy: /ollama/* → ${OLLAMA_TARGET}`);
   console.log(`  Expose over HTTPS with: tailscale serve --bg --https=8443 http://127.0.0.1:${PORT}\n`);

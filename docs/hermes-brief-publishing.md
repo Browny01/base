@@ -45,7 +45,7 @@ Publishes one report. Required arguments are `type`, `title`, `contentMarkdown`,
   "generatedAt": "2026-08-02T09:15:00+08:00",
   "periodStart": "2026-07-27",
   "periodEnd": "2026-08-02",
-  "workspace": "Bridge",
+  "workspace": "Base",
   "sourceRunId": "hermes-weekly-2026-08-02"
 }
 ```
@@ -92,7 +92,7 @@ curl --request POST "$BRIDGE_MCP_URL" \
         "title": "Morning COO Brief — 2 August",
         "contentMarkdown": "## Today at a glance\n\n- Review current priorities",
         "generatedAt": "2026-08-02T07:30:00+08:00",
-        "workspace": "Bridge",
+        "workspace": "Base",
         "sourceRunId": "morning-run-2026-08-02"
       }
     }

@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  X, MoreHorizontal, Sun, Moon, Settings,
+  X, MoreHorizontal, Sun, Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { visiblePages, isHidden, PAGE_BY_KEY, SETTINGS_PAGE, DEFAULT_NAV_PREFS, type NavPage } from "@/lib/nav-config";
 
 const isActive = (pathname: string, href: string) =>
@@ -20,8 +21,9 @@ function Tab({ item, active }: { item: NavPage; active: boolean }) {
     <Link
       href={item.href}
       aria-label={item.label}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "tap relative flex flex-col items-center justify-center gap-0.5 w-[58px] h-[46px] rounded-[16px] transition-colors",
+        "tap relative flex flex-col items-center justify-center gap-0.5 w-[58px] min-w-11 shrink-0 h-[46px] rounded-[16px] transition-colors",
         active ? "text-[var(--text)]" : "text-[var(--faint)]",
       )}
     >
@@ -34,8 +36,9 @@ function Tab({ item, active }: { item: NavPage; active: boolean }) {
 export function BottomNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const { theme, toggle: toggleTheme } = useTheme();
-  const { data } = useBridge();
+  const { data } = useBase();
   const isDark = theme === "dark";
 
   const navPrefs = data.navPrefs;
@@ -52,22 +55,22 @@ export function BottomNav() {
   return (
     <>
       {/* More sheet — the full app map */}
-      {open && (
-        <div className="fixed inset-0 z-[60] flex items-end" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] nx-fade" />
-          <div
-            className="relative w-full px-3 nx-slide-up"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 92px)" }}
-            onClick={(e) => e.stopPropagation()}
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px] nx-fade" />
+          <Dialog.Content
+            aria-describedby={undefined}
+            onCloseAutoFocus={(event) => { event.preventDefault(); triggerRef.current?.focus(); }}
+            className="fixed inset-x-3 bottom-[var(--app-bottom-clearance)] z-[70] max-h-[calc(100dvh-var(--app-bottom-clearance)-env(safe-area-inset-top)-1rem)] overflow-y-auto overscroll-contain glass glass-edge border border-[var(--border)] rounded-[26px] p-4 nx-slide-up"
           >
-            <div className="glass glass-edge border border-[var(--border)] rounded-[26px] p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="eyebrow">All pages</span>
-                <button onClick={() => setOpen(false)} className="tap w-7 h-7 flex items-center justify-center rounded-full text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)]">
+                <Dialog.Title className="eyebrow">All pages</Dialog.Title>
+                <Dialog.Close aria-label="Close all pages" className="tap w-11 h-11 flex items-center justify-center rounded-full text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)]">
                   <X className="w-4 h-4" />
-                </button>
+                </Dialog.Close>
               </div>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 min-[375px]:grid-cols-4 gap-1.5">
+
                 {all.map(({ href, label, icon: Icon }, i) => {
                   const active = isActive(pathname, href);
                   return (
@@ -86,25 +89,29 @@ export function BottomNav() {
                 {isDark ? <Sun style={{ width: 16, height: 16 }} strokeWidth={1.9} /> : <Moon style={{ width: 16, height: 16 }} strokeWidth={1.9} />}
                 {isDark ? "Light mode" : "Dark mode"}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* Floating liquid-glass tab bar */}
       <div
         className="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none px-4"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
       >
-        <div className="pointer-events-auto glass glass-edge border border-[var(--border)] rounded-[24px] px-1.5 py-1.5 flex items-center gap-0.5">
-          {tabs.map((item) => (
-            <Tab key={item.href} item={item} active={isActive(pathname, item.href)} />
-          ))}
+        <div className="pointer-events-auto max-w-full glass glass-edge border border-[var(--border)] rounded-[24px] px-1.5 py-1.5 flex items-center gap-0.5">
+          <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto no-scrollbar">
+            {tabs.map((item) => (
+              <Tab key={item.href} item={item} active={isActive(pathname, item.href)} />
+            ))}
+          </div>
           <button
+            ref={triggerRef}
             onClick={() => setOpen((v) => !v)}
             aria-label="More"
+            aria-expanded={open}
+            aria-haspopup="dialog"
             className={cn(
-              "tap relative flex items-center justify-center w-[58px] h-[46px] rounded-[16px] transition-colors",
+              "tap relative flex items-center justify-center w-[58px] min-w-11 shrink-0 h-[46px] rounded-[16px] transition-colors",
               moreActive ? "text-[var(--text)]" : "text-[var(--faint)]",
             )}
           >

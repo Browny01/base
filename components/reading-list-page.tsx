@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import { BookOpen, ImagePlus, X, Loader2 } from "lucide-react";
 import { CardListPage, type CardConfig } from "@/components/card-list-page";
@@ -191,7 +191,7 @@ function AddBook({ close, append }: { close: () => void; append: (item: ReadingL
 }
 
 export function ReadingListPage() {
-  const { data } = useBridge();
+  const { data } = useBase();
   const items = (data.readingList ?? []) as ReadingListItem[];
 
   return (

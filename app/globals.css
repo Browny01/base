@@ -366,7 +366,17 @@ html.dark .glass-edge {
 /* On touch devices there's no hover — reveal hover-only controls */
 @media (hover: none) {
   [class~="group-hover:opacity-100"] { opacity: 1 !important; }
+  [class~="group-hover/row:opacity-100"] { opacity: 1 !important; }
+  [class~="group-hover/sub:opacity-100"] { opacity: 1 !important; }
   button:active { transform: scale(.97); }
+}
+
+@media (max-width: 767px) {
+  /* Keep iOS from zooming the viewport when a compact field gains focus. */
+  input, select, textarea, .calendar-field { font-size: 16px; }
+  .calendar-icon-button { width: 44px; height: 44px; }
+  /* A transformed page makes fixed drawers and backdrops relative to the page. */
+  .nx-page-enter { animation-name: nx-fade-in; }
 }
 
 @media (prefers-reduced-motion: reduce) {

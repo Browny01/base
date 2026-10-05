@@ -1,18 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter, usePathname } from "next/navigation";
 import { getData } from "@/lib/store";
 import { useTheme } from "@/lib/theme-context";
 import { useNavMode } from "@/lib/nav-mode-context";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import {
   FolderKanban, Search, CornerDownLeft, LayoutGrid, LayoutDashboard,
-  type LucideIcon, Settings, Sun, Moon, PanelBottom, CalendarDays, CheckSquare,
+  type LucideIcon, Sun, Moon, PanelBottom, CalendarDays, CheckSquare, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { visiblePages, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
+import { useQuickActions } from "@/lib/quick-actions";
 
 type Item =
   | { kind: "page"; key: string; label: string; icon: LucideIcon; href: string; keywords?: string }
@@ -26,11 +27,12 @@ export function CommandBar() {
   const pathname = usePathname();
   const { theme, toggle: toggleTheme } = useTheme();
   const { mode, setMode } = useNavMode();
-  const { data } = useBridge();
+  const { data } = useBase();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const openPalette = useCallback(() => {
     setQuery("");
@@ -55,13 +57,14 @@ export function CommandBar() {
   }, [data.navPrefs]);
 
   // Quick actions — commands, not destinations.
+  const quick = useQuickActions();
   const actions = useMemo<Item[]>(() => [
-    { kind: "action", key: "act:newevent", label: "New event", icon: CalendarDays, keywords: "create add calendar schedule", run: () => { try { localStorage.setItem("bridge_open_new_event", "1"); window.dispatchEvent(new Event("bridge:new-event")); } catch {} router.push("/calendar"); } },
-    { kind: "action", key: "act:newtask", label: "New task", icon: CheckSquare, keywords: "create add todo", run: () => { try { localStorage.setItem("bridge_open_new_task", "1"); } catch {} router.push("/tasks"); } },
-    { kind: "action", key: "act:newproject", label: "New project", icon: FolderKanban, keywords: "create add", run: () => { try { localStorage.setItem("bridge_open_new_project", "1"); } catch {} router.push("/projects"); } },
+    { kind: "action", key: "act:newevent", label: "New event", icon: CalendarDays, keywords: "create add calendar schedule", run: quick.newEvent },
+    { kind: "action", key: "act:newtask", label: "New task", icon: CheckSquare, keywords: "create add todo", run: quick.newTask },
+    { kind: "action", key: "act:newproject", label: "New project", icon: FolderKanban, keywords: "create add", run: quick.newProject },
     { kind: "action", key: "act:theme", label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode", icon: theme === "dark" ? Sun : Moon, keywords: "theme dark light appearance", run: toggleTheme },
     { kind: "action", key: "act:nav", label: mode === "dock" ? "Use sidebar navigation" : "Use dock navigation", icon: mode === "dock" ? LayoutDashboard : PanelBottom, keywords: "dock sidebar navigation layout", run: () => setMode(mode === "dock" ? "sidebar" : "dock") },
-  ], [router, theme, toggleTheme, mode, setMode]);
+  ], [router, quick, theme, toggleTheme, mode, setMode]);
 
   // Filter each group, then flatten in the SAME order they're rendered so keyboard
   // navigation (results[active]) lines up with the rendered rows.
@@ -102,14 +105,14 @@ export function CommandBar() {
     if (it.kind === "page") { router.push(it.href); return; }
     if (it.kind === "project") { router.push(`/projects/${it.id}`); return; }
     if (it.kind === "wiki") {
-      try { localStorage.setItem("bridge_wiki_active", it.id); } catch {}
-      window.dispatchEvent(new CustomEvent("bridge:open-wiki", { detail: it.id }));
+      try { localStorage.setItem("base_wiki_active", it.id); } catch {}
+      window.dispatchEvent(new CustomEvent("base:open-wiki", { detail: it.id }));
       router.push("/notes");
       return;
     }
     // board
-    try { localStorage.setItem("bridge_vision_active", it.id); } catch {}
-    window.dispatchEvent(new CustomEvent("bridge:open-vision", { detail: it.id }));
+    try { localStorage.setItem("base_vision_active", it.id); } catch {}
+    window.dispatchEvent(new CustomEvent("base:open-vision", { detail: it.id }));
     router.push("/vision");
   };
 
@@ -152,28 +155,33 @@ export function CommandBar() {
   return (
     <>
       <button
+        ref={triggerRef}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         onClick={openPalette}
-        className="group flex items-center gap-2 h-8 w-full max-w-[340px] px-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--faint)] hover:bg-[var(--chip)] hover:border-[var(--border-2)] transition-colors"
+        className="group flex items-center gap-2 h-11 md:h-8 min-w-0 w-full max-w-[340px] px-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-[var(--faint)] hover:bg-[var(--chip)] hover:border-[var(--border-2)] transition-colors"
       >
         <Search className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
         <span className="text-[13px] text-[var(--muted)] truncate">Search or jump to…</span>
-        <kbd className="ml-auto flex items-center gap-0.5 text-[11px] font-medium text-[var(--faint)] tabular">
+        <kbd className="ml-auto hidden md:flex items-center gap-0.5 text-[11px] font-medium text-[var(--faint)] tabular">
           <span className="text-[12px]">⌘</span>K
         </kbd>
       </button>
 
-      {open && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh] bg-black/30 backdrop-blur-[2px] nx-fade" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-[560px] bg-[var(--bg)] border border-[var(--border)] rounded-xl overflow-hidden elevated nx-pop" onClick={(e) => e.stopPropagation()} onKeyDown={onListKey}>
-            <div className="flex items-center gap-2.5 px-4 h-12 border-b border-[var(--border)]">
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-[2px] nx-fade" />
+          <Dialog.Content aria-describedby={undefined} onCloseAutoFocus={(event) => { event.preventDefault(); triggerRef.current?.focus(); }} onKeyDown={onListKey} className="fixed top-[calc(env(safe-area-inset-top)+1rem)] sm:top-[12dvh] left-1/2 -translate-x-1/2 z-[101] flex flex-col w-[calc(100%-2rem)] max-w-[560px] max-h-[calc(100dvh-env(safe-area-inset-top)-2rem)] bg-[var(--bg)] border border-[var(--border)] rounded-xl overflow-hidden elevated nx-pop">
+            <Dialog.Title className="sr-only">Search pages, projects, and notes</Dialog.Title>
+            <div className="flex items-center gap-2.5 px-4 h-12 shrink-0 border-b border-[var(--border)]">
               <Search className="w-4 h-4 text-[var(--faint)] shrink-0" strokeWidth={2} />
-              <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} placeholder="Search pages, projects, notes…" className="flex-1 bg-transparent text-[14px] text-[var(--text)] placeholder-[var(--faint)] outline-none" />
-              <kbd className="text-[11px] text-[var(--faint)] border border-[var(--border)] rounded px-1.5 py-0.5">Esc</kbd>
+              <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} placeholder="Search pages, projects, notes…" aria-label="Search pages, projects, notes" className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--text)] placeholder-[var(--faint)] outline-none" />
+              <Dialog.Close aria-label="Close search" className="flex w-11 h-11 shrink-0 items-center justify-center rounded-lg text-[var(--faint)] hover:text-[var(--text)]"><X className="w-4 h-4" /></Dialog.Close>
             </div>
 
-            <div className="max-h-[360px] overflow-y-auto p-1.5">
+            <div className="min-h-0 max-h-[360px] overflow-y-auto overscroll-contain p-1.5">
               {results.length === 0 ? (
-                <div className="px-3 py-10 text-center"><p className="text-[13px] text-[var(--muted)]">No results for "{query}"</p></div>
+                <div className="px-3 py-10 text-center"><p className="text-[13px] text-[var(--muted)]">No results for &quot;{query}&quot;</p></div>
               ) : (
                 <>
                   {renderSection("Actions", acts, 0)}
@@ -185,15 +193,14 @@ export function CommandBar() {
               )}
             </div>
 
-            <div className="flex items-center gap-4 px-4 h-9 border-t border-[var(--border)] bg-[var(--surface-2)] text-[11px] text-[var(--faint)]">
+            <div className="hidden md:flex shrink-0 items-center gap-4 px-4 h-9 border-t border-[var(--border)] bg-[var(--surface-2)] text-[11px] text-[var(--faint)]">
               <span className="flex items-center gap-1"><kbd className="font-medium">↑↓</kbd> navigate</span>
               <span className="flex items-center gap-1"><kbd className="font-medium">↵</kbd> open</span>
               <span className="flex items-center gap-1"><kbd className="font-medium">esc</kbd> close</span>
             </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Eye, EyeOff, Loader2 } from "lucide-react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { DEFAULT_AI_SETTINGS, PROVIDER_INFO, modelsForProvider, type AiProvider, type AiSettings } from "@/lib/ai-settings";
 import { detectTimeZone, initialOf, needsOnboarding, offsetMinutes, timeZoneOptions } from "@/lib/profile";
 import { ALL_PAGES, DEFAULT_NAV_PREFS } from "@/lib/nav-config";
@@ -25,7 +25,7 @@ interface SetupStatus {
 const STEPS = ["Welcome", "About you", "Security", "Pages", "News briefing"] as const;
 
 export default function OnboardingPage() {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const router = useRouter();
 
   const [status, setStatus] = useState<SetupStatus | null>(null);

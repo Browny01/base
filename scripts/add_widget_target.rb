@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# Adds the BridgeWidgetExtension (WidgetKit) target to the native iOS project
+# Adds the BaseWidgetExtension (WidgetKit) target to the native iOS project
 # and embeds it in the App target. Idempotent — safe to re-run.
 begin
   require "xcodeproj"
@@ -15,8 +15,8 @@ raise "App target not found" unless app
 
 app_bundle_id = app.build_configurations.first.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] || "app.bridge.personal"
 dev_team = app.build_configurations.map { |c| c.build_settings["DEVELOPMENT_TEAM"] }.compact.first
-widget_bundle_id = "#{app_bundle_id}.BridgeWidget"
-NAME = "BridgeWidgetExtension"
+widget_bundle_id = "#{app_bundle_id}.BridgeWidget" # unchanged on purpose: stable app identity
+NAME = "BaseWidgetExtension"
 
 # ── Idempotency: tear down an existing widget target/embed/dependency ──────────
 if (old = project.targets.find { |t| t.name == NAME })
@@ -31,18 +31,18 @@ end
 # ── Create the app-extension target ───────────────────────────────────────────
 widget = project.new_target(:app_extension, NAME, :ios, "17.0")
 
-group = project.main_group.find_subpath("BridgeWidget", true)
+group = project.main_group.find_subpath("BaseWidget", true)
 group.set_source_tree("SOURCE_ROOT")
-group.set_path("BridgeWidget")
+group.set_path("BaseWidget")
 # clear any stale children from a previous run
 group.clear
-swift_ref = group.new_reference("BridgeWidget.swift")
+swift_ref = group.new_reference("BaseWidget.swift")
 group.new_reference("Info.plist")
 widget.source_build_phase.add_file_reference(swift_ref)
 
 widget.build_configurations.each do |c|
   bs = c.build_settings
-  bs["INFOPLIST_FILE"] = "BridgeWidget/Info.plist"
+  bs["INFOPLIST_FILE"] = "BaseWidget/Info.plist"
   bs["PRODUCT_BUNDLE_IDENTIFIER"] = widget_bundle_id
   bs["PRODUCT_NAME"] = "$(TARGET_NAME)"
   bs["SWIFT_VERSION"] = "5.0"

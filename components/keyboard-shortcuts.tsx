@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
+import { useTheme } from "@/lib/theme-context";
+import { useNavMode } from "@/lib/nav-mode-context";
+import { useSidebar } from "@/lib/sidebar-context";
+import { useQuickActions } from "@/lib/quick-actions";
 import { isHidden, PAGE_BY_HREF } from "@/lib/nav-config";
 import { SHORTCUT_SECTIONS, onOpenShortcutSheet } from "@/lib/shortcuts";
 // Press `g` then a key to jump around. `?` opens the cheat-sheet.
@@ -30,12 +34,37 @@ const isTyping = (el: EventTarget | null) => {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || n.isContentEditable;
 };
 
+// Modified shortcuts are read as `mod+shift+key`. Anything else (⌘F, ⌘P, ⌘R …)
+// is deliberately ignored — the browser owns those and users expect them to.
+const COMBOS: Record<string, string> = {
+  "mod+shift+n": "newTask",
+  "mod+shift+o": "newProject",
+  "mod+shift+e": "newEvent",
+  "mod+shift+d": "toggleTheme",
+  "mod+\\": "toggleNav",
+  "mod+b": "toggleSidebar",
+};
+
+function comboOf(e: KeyboardEvent): string | null {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;
+  const parts = [
+    e.metaKey || e.ctrlKey ? "mod" : "",
+    e.shiftKey ? "shift" : "",
+    e.key.length === 1 ? e.key.toLowerCase() : e.key,
+  ].filter(Boolean);
+  return parts.join("+");
+}
+
 export function KeyboardShortcuts() {
   const router = useRouter();
   const pathname = usePathname();
-  const { data } = useBridge();
+  const { data } = useBase();
   const [cheat, setCheat] = useState(false);
   const gArmed = useRef(0);
+  const { toggle: toggleTheme } = useTheme();
+  const { mode, setMode } = useNavMode();
+  const { toggle: toggleSidebar } = useSidebar();
+  const quick = useQuickActions();
 
   // Shortcuts for pages you've hidden in Settings still work (the page still
   // exists), but don't advertise them in the cheat-sheet.
@@ -48,8 +77,22 @@ export function KeyboardShortcuts() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isTyping(e.target)) return;
+
+      // Modified shortcuts work anywhere, including on top of an open palette.
+      const combo = comboOf(e);
+      if (combo) {
+        const action = COMBOS[combo];
+        if (!action) return;
+        e.preventDefault();
+        if (action === "toggleTheme") toggleTheme();
+        else if (action === "toggleSidebar") toggleSidebar();
+        else if (action === "toggleNav") setMode(mode === "dock" ? "sidebar" : "dock");
+        else quick[action as "newTask" | "newProject" | "newEvent"]();
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       if (e.key === "?") { e.preventDefault(); setCheat((v) => !v); return; }
       if (e.key === "Escape") { setCheat(false); return; }
@@ -64,7 +107,7 @@ export function KeyboardShortcuts() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [router]);
+  }, [router, mode, setMode, toggleTheme, toggleSidebar, quick]);
 
   if (!cheat || typeof document === "undefined") return null;
 

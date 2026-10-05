@@ -111,13 +111,13 @@ test("timelineForTask only emits events backed by timestamps or explicit state",
 });
 
 test("normalizeAutonomySettings clamps unsafe control values", () => {
-  const settings = normalizeAutonomySettings({ enabled: false, maxConcurrentWorkers: 99, dailyRunLimit: -3, maxCorrectionAttempts: 8, allowedTaskClasses: ["research", "deploy"], allowedWorkspaces: ["Bridge", "Bridge", ""] });
+  const settings = normalizeAutonomySettings({ enabled: false, maxConcurrentWorkers: 99, dailyRunLimit: -3, maxCorrectionAttempts: 8, allowedTaskClasses: ["research", "deploy"], allowedWorkspaces: ["Base", "Base", ""] });
   assert.equal(settings.enabled, false);
   assert.equal(settings.maxConcurrentWorkers, 3);
   assert.equal(settings.dailyRunLimit, 1);
   assert.equal(settings.maxCorrectionAttempts, 1);
   assert.deepEqual(settings.allowedTaskClasses, ["research"]);
-  assert.deepEqual(settings.allowedWorkspaces, ["Bridge"]);
+  assert.deepEqual(settings.allowedWorkspaces, ["Base"]);
   // A fresh install has no business context to assume — it starts empty.
   assert.equal(settings.currentBusinessFocus, "");
   assert.deepEqual(DEFAULT_AUTONOMY_SETTINGS.allowedWorkspaces, ["Base"]);
@@ -181,10 +181,10 @@ test("generic agent writes cannot bypass autonomy claiming or verification", () 
   const patch = sanitizeAutonomyAgentPatch(task({ executionState: "awaiting_review" }), { title: "Safe title", executionState: "completed", done: true, verifiedAt: "now", resultSummary: "forged", taskClass: "research", workspace: "Systemly", dependencyIds: [] });
   assert.deepEqual(patch, { title: "Safe title" });
 
-  const suggestion = prepareAutonomySuggestion({ id: "idea", title: "Agent idea", tag: "night-auto", workspace: "Bridge", taskClass: "research", dependencyIds: ["source"], executionState: "completed", done: true, resultSummary: "forged" });
+  const suggestion = prepareAutonomySuggestion({ id: "idea", title: "Agent idea", tag: "night-auto", workspace: "Base", taskClass: "research", dependencyIds: ["source"], executionState: "completed", done: true, resultSummary: "forged" });
   assert.equal(suggestion.executionState, "suggested");
   assert.equal(suggestion.done, false);
-  assert.equal(suggestion.workspace, "Bridge");
+  assert.equal(suggestion.workspace, "Base");
   assert.equal(suggestion.taskClass, "research");
   assert.deepEqual(suggestion.dependencyIds, ["source"]);
   assert.equal("resultSummary" in suggestion, false);

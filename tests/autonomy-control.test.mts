@@ -13,7 +13,7 @@ const SETTINGS = {
   dailyRunLimit: 6,
   maxCorrectionAttempts: 1,
   allowedTaskClasses: ["research", "planning", "implementation", "review", "operations"],
-  allowedWorkspaces: ["Bridge", "Dropshipping"],
+  allowedWorkspaces: ["Base", "Dropshipping"],
   requireApprovalForImplementation: true,
   workingHoursStart: "00:00",
   workingHoursEnd: "23:59",
@@ -94,7 +94,7 @@ test("only owning run can submit and submission clears the active lease", () => 
 });
 
 test("implementation remains owner-gated", () => {
-  const implementation = { ...queued, taskClass: "implementation", workspace: "Bridge" };
+  const implementation = { ...queued, taskClass: "implementation", workspace: "Base" };
   const denied = claimAutonomyTaskInData({ tasks: [implementation], autonomySettings: SETTINGS }, {
     taskId: "task-1", runId: "run-implementation", agent: "worker", model: "model", startedAt: "2026-08-09T08:00:00.000Z",
   });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, getToday } from "@/lib/utils";
 import { TASK_TAGS, normalizeTaskTag, taskTagLabel, type Task, type Priority, type TaskTag, type RecurringFreq } from "@/lib/store";
@@ -9,10 +9,11 @@ import { DEFAULT_TASK_SORT, PRIORITY_META, TASK_SORTS, isTaskSort, priorityLabel
 import { useStoredPref, writeStored } from "@/lib/prefs";
 import { Plus, Trash2, RotateCcw, LayoutList, Columns3, Pencil, Check, X, ChevronDown, ChevronRight, ChevronUp, GripVertical, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HANDOFF_OPEN_NEW_TASK, LEGACY_HANDOFF_OPEN_NEW_TASK, consumeHandoff } from "@/lib/base-storage";
 
 const PRIORITIES = PRIORITY_META;
 const TAGS = TASK_TAGS;
-const SORT_KEY = "bridge_tasks_sort";
+const SORT_KEY = "base_tasks_sort";
 const RECURRING: { value: RecurringFreq; label: string }[] = [
   { value: null, label: "None" },
   { value: "daily", label: "Daily" },
@@ -29,7 +30,7 @@ function priorityBadge(priority: Priority) {
 }
 
 export function TasksPage() {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const { toast } = useToast();
   const [filter, setFilter] = useState<"all" | "today" | TaskTag>("all");
   const [view, setView] = useState<"list" | "kanban">("list");
@@ -45,7 +46,9 @@ export function TasksPage() {
   const today = getToday(data.profile?.timezone);
 
   // ⌘K → "New task" opens the form on arrival
-  useEffect(() => { try { if (localStorage.getItem("bridge_open_new_task")) { localStorage.removeItem("bridge_open_new_task"); setShowForm(true); } } catch {} }, []);
+  useEffect(() => {
+    if (consumeHandoff(HANDOFF_OPEN_NEW_TASK, [LEGACY_HANDOFF_OPEN_NEW_TASK])) setShowForm(true);
+  }, []);
 
   const filtered = data.tasks.filter((t) => {
     if (filter === "today") return t.dueDate === today && !t.done;
@@ -123,20 +126,20 @@ export function TasksPage() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-[var(--text)]">Tasks</h1>
         <div className="flex items-center gap-2">
           <SortMenu value={sort} onChange={setSort} />
           {/* View toggle */}
           <div className="flex bg-[var(--surface)] border border-[var(--border)] rounded-lg p-1">
-            <button onClick={() => setView("list")} className={cn("p-1.5 rounded-md transition-colors", view === "list" ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
+            <button aria-label="List view" aria-pressed={view === "list"} onClick={() => setView("list")} className={cn("w-11 h-11 md:w-auto md:h-auto p-1.5 flex items-center justify-center rounded-md transition-colors", view === "list" ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
               <LayoutList className="w-4 h-4" />
             </button>
-            <button onClick={() => setView("kanban")} className={cn("p-1.5 rounded-md transition-colors", view === "kanban" ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
+            <button aria-label="Board view" aria-pressed={view === "kanban"} onClick={() => setView("kanban")} className={cn("w-11 h-11 md:w-auto md:h-auto p-1.5 flex items-center justify-center rounded-md transition-colors", view === "kanban" ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
               <Columns3 className="w-4 h-4" />
             </button>
           </div>
-          <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors">
+          <button onClick={() => setShowForm(!showForm)} className="flex min-h-11 md:min-h-0 items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors">
             <Plus className="w-4 h-4" /> New Task
           </button>
         </div>
@@ -300,7 +303,7 @@ function KanbanBoard({ filtered, doneTasks, today, onToggle, onDelete, onEdit }:
   ];
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6">
+    <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 sm:-mx-6 sm:px-6">
       {columns.map(({ key, tasks }) => {
         const label = key === "done" ? "Done" : priorityLabel(key);
         const border = key === "done" || key === "P1" || key === "P2" ? "border-[var(--border-2)]" : "border-[var(--border)]";
@@ -353,10 +356,10 @@ function KanbanCard({ task, today, onToggle, onDelete, onEdit }: {
           ))}
         </div>
         <div className="flex gap-2">
-          <select className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.tag} onChange={(e) => setEditForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
+          <select className="flex-1 min-w-0 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.tag} onChange={(e) => setEditForm((f) => ({ ...f, tag: e.target.value as TaskTag }))}>
             {TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
           </select>
-          <input type="date" className="flex-1 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
+          <input type="date" className="flex-1 min-w-0 bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-2 py-1.5 text-sm text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
         </div>
         <div className="flex gap-1 justify-end">
           <button onClick={() => setEditing(false)} className="p-1 text-[var(--muted)] hover:text-[var(--text)] transition-colors"><X className="w-3.5 h-3.5" /></button>

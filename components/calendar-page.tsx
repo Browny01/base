@@ -7,7 +7,7 @@ import {
   CreditCard, Dumbbell, ExternalLink, Flag, GraduationCap, Loader2, MapPin,
   Pencil, Plus, Repeat2, Trash2, Video, X,
 } from "lucide-react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import {
   addMonths, coversDate, dateKey, expandCalendarEvents, monthGrid, parseDateKey,
@@ -146,7 +146,7 @@ function sourceIcon(source: SourceKey, className = "w-4 h-4") {
 }
 
 export function CalendarPage() {
-  const { data, mutate, loaded } = useBridge();
+  const { data, mutate, loaded } = useBase();
   const { toast } = useToast();
   const today = dateKey(new Date());
   const [anchor, setAnchor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
@@ -190,17 +190,17 @@ export function CalendarPage() {
   useEffect(() => {
     const openRequestedEvent = () => {
       try {
-        if (localStorage.getItem("bridge_open_new_event")) {
-          localStorage.removeItem("bridge_open_new_event");
+        if (localStorage.getItem("base_open_new_event")) {
+          localStorage.removeItem("base_open_new_event");
           setEditor({ open: true, event: null });
         }
       } catch {}
     };
     const frame = requestAnimationFrame(openRequestedEvent);
-    window.addEventListener("bridge:new-event", openRequestedEvent);
+    window.addEventListener("base:new-event", openRequestedEvent);
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("bridge:new-event", openRequestedEvent);
+      window.removeEventListener("base:new-event", openRequestedEvent);
     };
   }, []);
 

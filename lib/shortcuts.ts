@@ -28,6 +28,24 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
     ],
   },
   {
+    id: "create",
+    title: "Create",
+    rows: [
+      { keys: ["⌘", "⇧", "N"], label: "New task" },
+      { keys: ["⌘", "⇧", "O"], label: "New project" },
+      { keys: ["⌘", "⇧", "E"], label: "New event" },
+    ],
+  },
+  {
+    id: "view",
+    title: "View",
+    rows: [
+      { keys: ["⌘", "⇧", "D"], label: "Toggle dark / light mode" },
+      { keys: ["⌘", "\\"], label: "Sidebar ↔ dock navigation" },
+      { keys: ["⌘", "B"], label: "Collapse / expand sidebar" },
+    ],
+  },
+  {
     id: "notes",
     title: "Notes",
     only: ["/notes"],

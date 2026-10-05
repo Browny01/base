@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import { Play, Film, Tv, Video, Search, Plus, Loader2, Check } from "lucide-react";
 import { CardListPage, type CardConfig } from "@/components/card-list-page";
@@ -234,7 +234,7 @@ function AddWatch({ items, close, append }: {
 }
 
 export function WatchListPage() {
-  const { data } = useBridge();
+  const { data } = useBase();
   const [filter, setFilter] = useState<"all" | WatchKind>("all");
 
   // Normalize legacy items (name/category → title/kind) so old data still renders.

@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum BridgeSection: String, CaseIterable, Identifiable {
+enum BaseSection: String, CaseIterable, Identifiable {
     case today, tasks, projects, notes, habits, focus, finance, news
 
     var id: String { rawValue }
@@ -20,8 +20,8 @@ enum BridgeSection: String, CaseIterable, Identifiable {
     }
 }
 
-struct BridgeRootView: View {
-    @ObservedObject var store: BridgeStore
+struct BaseRootView: View {
+    @ObservedObject var store: BaseStore
 
     var body: some View {
         #if os(macOS)
@@ -35,16 +35,16 @@ struct BridgeRootView: View {
 
 #if os(macOS)
 private struct MacRootView: View {
-    @ObservedObject var store: BridgeStore
-    @State private var selection: BridgeSection? = .today
+    @ObservedObject var store: BaseStore
+    @State private var selection: BaseSection? = .today
 
     var body: some View {
         NavigationView {
             List(selection: $selection) {
-                Section("Bridge") {
-                    ForEach(BridgeSection.allCases) { section in
+                Section("Base") {
+                    ForEach(BaseSection.allCases) { section in
                         Label(section.title, systemImage: section.icon)
-                            .tag(section as BridgeSection?)
+                            .tag(section as BaseSection?)
                     }
                 }
                 Section {
@@ -52,7 +52,7 @@ private struct MacRootView: View {
                 }
             }
             .listStyle(.sidebar)
-            .navigationTitle("Bridge")
+            .navigationTitle("Base")
 
             sectionView(selection ?? .today)
                 .environmentObject(store)
@@ -64,18 +64,18 @@ private struct MacRootView: View {
 
 #if os(iOS)
 private struct MobileRootView: View {
-    @ObservedObject var store: BridgeStore
+    @ObservedObject var store: BaseStore
 
     var body: some View {
         TabView {
             nav(DashboardView(), title: "Today")
-                .tabItem { Label("Today", systemImage: BridgeSection.today.icon) }
+                .tabItem { Label("Today", systemImage: BaseSection.today.icon) }
             nav(TasksView(), title: "Tasks")
-                .tabItem { Label("Tasks", systemImage: BridgeSection.tasks.icon) }
+                .tabItem { Label("Tasks", systemImage: BaseSection.tasks.icon) }
             nav(ProjectsView(), title: "Projects")
-                .tabItem { Label("Projects", systemImage: BridgeSection.projects.icon) }
+                .tabItem { Label("Projects", systemImage: BaseSection.projects.icon) }
             nav(NotesView(), title: "Notes")
-                .tabItem { Label("Notes", systemImage: BridgeSection.notes.icon) }
+                .tabItem { Label("Notes", systemImage: BaseSection.notes.icon) }
             NavigationView { MoreView() }
                 .environmentObject(store)
                 .tabItem { Label("More", systemImage: "ellipsis.circle") }
@@ -95,7 +95,7 @@ private struct MobileRootView: View {
 #endif
 
 @ViewBuilder
-private func sectionView(_ section: BridgeSection) -> some View {
+private func sectionView(_ section: BaseSection) -> some View {
     switch section {
     case .today: DashboardView()
     case .tasks: TasksView()
@@ -109,7 +109,7 @@ private func sectionView(_ section: BridgeSection) -> some View {
 }
 
 private struct SyncToolbar: ToolbarContent {
-    @ObservedObject var store: BridgeStore
+    @ObservedObject var store: BaseStore
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .automatic) {
@@ -126,7 +126,7 @@ private struct SyncToolbar: ToolbarContent {
 }
 
 private struct SyncStatusView: View {
-    @ObservedObject var store: BridgeStore
+    @ObservedObject var store: BaseStore
 
     var body: some View {
         HStack(spacing: 8) {
@@ -173,12 +173,12 @@ private struct SyncStatusView: View {
 }
 
 private struct MoreView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
 
     var body: some View {
         List {
             Section {
-                ForEach([BridgeSection.habits, .focus, .finance, .news]) { section in
+                ForEach([BaseSection.habits, .focus, .finance, .news]) { section in
                     NavigationLink(destination: sectionView(section).environmentObject(store)) {
                         Label(section.title, systemImage: section.icon)
                     }
@@ -192,12 +192,12 @@ private struct MoreView: View {
 }
 
 private struct DashboardView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
 
-    private var tasks: [BridgeRecord] { store.records(in: "tasks") }
-    private var projects: [BridgeRecord] { store.records(in: "projects") }
-    private var habits: [BridgeRecord] { store.records(in: "habits") }
-    private var logs: [BridgeRecord] { store.records(in: "habitLogs") }
+    private var tasks: [BaseRecord] { store.records(in: "tasks") }
+    private var projects: [BaseRecord] { store.records(in: "projects") }
+    private var habits: [BaseRecord] { store.records(in: "habits") }
+    private var logs: [BaseRecord] { store.records(in: "habitLogs") }
 
     var body: some View {
         ScrollView {
@@ -242,7 +242,7 @@ private struct DashboardView: View {
     }
 
     private var todayHabitCount: Int {
-        let today = BridgeDate.today()
+        let today = BaseDate.today()
         return logs.filter { $0.string("date") == today && $0.bool("completed") }.count
     }
 }
@@ -267,10 +267,10 @@ private struct MetricTile: View {
 }
 
 private struct TasksView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @State private var showingAdd = false
 
-    private var tasks: [BridgeRecord] {
+    private var tasks: [BaseRecord] {
         store.records(in: "tasks").sorted {
             if $0.bool("done") != $1.bool("done") { return !$0.bool("done") }
             return $0.string("createdAt") > $1.string("createdAt")
@@ -288,7 +288,7 @@ private struct TasksView: View {
                         let done = !task.bool("done")
                         store.update(collection: "tasks", id: task.id, changes: [
                             "done": .bool(done),
-                            "completedAt": done ? .string(BridgeDate.now()) : .null,
+                            "completedAt": done ? .string(BaseDate.now()) : .null,
                         ])
                     } label: {
                         Image(systemName: task.bool("done") ? "checkmark.circle.fill" : "circle")
@@ -334,7 +334,7 @@ private struct TasksView: View {
 }
 
 private struct AddTaskView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var priority = "P2"
@@ -360,7 +360,7 @@ private struct AddTaskView: View {
                         store.upsert(collection: "tasks", fields: [
                             "id": .string(UUID().uuidString), "title": .string(title.trimmingCharacters(in: .whitespacesAndNewlines)),
                             "priority": .string(priority), "tag": .string(tag), "dueDate": .null,
-                            "recurring": .null, "done": .bool(false), "createdAt": .string(BridgeDate.now()),
+                            "recurring": .null, "done": .bool(false), "createdAt": .string(BaseDate.now()),
                         ])
                         dismiss()
                     }
@@ -373,10 +373,10 @@ private struct AddTaskView: View {
 }
 
 private struct ProjectsView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @State private var showingAdd = false
 
-    private var projects: [BridgeRecord] {
+    private var projects: [BaseRecord] {
         store.records(in: "projects").filter { !$0.bool("archived") }
     }
 
@@ -417,7 +417,7 @@ private struct ProjectsView: View {
 }
 
 private struct AddProjectView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var description = ""
@@ -436,7 +436,7 @@ private struct AddProjectView: View {
                         store.upsert(collection: "projects", fields: [
                             "id": .string(UUID().uuidString), "name": .string(name.trimmingCharacters(in: .whitespacesAndNewlines)),
                             "description": .string(description), "color": .string("cyan"), "status": .string("active"),
-                            "category": .string("major"), "archived": .bool(false), "createdAt": .string(BridgeDate.now()),
+                            "category": .string("major"), "archived": .bool(false), "createdAt": .string(BaseDate.now()),
                         ])
                         dismiss()
                     }
@@ -449,10 +449,10 @@ private struct AddProjectView: View {
 }
 
 private struct NotesView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @State private var showingAdd = false
 
-    private var notes: [BridgeRecord] {
+    private var notes: [BaseRecord] {
         store.records(in: "wikiPages")
             .filter { $0.fields["deletedAt"] == nil || $0.fields["deletedAt"] == .null }
             .sorted { $0.string("updatedAt") > $1.string("updatedAt") }
@@ -486,7 +486,7 @@ private struct NotesView: View {
 }
 
 private struct NoteDetailView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @Environment(\.dismiss) private var dismiss
     let noteID: String
     @State private var showingAppend = false
@@ -527,7 +527,7 @@ private struct NoteDetailView: View {
 }
 
 private struct AddNoteView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var bodyText = ""
@@ -543,7 +543,7 @@ private struct AddNoteView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let now = BridgeDate.now()
+                        let now = BaseDate.now()
                         store.upsert(collection: "wikiPages", fields: [
                             "id": .string(UUID().uuidString), "parentId": .null,
                             "title": .string(title.trimmingCharacters(in: .whitespacesAndNewlines)), "icon": .string("📝"),
@@ -562,7 +562,7 @@ private struct AddNoteView: View {
 }
 
 private struct AppendNoteView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @Environment(\.dismiss) private var dismiss
     let noteID: String
     @State private var text = ""
@@ -579,7 +579,7 @@ private struct AppendNoteView: View {
                             var blocks = note.array("blocks")
                             blocks.append(.object(textBlock(text)))
                             store.update(collection: "wikiPages", id: noteID, changes: [
-                                "blocks": .array(blocks), "updatedAt": .string(BridgeDate.now()),
+                                "blocks": .array(blocks), "updatedAt": .string(BaseDate.now()),
                             ])
                             dismiss()
                         }
@@ -592,10 +592,10 @@ private struct AppendNoteView: View {
 }
 
 private struct HabitsView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @State private var showingAdd = false
 
-    private var habits: [BridgeRecord] { store.records(in: "habits") }
+    private var habits: [BaseRecord] { store.records(in: "habits") }
 
     var body: some View {
         List {
@@ -629,23 +629,23 @@ private struct HabitsView: View {
         .sheet(isPresented: $showingAdd) { AddHabitView().environmentObject(store) }
     }
 
-    private func logID(_ habit: BridgeRecord) -> String { "\(habit.id)-\(BridgeDate.today())" }
+    private func logID(_ habit: BaseRecord) -> String { "\(habit.id)-\(BaseDate.today())" }
 
-    private func completed(_ habit: BridgeRecord) -> Bool {
+    private func completed(_ habit: BaseRecord) -> Bool {
         store.record(in: "habitLogs", id: logID(habit))?.bool("completed") == true
     }
 
-    private func toggle(_ habit: BridgeRecord) {
+    private func toggle(_ habit: BaseRecord) {
         let id = logID(habit)
         store.upsert(collection: "habitLogs", fields: [
-            "id": .string(id), "habitId": .string(habit.id), "date": .string(BridgeDate.today()),
+            "id": .string(id), "habitId": .string(habit.id), "date": .string(BaseDate.today()),
             "completed": .bool(!completed(habit)),
         ])
     }
 }
 
 private struct AddHabitView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var emoji = "⭐"
@@ -676,7 +676,7 @@ private struct AddHabitView: View {
 }
 
 private struct FocusView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @State private var minutes = 25
     @State private var remaining = 25 * 60
     @State private var endDate: Date?
@@ -730,7 +730,7 @@ private struct FocusView: View {
         let elapsed = max(1, Int(ceil(Double(minutes * 60 - remaining) / 60.0)))
         store.upsert(collection: "focusSessions", fields: [
             "id": .string(UUID().uuidString), "durationMins": .number(Double(elapsed)),
-            "tag": .string("personal"), "notes": .string("Native focus session"), "date": .string(BridgeDate.now()),
+            "tag": .string("personal"), "notes": .string("Native focus session"), "date": .string(BaseDate.now()),
         ])
         hasSaved = true
         endDate = nil
@@ -738,10 +738,10 @@ private struct FocusView: View {
 }
 
 private struct FinanceView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @State private var showingAdd = false
 
-    private var entries: [BridgeRecord] {
+    private var entries: [BaseRecord] {
         store.records(in: "incomeEntries").sorted { $0.string("date") > $1.string("date") }
     }
 
@@ -793,7 +793,7 @@ private struct FinanceView: View {
 }
 
 private struct AddFinanceEntryView: View {
-    @EnvironmentObject private var store: BridgeStore
+    @EnvironmentObject private var store: BaseStore
     @Environment(\.dismiss) private var dismiss
     @State private var source = ""
     @State private var amount = ""
@@ -817,7 +817,7 @@ private struct AddFinanceEntryView: View {
                     Button("Add") {
                         store.upsert(collection: "incomeEntries", fields: [
                             "id": .string(UUID().uuidString), "source": .string(source.trimmingCharacters(in: .whitespacesAndNewlines)),
-                            "amount": .number(Double(amount) ?? 0), "date": .string(BridgeDate.today()), "type": .string(type),
+                            "amount": .number(Double(amount) ?? 0), "date": .string(BaseDate.today()), "type": .string(type),
                         ])
                         dismiss()
                     }
@@ -830,8 +830,8 @@ private struct AddFinanceEntryView: View {
 }
 
 private struct NewsBriefingView: View {
-    @AppStorage("bridge.news.summary") private var cachedSummary = ""
-    @AppStorage("bridge.news.generatedAt") private var cachedDate = ""
+    @AppStorage("base.news.summary") private var cachedSummary = ""
+    @AppStorage("base.news.generatedAt") private var cachedDate = ""
     @State private var isLoading = false
     @State private var error = ""
 
@@ -872,13 +872,13 @@ private struct NewsBriefingView: View {
         error = ""
         defer { isLoading = false }
         do {
-            let url = BridgeStore.serviceURL.appendingPathComponent("api/news/summary")
+            let url = BaseStore.serviceURL.appendingPathComponent("api/news/summary")
             let (data, response) = try await URLSession.shared.data(from: url)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw NewsError.failed }
             let result = try JSONDecoder().decode(BriefingResponse.self, from: data)
             guard result.ok, let summary = result.summary else { throw NewsError.failed }
             cachedSummary = summary
-            cachedDate = result.generatedAt ?? BridgeDate.now()
+            cachedDate = result.generatedAt ?? BaseDate.now()
         } catch {
             self.error = cachedSummary.isEmpty ? "A connection is required for the first briefing." : "Offline: showing the last downloaded briefing."
         }
@@ -959,7 +959,7 @@ private func textBlock(_ text: String) -> [String: JSONValue] {
     ["id": .string(UUID().uuidString), "type": .string("text"), "text": .string(text)]
 }
 
-private func noteText(_ note: BridgeRecord) -> String {
+private func noteText(_ note: BaseRecord) -> String {
     note.array("blocks").compactMap { block in
         guard let fields = block.objectValue else { return nil }
         let type = fields["type"]?.stringValue ?? "text"

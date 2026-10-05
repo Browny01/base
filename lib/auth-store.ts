@@ -1,6 +1,7 @@
 import { createDecipheriv, pbkdf2 } from "crypto";
 import { promisify } from "util";
 import { mcpRedis } from "@/lib/mcp-data";
+import { AUTH_PASSWORD_KEY, PREVIOUS_AUTH_PASSWORD_KEYS, readMigrating } from "@/lib/base-data";
 
 // A password chosen during onboarding lives in Redis next to the data, not in
 // env vars — the person running their own copy shouldn't have to edit a
@@ -11,10 +12,8 @@ import { mcpRedis } from "@/lib/mcp-data";
 // re-deriving the key from the candidate password and decrypting, so the stored
 // value can't be replayed and the plaintext password never reaches the server.
 //
-// Env vars still win: if BRIDGE_PASSWORD / BRIDGE_PASSWORD_HASH is set, that
+// Env vars still win: if BASE_PASSWORD / BASE_PASSWORD_HASH is set, that
 // operator-supplied credential is authoritative and onboarding may not replace it.
-
-const PASSWORD_KEY = "bridge:auth:password";
 
 const pbkdf2Async = promisify(pbkdf2) as (
   password: string,
@@ -45,7 +44,7 @@ export async function readStoredVerifier(): Promise<StoredVerifier | null> {
   const redis = mcpRedis();
   if (!redis) return null;
   try {
-    return parseVerifier(await redis.get<string>(PASSWORD_KEY));
+    return parseVerifier(await readMigrating(redis, AUTH_PASSWORD_KEY, PREVIOUS_AUTH_PASSWORD_KEYS));
   } catch {
     return null;
   }
@@ -55,7 +54,7 @@ export async function writeStoredVerifier(verifier: string): Promise<boolean> {
   const redis = mcpRedis();
   if (!redis) return false;
   if (!parseVerifier(verifier)) return false;
-  await redis.set(PASSWORD_KEY, verifier);
+  await redis.set(AUTH_PASSWORD_KEY, verifier);
   return true;
 }
 

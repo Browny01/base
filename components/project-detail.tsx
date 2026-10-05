@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { useConfirm } from "@/lib/confirm-context";
 import { prepareProjectLogo } from "@/lib/project-logo";
@@ -55,7 +55,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function ProjectDetail({ id }: { id: string }) {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const { toast } = useToast();
   const confirm = useConfirm();
   const router = useRouter();
@@ -649,9 +649,9 @@ export function ProjectDetail({ id }: { id: string }) {
               </div>
             </div>
 
-            <div className="flex min-h-[520px]">
+            <div className="flex flex-col md:flex-row min-h-[520px]">
           {/* Sidebar */}
-          <div className="w-52 shrink-0 border-r border-[var(--border)] pr-3 flex flex-col gap-1">
+          <div className="w-full md:w-52 shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] pb-3 md:pb-0 md:pr-3 mb-4 md:mb-0 flex flex-col gap-1 max-md:max-h-60 overflow-y-auto">
             <button
               onClick={createDoc}
               className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] rounded-lg transition-colors w-full mb-1"
@@ -713,7 +713,7 @@ export function ProjectDetail({ id }: { id: string }) {
           </div>
 
           {/* Editor */}
-          <div className="flex-1 pl-6 flex flex-col min-w-0">
+          <div className="flex-1 md:pl-6 flex flex-col min-w-0">
             {selectedDoc ? (
               <>
                 <input

@@ -36,7 +36,9 @@
 	     half lives in the login keychain and signs each release (see
 	     scripts/release_mac.sh). The appcast + zips are assets on the "latest"
 	     GitHub Release of the PUBLIC bridge-mac-releases repo, so the app can
-	     check anonymously even though the source repo is private. -->
+	     check anonymously even though the source repo is private.
+	     The repo name is deliberately NOT renamed: it is the published endpoint,
+	     and changing it would leave every installed copy unable to find updates. -->
 	<key>SUFeedURL</key>
 	<string>https://github.com/Browny01/bridge-mac-releases/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>

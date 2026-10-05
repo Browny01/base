@@ -7,7 +7,7 @@ import { useSidebar } from "@/lib/sidebar-context";
 import { useNavMode } from "@/lib/nav-mode-context";
 import { useTheme } from "@/lib/theme-context";
 import { useAccent, ACCENTS } from "@/lib/accent-context";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import {
   DEFAULT_AI_SETTINGS,
   PROVIDER_INFO,
@@ -535,7 +535,7 @@ export function SettingsPage() {
   const { accent, setAccent } = useAccent();
   const { collapsed, toggle } = useSidebar();
   const { mode, setMode } = useNavMode();
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const newsPrefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
   const aiSettings = data.aiSettings ?? DEFAULT_AI_SETTINGS;
   const navPrefs = data.navPrefs ?? DEFAULT_NAV_PREFS;

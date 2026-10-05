@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { useConfirm } from "@/lib/confirm-context";
 import { uid, cn } from "@/lib/utils";
@@ -167,7 +167,7 @@ function pageToPrintDoc(page: WikiPageT): string {
 }
 
 export function WikiPage() {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const { toast } = useToast();
   const confirm = useConfirm();
   const allWiki = useMemo(() => data.wikiPages ?? [], [data.wikiPages]);
@@ -177,19 +177,19 @@ export function WikiPage() {
   const idx = useMemo(() => buildWikiIndex(pages), [pages]);
 
   const [rawActive, setRawActive] = useState<string>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("bridge_wiki_active") || "" : "");
+    typeof window !== "undefined" ? localStorage.getItem("base_wiki_active") || "" : "");
   const [view, setView] = useState<"editor" | "graph">("editor");
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
-    try { const v = localStorage.getItem("bridge_wiki_expanded"); return v ? new Set<string>(JSON.parse(v)) : new Set(); } catch { return new Set(); }
+    try { const v = localStorage.getItem("base_wiki_expanded"); return v ? new Set<string>(JSON.parse(v)) : new Set(); } catch { return new Set(); }
   });
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
-    try { const v = localStorage.getItem("bridge_wiki_collapsed"); return v ? new Set<string>(JSON.parse(v)) : new Set(); } catch { return new Set(); }
+    try { const v = localStorage.getItem("base_wiki_collapsed"); return v ? new Set<string>(JSON.parse(v)) : new Set(); } catch { return new Set(); }
   });
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const [trashOpen, setTrashOpen] = useState<boolean>(() => typeof window !== "undefined" && localStorage.getItem("bridge_wiki_trash") === "1");
+  const [trashOpen, setTrashOpen] = useState<boolean>(() => typeof window !== "undefined" && localStorage.getItem("base_wiki_trash") === "1");
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);     // mobile drawer
   // Pages unlocked this session (cleared on reload, so the password is needed again).
@@ -203,7 +203,7 @@ export function WikiPage() {
   function selectPage(id: string) {
     setRawActive(id);
     setSidebarOpen(false);   // close the mobile drawer on selection
-    if (typeof window !== "undefined") localStorage.setItem("bridge_wiki_active", id);
+    if (typeof window !== "undefined") localStorage.setItem("base_wiki_active", id);
   }
   function toggleExpand(id: string) {
     setExpanded((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -217,11 +217,11 @@ export function WikiPage() {
     const h = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       setRawActive(id);
-      try { localStorage.setItem("bridge_wiki_active", id); } catch {}
+      try { localStorage.setItem("base_wiki_active", id); } catch {}
       setView("editor");
     };
-    window.addEventListener("bridge:open-wiki", h);
-    return () => window.removeEventListener("bridge:open-wiki", h);
+    window.addEventListener("base:open-wiki", h);
+    return () => window.removeEventListener("base:open-wiki", h);
   }, []);
 
   function createPage(parentId: string | null = null, seed?: { icon: string; title: string; blocks: WikiBlock[] }, folderId: string | null = null): string {
@@ -270,9 +270,9 @@ export function WikiPage() {
   }, []);
 
   // Persist sidebar UI state across reloads.
-  useEffect(() => { try { localStorage.setItem("bridge_wiki_expanded", JSON.stringify([...expanded])); } catch {} }, [expanded]);
-  useEffect(() => { try { localStorage.setItem("bridge_wiki_collapsed", JSON.stringify([...collapsedFolders])); } catch {} }, [collapsedFolders]);
-  useEffect(() => { try { localStorage.setItem("bridge_wiki_trash", trashOpen ? "1" : "0"); } catch {} }, [trashOpen]);
+  useEffect(() => { try { localStorage.setItem("base_wiki_expanded", JSON.stringify([...expanded])); } catch {} }, [expanded]);
+  useEffect(() => { try { localStorage.setItem("base_wiki_collapsed", JSON.stringify([...collapsedFolders])); } catch {} }, [collapsedFolders]);
+  useEffect(() => { try { localStorage.setItem("base_wiki_trash", trashOpen ? "1" : "0"); } catch {} }, [trashOpen]);
 
   // ── Folders ────────────────────────────────────────────────────────────────
   function createFolder() {
@@ -415,14 +415,14 @@ export function WikiPage() {
   const searchResults = searching ? pages.filter((p) => searchIds.has(p.id)) : [];
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] bg-[var(--bg)] relative">
+    <div className="flex flex-1 min-h-0 bg-[var(--bg)] relative">
       {/* mobile drawer backdrop */}
-      {sidebarOpen && <div className="md:hidden fixed inset-0 top-14 z-40 bg-black/40 backdrop-blur-[2px] nx-fade" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && <div className="md:hidden fixed inset-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] bg-black/40 backdrop-blur-[2px] nx-fade" onClick={() => setSidebarOpen(false)} />}
 
       {/* ── Page tree ─────────────────────────────────────────────────────── */}
       <aside className={cn(
         "border-r border-[var(--border)] flex flex-col bg-[var(--bg)] w-72 md:w-60 shrink-0",
-        "max-md:fixed max-md:top-14 max-md:bottom-0 max-md:left-0 max-md:z-50 max-md:shadow-2xl transition-transform duration-200 ease-out",
+        "max-md:fixed max-md:top-[calc(3.5rem+env(safe-area-inset-top))] max-md:bottom-0 max-md:pb-[env(safe-area-inset-bottom)] max-md:left-0 max-md:z-[80] max-md:shadow-2xl transition-transform duration-200 ease-out",
         sidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
       )}>
         <div className="flex items-center justify-between h-12 px-3 shrink-0 border-b border-[var(--border)]">
@@ -591,7 +591,7 @@ export function WikiPage() {
       </aside>
 
       {/* ── Main column ───────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Top bar */}
         <div className="flex items-center justify-between h-12 px-3 sm:px-4 shrink-0 border-b border-[var(--border)] gap-1">
           <button

@@ -27,12 +27,18 @@ queue edits without a connection, and merge those edits when the internet return
   shapes, arrows, undo/redo, board switching, and image uploads.
 - **Finance** - income/spend ledger, daily revenue target, subscriptions, wallet
   balances, token data, FX conversion, and portfolio snapshots.
-- **News** - RSS/live news, market cards, AI summaries, creator feeds, Reddit/X
-  preferences, and live status checks.
+- **News** - RSS/live news, market cards, AI-written briefings, creator feeds,
+  Reddit/X preferences, and live status checks. This is the only AI surface in
+  the app today - the old standalone AI chat was removed.
 - **Settings** - appearance, navigation mode, accent/theme preferences, personal
   AI context, news/feed sources, and local app preferences.
-- **Command palette and shortcuts** - `Cmd+K` search across pages, projects,
-  notes, boards, and common actions.
+- **Command palette** - `Cmd+K` search across pages, projects, notes, boards,
+  wiki pages, and common actions.
+- **Site-wide keyboard shortcuts** - navigate with `g`+key, create from anywhere
+  with `Cmd+Shift+N/O/E`, and flip theme, sidebar, and navigation mode on the
+  spot. Press `?` for the full sheet. See [Keyboard Shortcuts](#keyboard-shortcuts).
+- **First-run onboarding** - a one-time setup wizard collects a name, timezone,
+  password, and the pages you actually want, then takes you straight to work.
 - **Native iPhone support** - SwiftUI dashboard, tasks, projects, notes, habits,
   focus, finance, cached news, offline mutation queue, and WidgetKit home-screen
   widget.
@@ -50,7 +56,7 @@ queue edits without a connection, and merge those edits when the internet return
 - **Storage:** Upstash Redis/KV for app state, Vercel Blob for uploads
 - **Native:** SwiftUI and WidgetKit for iPhone, SwiftUI/WebKit hybrid for Mac,
   Network framework reconnect detection, Sparkle for Mac updates
-- **AI/search:** Gemini, Perplexity, optional local Ollama relay
+- **AI/search:** Gemini, Perplexity, optional local CLI/Ollama relay (`scripts/base-cli.mjs`)
 - **Deployment:** Vercel with daily cron snapshots
 
 > This repo uses a Next.js version with breaking changes. Before changing
@@ -67,10 +73,10 @@ app/
 components/              Page components, navigation, command palette, UI
 lib/                     Store, contexts, sessions, AI context, utilities
 public/                  Brand assets and PWA manifest
-native/BridgeCore/       Shared native models, offline store, sync queue, and views
-ios/                     Native SwiftUI iOS project and Bridge Widget extension
+native/BaseCore/         Shared native models, offline store, sync queue, and views
+ios/                     Native SwiftUI iOS project and Base Widget extension
 macos/                   macOS WebKit host, offline fallback, and Sparkle config
-scripts/                 Native install/release helpers and maintenance scripts
+scripts/                 Native install/release helpers, base-cli.mjs local relay
 docs/                    iOS/macOS app notes
 ```
 
@@ -96,12 +102,73 @@ Build for production:
 npm run build
 ```
 
-Run static checks:
+Run static checks and tests:
 
 ```bash
 npm run lint
 npx tsc --noEmit
+npm test
 ```
+
+## Keyboard Shortcuts
+
+`KeyboardShortcuts` is mounted once in the app layout, so these work on every
+page. Press `?` in the app to see this list in a cheat-sheet. Shortcuts are
+ignored while you're typing in a field, and unknown combos are left to the
+browser (so `Cmd+F`, `Cmd+P`, `Cmd+R` still behave normally).
+
+| Keys | Action |
+| --- | --- |
+| `Cmd/Ctrl + K` | Search / command palette |
+| `?` | Toggle the shortcut sheet |
+| `g` then `d j v n a t w e m o f r s` | Jump to dashboard, projects, vision, notes, calendar, tasks, shopping, reading, watch, focus, finance, news, settings |
+| `Cmd/Ctrl + Shift + N` | New task |
+| `Cmd/Ctrl + Shift + O` | New project |
+| `Cmd/Ctrl + Shift + E` | New calendar event |
+| `Cmd/Ctrl + Shift + D` | Toggle dark / light mode |
+| `Cmd/Ctrl + \` | Switch between sidebar and dock navigation |
+| `Cmd/Ctrl + B` | Collapse / expand the sidebar |
+
+On the notes page, `Cmd+N` is a new note and `Cmd+Z` / `Cmd+Shift+Z` are
+undo/redo - those are handled by the editor, so the combos above avoid them.
+
+To add a shortcut, register it in `COMBOS` in `components/keyboard-shortcuts.tsx`
+and add the matching row in `lib/shortcuts.ts`; the cheat-sheet renders straight
+from that registry, so it never needs editing.
+
+## Naming and legacy keys
+
+Base was Nexus, then Bridge, and is now Base. Data keys, env vars, and cookies
+were renamed, but **nothing was dropped**: each rename reads the new name first,
+falls back to the old one, and copies the value forward on first read. Upgrading
+therefore never loses data and never signs anyone out.
+
+| What | Current | Still read |
+| --- | --- | --- |
+| Redis data | `base:data` | `bridge:data`, `nexus:data` |
+| Redis revision | `base:data:revision` | `bridge:data:revision`, `nexus:data:revision` |
+| Redis history | `base:data:history` | `bridge:data:history` |
+| Redis password verifier | `base:auth:password` | `bridge:auth:password` |
+| Redis news cache | `base:news:summary:*` | - (a cache; a miss just re-fetches) |
+| localStorage document | `base_data` | `bridge_data`, `nexus_data` |
+| Session cookie | `base_auth` | `bridge_auth` (old cookie is cleared on next login) |
+| Native handoff flags | `base_open_new_task`, `base_open_new_project` | `bridge_open_new_task`, `bridge_open_new_project` |
+| Widget auth header | `x-base-token` | `x-bridge-token` |
+| Local relay token | `BASE_CLI_TOKEN` | `BRIDGE_CLI_TOKEN` |
+
+The native handoff flags and the widget header are a live contract with builds
+users have already installed, so the **macOS app writes both** flag names and the
+server accepts both headers until no supported client still emits the old one.
+
+Two things are deliberately **not** renamed, because they are identity rather than
+branding:
+
+- **Bundle identifiers** - `app.bridge.personal`, `app.bridge.personal.mac`, and
+  `app.bridge.personal.BridgeWidget`. A different bundle ID is a different app:
+  existing installs would stop receiving updates. Change these only as a
+  deliberate migration, not as part of a rename.
+- **The Sparkle feed** - the macOS update feed still points at
+  `Browny01/bridge-mac-releases`, which is a published endpoint.
 
 ## Environment Variables
 
@@ -110,9 +177,10 @@ variables depending on the feature set you want enabled:
 
 | Variable | Used for |
 | --- | --- |
-| `BRIDGE_PASSWORD` | Password login; falls back to the project default if unset |
-| `BRIDGE_SESSION_SECRET` | HMAC session cookie signing |
-| `BRIDGE_AGENT_TOKEN` | Agent/task API authentication |
+| `BASE_PASSWORD` | Password login; falls back to the project default if unset |
+| `BASE_PASSWORD_HASH` | scrypt hash of the login password (plaintext never needed) |
+| `BASE_SESSION_SECRET` | HMAC session cookie signing |
+| `BASE_AGENT_TOKEN` | Agent/task API authentication |
 | `MCP_TOKEN` | MCP server authentication |
 | `CRON_SECRET` | Daily snapshot cron authorization |
 | `KV_URL`, `REDIS_URL` | Upstash Redis/KV compatibility URLs |
@@ -122,9 +190,14 @@ variables depending on the feature set you want enabled:
 | `PERPLEXITY_API_KEY` | Web search and live news lookups |
 | `STRIPE_SECRET_KEY` | Stripe revenue/business stats |
 | `CALCOM_API_KEY` | Cal.com bookings |
-| `BRIDGE_CLI_TOKEN` | Optional local Bridge CLI/Ollama relay auth |
-| `BRIDGE_ALLOWED_ORIGIN` | Optional local relay origin allowlist |
-| `BRIDGE_OLLAMA_URL` | Optional local Ollama endpoint |
+| `BASE_CLI_TOKEN` | Optional local CLI/Ollama relay auth |
+| `BASE_ALLOWED_ORIGIN` | Optional local relay origin allowlist |
+| `BASE_OLLAMA_URL` | Optional local Ollama endpoint |
+
+Every `BASE_*` variable above also accepts its older `BRIDGE_*` (and, for some,
+`NEXUS_*`) name as a fallback, so an existing deployment keeps working without a
+flag day. New variables should be added as `BASE_*` only. See
+[Naming and legacy keys](#naming-and-legacy-keys).
 
 Keep env files local. `.env*` and `.vercel/` are intentionally gitignored.
 
@@ -141,7 +214,7 @@ npm run ios   # open ios/App/App.xcodeproj
 ```
 
 Choose the `App` scheme and your signing team in Xcode, then run on a simulator or
-connected iPhone. The project also includes the `BridgeWidget` WidgetKit extension.
+connected iPhone. The project also includes the `BaseWidget` WidgetKit extension.
 See `docs/ios-app.md` for signing, offline behavior, and installation details.
 
 ## macOS App
@@ -187,6 +260,7 @@ native clients use the deployed API for synchronization and news refreshes.
 | `npm run build` | Create a production Next.js build |
 | `npm run start` | Start the production server |
 | `npm run lint` | Run ESLint |
+| `npm test` | Run the Node test suite |
 | `npm run ios` | Open the native iOS project |
 | `npm run mac:gen` | Generate the macOS Xcode project |
 | `npm run mac` | Generate and open the macOS project |
@@ -199,7 +273,7 @@ native clients use the deployed API for synchronization and news refreshes.
   abstractions.
 - Do not commit secrets, `.vercel/`, local env files, native build output, or
   generated caches.
-- Put shared iOS/macOS data behavior and screens in `native/BridgeCore`; keep only
+- Put shared iOS/macOS data behavior and screens in `native/BaseCore`; keep only
   platform lifecycle and shortcut code in the platform folders.
 - Preserve unknown JSON fields when extending native sync so older clients cannot
   erase newer web-only data.
@@ -214,7 +288,8 @@ native clients use the deployed API for synchronization and news refreshes.
 - **Offline-first sync v2** - conflict-aware merges with field-level resolution
   and end-to-end encryption for local native data.
 - **AI planning agent** - turn a project goal into a dated, prioritized task plan
-  using Gemini and pull results back into the calendar.
+  using Gemini and pull results back into the calendar. This is the intended
+  successor to the retired AI chat.
 - **Widgets & watch** - additional WidgetKit variants (tasks, calendar, focus) and
   an Apple Watch companion for quick capture and glanceable summaries.
 - **Multi-workspace** - multiple Base documents per account with per-workspace

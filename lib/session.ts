@@ -1,4 +1,4 @@
-import { bridgeSessionSecret } from "@/lib/env";
+import { baseSessionSecret } from "@/lib/env";
 
 // Signed session tokens for the site auth cookie. Replaces the old "cookie is
 // present" check (which any value satisfied) with an HMAC-signed, expiring token
@@ -15,7 +15,7 @@ import { bridgeSessionSecret } from "@/lib/env";
 const enc = new TextEncoder();
 
 function secretKey(): string | undefined {
-  return bridgeSessionSecret();
+  return baseSessionSecret();
 }
 
 async function hmac(msg: string): Promise<string> {

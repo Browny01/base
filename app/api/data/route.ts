@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { readCurrentData } from "@/lib/bridge-data";
-import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
+import { DATA_HISTORY_KEY, readCurrentData } from "@/lib/base-data";
+import { safeWriteBaseData } from "@/lib/autonomy-persistence";
 
-const HISTORY = "bridge:data:history";   // rolling backups (newest first)
+// Rolling backups (newest first).
+const HISTORY = DATA_HISTORY_KEY;
 
 function getRedis(): Redis | null {
   // New Upstash Marketplace integration uses UPSTASH_REDIS_REST_* names
@@ -40,7 +41,7 @@ export async function GET() {
     const data = unwrap(await readCurrentData(redis));
     return NextResponse.json({ data, configured: true });
   } catch (err) {
-    console.error("[bridge/data GET]", err);
+    console.error("[base/data GET]", err);
     return NextResponse.json({ data: null, configured: true, error: String(err) });
   }
 }
@@ -69,10 +70,10 @@ export async function POST(req: NextRequest) {
       try { await redis.lpush(HISTORY, JSON.stringify(existing)); await redis.ltrim(HISTORY, 0, 24); } catch { /* ignore backup errors */ }
     }
 
-    await safeWriteBridgeData(redis, body, false);
+    await safeWriteBaseData(redis, body, false);
     return NextResponse.json({ ok: true, configured: true });
   } catch (err) {
-    console.error("[bridge/data POST]", err);
+    console.error("[base/data POST]", err);
     return NextResponse.json({ ok: false, configured: true, error: String(err) });
   }
 }

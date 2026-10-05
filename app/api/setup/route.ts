@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { bridgePassword, bridgePasswordHash, bridgeSessionSecret } from "@/lib/env";
+import { basePassword, basePasswordHash, baseSessionSecret } from "@/lib/env";
 import { parseVerifier, readStoredVerifier, writeStoredVerifier } from "@/lib/auth-store";
 import { signSession } from "@/lib/session";
+import { setSessionCookie } from "@/lib/session-cookie";
 
 export const runtime = "nodejs";
 
@@ -10,16 +11,15 @@ export const runtime = "nodejs";
 // locked down without the person running it touching deployment env vars.
 //
 // Deliberately narrow:
-//   • If BRIDGE_PASSWORD / BRIDGE_PASSWORD_HASH is set, the operator's value
+//   • If BASE_PASSWORD / BASE_PASSWORD_HASH is set, the operator's value
 //     wins and setup refuses to overwrite it.
 //   • Once a password is stored, this endpoint is closed — changing it is a
 //     deliberate reset, not a side effect of reopening onboarding.
 //   • Same-origin POSTs only, like the login route.
 
-const COOKIE = "bridge_auth";
-const THIRTY_DAYS = 60 * 60 * 24 * 30;
 
-const envConfigured = () => bridgePassword() !== undefined || bridgePasswordHash() !== undefined;
+
+const envConfigured = () => basePassword() !== undefined || basePasswordHash() !== undefined;
 
 function originAllowed(req: NextRequest): boolean {
   const origin = req.headers.get("origin");
@@ -43,7 +43,7 @@ export async function GET() {
     passwordMode: configured ? "env" : stored ? "saved" : "none",
     needsPassword,
     canSetPassword: !configured && !stored,
-    sessionReady: Boolean(bridgeSessionSecret()),
+    sessionReady: Boolean(baseSessionSecret()),
   });
 }
 
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
   if (!(await writeStoredVerifier(password))) {
     return NextResponse.json(
-      { error: "Base data isn't configured, so a password can't be saved yet. Set BRIDGE_PASSWORD in the environment instead." },
+      { error: "Base data isn't configured, so a password can't be saved yet. Set BASE_PASSWORD in the environment instead." },
       { status: 503 },
     );
   }
@@ -86,19 +86,12 @@ export async function POST(req: NextRequest) {
   const token = await signSession(30);
   if (!token) {
     return NextResponse.json(
-      { error: "Password saved, but session signing isn't configured — set BRIDGE_SESSION_SECRET before signing in." },
+      { error: "Password saved, but session signing isn't configured — set BASE_SESSION_SECRET before signing in." },
       { status: 503 },
     );
   }
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: THIRTY_DAYS,
-    path: "/",
-    sameSite: "lax",
-    priority: "high",
-  });
+  setSessionCookie(res, token);
   return res;
 }
 

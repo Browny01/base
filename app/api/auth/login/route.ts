@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { bridgePassword, bridgePasswordHash } from "@/lib/env";
+import { basePassword, basePasswordHash } from "@/lib/env";
 import { readStoredVerifier, verifyStoredPassword } from "@/lib/auth-store";
 import { signSession } from "@/lib/session";
-
-const COOKIE = "bridge_auth";
-const THIRTY_DAYS = 60 * 60 * 24 * 30;
+import { setSessionCookie } from "@/lib/session-cookie";
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, keylen: number) => Promise<Buffer>;
 
 // Simple in-memory rate limit per IP to blunt password brute-forcing. This is a
 // best-effort belt-and-braces layer: on serverless (Vercel) functions it resets
-// per warm instance, so the real protections are a strong BRIDGE_PASSWORD /
-// BRIDGE_PASSWORD_HASH and a dedicated BRIDGE_SESSION_SECRET.
+// per warm instance, so the real protections are a strong BASE_PASSWORD /
+// BASE_PASSWORD_HASH and a dedicated BASE_SESSION_SECRET.
 const attempts = new Map<string, { n: number; until: number }>();
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
@@ -47,12 +45,12 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// Verify a candidate password against BRIDGE_PASSWORD_HASH (scrypt) when set,
-// then the plaintext BRIDGE_PASSWORD env value, and finally the password chosen
+// Verify a candidate password against BASE_PASSWORD_HASH (scrypt) when set,
+// then the plaintext BASE_PASSWORD env value, and finally the password chosen
 // during onboarding (stored in Redis as a browser-side PBKDF2/AES-GCM verifier).
 // Env values come first: an operator's deployment config is authoritative.
 async function verifyPassword(password: string): Promise<boolean> {
-  const hashSpec = bridgePasswordHash();
+  const hashSpec = basePasswordHash();
   if (hashSpec) {
     const colon = hashSpec.indexOf(":");
     if (colon <= 0) return false;
@@ -66,7 +64,7 @@ async function verifyPassword(password: string): Promise<boolean> {
       return false;
     }
   }
-  const correct = bridgePassword();
+  const correct = basePassword();
   if (correct !== undefined) return safeEqual(password, correct);
 
   const stored = await readStoredVerifier();
@@ -74,7 +72,7 @@ async function verifyPassword(password: string): Promise<boolean> {
 }
 
 const authConfigured = async (): Promise<boolean> =>
-  bridgePassword() !== undefined || bridgePasswordHash() !== undefined || Boolean(await readStoredVerifier());
+  basePassword() !== undefined || basePasswordHash() !== undefined || Boolean(await readStoredVerifier());
 
 // Reject cross-site login POSTs (CSRF). Browsers send an Origin header on
 // cross-origin POSTs; same-origin fetches must match the app's host.
@@ -93,7 +91,7 @@ function originAllowed(req: NextRequest): boolean {
 export async function POST(req: NextRequest) {
   if (!(await authConfigured())) {
     return NextResponse.json(
-      { error: "Login is not configured — set BRIDGE_PASSWORD in deployment env vars, or finish onboarding." },
+      { error: "Login is not configured — set BASE_PASSWORD in deployment env vars, or finish onboarding." },
       { status: 503 }
     );
   }
@@ -130,19 +128,12 @@ export async function POST(req: NextRequest) {
   const token = await signSession(30);
   if (!token) {
     return NextResponse.json(
-      { error: "Session signing is not configured — set BRIDGE_SESSION_SECRET." },
+      { error: "Session signing is not configured — set BASE_SESSION_SECRET." },
       { status: 503 }
     );
   }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: THIRTY_DAYS,
-    path: "/",
-    sameSite: "lax",
-    priority: "high",
-  });
+  setSessionCookie(res, token);
   return res;
 }

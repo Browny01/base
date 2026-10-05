@@ -1,11 +1,11 @@
 import { Redis } from "@upstash/redis";
-import { readCurrentData } from "@/lib/bridge-data";
-import { mergeBridgeWrite } from "@/lib/autonomy-persistence";
-import { mutateBridgeDataAtomically, type BridgeDataRecord } from "@/lib/versioned-bridge-store";
+import { readCurrentData, readCurrentHistory } from "@/lib/base-data";
+import { mergeBaseWrite } from "@/lib/autonomy-persistence";
+import { mutateBaseDataAtomically, type BaseDataRecord } from "@/lib/versioned-base-store";
 
 export const runtime = "nodejs";
 
-const HISTORY_KEY = "bridge:data:history";
+const HISTORY_KEY = "base:data:history";
 const MAX_OPERATIONS = 200;
 const MAX_BODY_BYTES = 2_000_000;
 
@@ -67,8 +67,8 @@ function validOperation(value: unknown): value is NativeOperation {
   return (operation.value as Record<string, unknown>).id === operation.recordId;
 }
 
-function applyOperations(data: BridgeDataRecord, operations: NativeOperation[]): BridgeDataRecord {
-  const next: BridgeDataRecord = { ...data };
+function applyOperations(data: BaseDataRecord, operations: NativeOperation[]): BaseDataRecord {
+  const next: BaseDataRecord = { ...data };
   for (const operation of operations) {
     const collection = Array.isArray(next[operation.collection])
       ? [...next[operation.collection] as unknown[]]
@@ -93,7 +93,7 @@ export async function GET() {
   try {
     return Response.json({ data: unwrap(await readCurrentData(redis)), configured: true });
   } catch (error) {
-    console.error("[bridge/native/sync GET]", error);
+    console.error("[base/native/sync GET]", error);
     return Response.json({ data: null, configured: true, error: "Unable to load Base data." }, { status: 500 });
   }
 }
@@ -120,10 +120,10 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, data: unwrap(await readCurrentData(redis)), applied: [] });
     }
 
-    const mutation = await mutateBridgeDataAtomically(redis, (current) => {
+    const mutation = await mutateBaseDataAtomically(redis, (current) => {
       const applied = applyOperations(current, operations);
       return {
-        data: mergeBridgeWrite(current, applied, true),
+        data: mergeBaseWrite(current, applied, true),
         result: { previous: current },
       };
     });
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
       updatedAt: mutation.data.updatedAt,
     });
   } catch (error) {
-    console.error("[bridge/native/sync POST]", error);
+    console.error("[base/native/sync POST]", error);
     return Response.json({ ok: false, error: "Unable to sync Base data." }, { status: 500 });
   }
 }
