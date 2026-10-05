@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: WebModel
-    @ObservedObject var store: BridgeStore
+    @ObservedObject var store: BaseStore
 
     var body: some View {
         ZStack {
@@ -10,7 +10,7 @@ struct ContentView: View {
                 .ignoresSafeArea()
 
             if model.loadFailed {
-                BridgeRootView(store: store)
+                BaseRootView(store: store)
                     .transition(.opacity)
             } else {
                 WebView(model: model)

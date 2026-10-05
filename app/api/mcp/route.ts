@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
-import type { BoardDrawing, BoardItem, BridgeData, DrawTool, WikiPage } from "@/lib/store";
+import type { BoardDrawing, BoardItem, BaseData, DrawTool, WikiPage } from "@/lib/store";
 import { buildAutonomySummary, computeAutonomyMetrics, isAutonomyTask, normalizeAutonomySettings, prepareAutonomySuggestion, sanitizeAutonomyAgentPatch, validateAutonomyEvidence } from "@/lib/autonomy";
 import { BRIEF_TYPES, isBriefType, newestBriefs, upsertBriefCollection } from "@/lib/briefs";
 import { expandCalendarEvents } from "@/lib/calendar";
@@ -14,7 +14,7 @@ import { validateAccessToken } from "@/lib/mcp-oauth";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const SERVER_INFO = { name: "bridge", title: "Base — Agent Control", version: "2.1.0" };
+const SERVER_INFO = { name: "base", title: "Base — Agent Control", version: "2.1.0" };
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -31,9 +31,9 @@ async function authorized(req: NextRequest): Promise<boolean> {
 }
 
 type McpState = {
-  raw: BridgeData;
-  data: BridgeData;
-  save: (next: BridgeData) => Promise<void>;
+  raw: BaseData;
+  data: BaseData;
+  save: (next: BaseData) => Promise<void>;
 };
 type Tool = {
   name: string;
@@ -92,11 +92,11 @@ function collectionData(state: McpState, collection: Collection): unknown[] {
   const value = state.data[collection];
   return Array.isArray(value) ? value : [];
 }
-async function save(state: McpState, next: BridgeData) {
+async function save(state: McpState, next: BaseData) {
   await state.save({ ...next, updatedAt: Date.now() });
 }
 
-function publicOverview(d: BridgeData) {
+function publicOverview(d: BaseData) {
   const notes = d.wikiPages ?? [];
   return {
     tasks: { total: d.tasks?.length ?? 0, open: (d.tasks ?? []).filter((t) => !t.done).length },
@@ -111,12 +111,12 @@ function publicOverview(d: BridgeData) {
   };
 }
 
-function isEditableNote(raw: BridgeData, id: unknown): WikiPage | null {
+function isEditableNote(raw: BaseData, id: unknown): WikiPage | null {
   if (typeof id !== "string") return null;
   const note = (raw.wikiPages ?? []).find((page) => page.id === id);
   return note && !note.locked && !note.deletedAt ? note : null;
 }
-function isProtectedFolder(raw: BridgeData, id: string): boolean {
+function isProtectedFolder(raw: BaseData, id: string): boolean {
   return (raw.wikiPages ?? []).some((page) => page.folderId === id && (page.locked || page.deletedAt));
 }
 
@@ -281,7 +281,7 @@ const TOOLS: Tool[] = [
       if ("createdAt" in nextRecord === false) nextRecord.createdAt = now();
       const list = Array.isArray(state.raw[args.collection]) ? state.raw[args.collection] : [];
       if (findRecord(list as unknown[], String(nextRecord.id)) >= 0) return error("An item with that id already exists.");
-      const next = { ...state.raw, [args.collection]: [...list, nextRecord] } as BridgeData;
+      const next = { ...state.raw, [args.collection]: [...list, nextRecord] } as BaseData;
       await save(state, next);
       return { ok: true, collection: args.collection, record: nextRecord };
     },
@@ -303,7 +303,7 @@ const TOOLS: Tool[] = [
       if (args.collection === "tasks") safePatch = sanitizeAutonomyAgentPatch(current as unknown as Parameters<typeof sanitizeAutonomyAgentPatch>[0], safePatch);
       const updated = { ...current, ...safePatch };
       const nextList = [...list]; nextList[index] = updated;
-      await save(state, { ...state.raw, [args.collection]: nextList } as BridgeData);
+      await save(state, { ...state.raw, [args.collection]: nextList } as BaseData);
       return { ok: true, collection: args.collection, record: updated };
     },
   },
@@ -318,7 +318,7 @@ const TOOLS: Tool[] = [
       if (index < 0) return error("Record not found.");
       if (args.collection === "wikiFolders" && isProtectedFolder(state.raw, args.id)) return error("This folder contains a locked or trashed note and cannot be changed by an agent.");
       if (args.collection === "tasks" && isAutonomyTask(state.raw.tasks.find((task) => task.id === args.id) ?? { id: args.id, title: "" })) return error("Autonomous tasks cannot be deleted through MCP.");
-      await save(state, { ...state.raw, [args.collection]: list.filter((_item, i) => i !== index) } as BridgeData);
+      await save(state, { ...state.raw, [args.collection]: list.filter((_item, i) => i !== index) } as BaseData);
       return { ok: true, deleted: args.id, collection: args.collection };
     },
   },
@@ -333,7 +333,7 @@ const TOOLS: Tool[] = [
       const nextValue = !args.replace && asObject(current) && asObject(args.value)
         ? { ...asObject(current), ...asObject(args.value) }
         : args.value;
-      await save(state, { ...state.raw, [args.setting]: nextValue } as BridgeData);
+      await save(state, { ...state.raw, [args.setting]: nextValue } as BaseData);
       return { ok: true, setting: args.setting, value: nextValue };
     },
   },
@@ -611,7 +611,7 @@ async function loadState(): Promise<McpState | null> {
   if (cache && Date.now() - cache.at < 1500) return cache.state;
   const raw = await readRawData();
   if (!raw) return null;
-  const makeState = (nextRaw: BridgeData): McpState => ({
+  const makeState = (nextRaw: BaseData): McpState => ({
     raw: nextRaw,
     data: sanitize(nextRaw),
     save: async (next) => {

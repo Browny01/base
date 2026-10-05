@@ -17,7 +17,7 @@ import { DEFAULT_AI_SETTINGS, hasSavedKey, normalizeAiSettings } from "@/lib/ai-
 import { decryptSecret, sessionSecret } from "@/lib/vault";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import type { AssetData } from "@/app/api/market/charts/route";
 import type { LiveStatusItem } from "@/app/api/live-status/route";
 import type { NewsArticle } from "@/app/api/news/route";
@@ -427,7 +427,7 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
   );
 }
 function NewsBriefing() {
-  const { data } = useBridge();
+  const { data } = useBase();
   const settings = normalizeAiSettings(data.aiSettings ?? DEFAULT_AI_SETTINGS);
   const [state, setState] = useState<{ loading: boolean; summary?: string; generatedAt?: string; error?: string }>({ loading: true });
 
@@ -495,7 +495,7 @@ export function NewsPage() {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [mktPage, setMktPage] = useState(0);
   const [cols, setCols] = useState(4);
-  const { data } = useBridge();
+  const { data } = useBase();
   const prefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
 
   const selectedAsset = assets.find((asset) => asset.id === selectedAssetId) ?? assets[3] ?? assets[0] ?? null;

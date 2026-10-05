@@ -3,7 +3,7 @@ import Foundation
 import Network
 
 @MainActor
-final class BridgeStore: ObservableObject {
+final class BaseStore: ObservableObject {
     enum SyncState: Equatable {
         case offline
         case syncing
@@ -19,7 +19,7 @@ final class BridgeStore: ObservableObject {
 
     private var pending: [NativeOperation] = []
     private let monitor = NWPathMonitor()
-    private let monitorQueue = DispatchQueue(label: "app.bridge.connectivity")
+    private let monitorQueue = DispatchQueue(label: "app.base.connectivity")
     private var isOnline = false
 
     init() {
@@ -31,15 +31,15 @@ final class BridgeStore: ObservableObject {
 
     var pendingCount: Int { pending.count }
 
-    func records(in collection: String) -> [BridgeRecord] {
+    func records(in collection: String) -> [BaseRecord] {
         guard let values = document[collection]?.arrayValue else { return [] }
         return values.compactMap { value in
             guard let fields = value.objectValue, fields["id"]?.stringValue != nil else { return nil }
-            return BridgeRecord(fields: fields)
+            return BaseRecord(fields: fields)
         }
     }
 
-    func record(in collection: String, id: String) -> BridgeRecord? {
+    func record(in collection: String, id: String) -> BaseRecord? {
         records(in: collection).first { $0.id == id }
     }
 
@@ -178,9 +178,19 @@ final class BridgeStore: ObservableObject {
         try? data.write(to: snapshotURL, options: .atomic)
     }
 
+    // Renamed from Bridge/ to Base/. Reads the old directory when the new one is
+    // absent, so an upgraded install keeps its offline snapshot instead of
+    // silently starting from empty until the next successful sync.
     private var snapshotURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("Bridge", isDirectory: true).appendingPathComponent("offline-data.json")
+        func url(in directory: String) -> URL {
+            base.appendingPathComponent(directory, isDirectory: true)
+                .appendingPathComponent("offline-data.json")
+        }
+        let current = url(in: "Base")
+        if FileManager.default.fileExists(atPath: current.path) { return current }
+        let legacy = url(in: "Bridge")
+        return FileManager.default.fileExists(atPath: legacy.path) ? legacy : current
     }
 
     private static let emptyDocument: [String: JSONValue] = {
@@ -204,8 +214,8 @@ private enum SyncError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .badResponse: return "Bridge could not reach the sync service."
-        case .notConfigured: return "Bridge sync is not configured on the server."
+        case .badResponse: return "Base could not reach the sync service."
+        case .notConfigured: return "Base sync is not configured on the server."
         }
     }
 }

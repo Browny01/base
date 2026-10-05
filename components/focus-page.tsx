@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { uid, getToday, formatTime } from "@/lib/utils";
 import { TASK_TAGS, taskTagLabel, type TaskTag } from "@/lib/store";
 import { Play, Pause, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
@@ -16,7 +16,7 @@ const MODES = [
 const TAGS = TASK_TAGS;
 
 export function FocusPage() {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const [modeIdx, setModeIdx] = useState(0);
   const [seconds, setSeconds] = useState(MODES[0].mins * 60);
   const [running, setRunning] = useState(false);

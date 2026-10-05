@@ -1,4 +1,4 @@
-import type { BridgeData, CalendarCategory, CalendarEvent, CalendarRepeat, ProjectColor } from "./store";
+import type { BaseData, CalendarCategory, CalendarEvent, CalendarRepeat, ProjectColor } from "./store";
 
 export const CALENDAR_CATEGORIES = ["work", "personal", "money", "health", "other"] as const satisfies readonly CalendarCategory[];
 export const CALENDAR_COLORS = ["indigo", "cyan", "emerald", "yellow", "red", "purple", "orange", "pink"] as const satisfies readonly ProjectColor[];
@@ -17,7 +17,7 @@ const CATEGORY_COLOR: Record<CalendarCategory, ProjectColor> = {
 
 export type CalendarEventInput = Omit<CalendarEvent, "id" | "createdAt" | "updatedAt">;
 export type CalendarMutationResult =
-  | { ok: true; data: BridgeData; event: CalendarEvent; created: boolean }
+  | { ok: true; data: BaseData; event: CalendarEvent; created: boolean }
   | { ok: false; error: string };
 
 export function isCalendarDate(value: unknown): value is string {
@@ -95,7 +95,7 @@ export function validateCalendarEventInput(raw: Record<string, unknown>): { ok: 
   };
 }
 
-export function createCalendarEvent(data: BridgeData, raw: Record<string, unknown>, id: string, stamp = new Date().toISOString()): CalendarMutationResult {
+export function createCalendarEvent(data: BaseData, raw: Record<string, unknown>, id: string, stamp = new Date().toISOString()): CalendarMutationResult {
   if (!id || id.length > 200) return { ok: false, error: "A valid event id is required." };
   if ((data.calendarEvents ?? []).some((event) => event.id === id)) return { ok: false, error: "A calendar event with that id already exists." };
   const validated = validateCalendarEventInput(raw);
@@ -104,7 +104,7 @@ export function createCalendarEvent(data: BridgeData, raw: Record<string, unknow
   return { ok: true, data: { ...data, calendarEvents: [...(data.calendarEvents ?? []), event], updatedAt: Date.now() }, event, created: true };
 }
 
-export function updateCalendarEvent(data: BridgeData, id: string, patch: Record<string, unknown>, stamp = new Date().toISOString()): CalendarMutationResult {
+export function updateCalendarEvent(data: BaseData, id: string, patch: Record<string, unknown>, stamp = new Date().toISOString()): CalendarMutationResult {
   if (!Object.keys(patch).length) return { ok: false, error: "patch must include at least one calendar event field." };
   const unknown = Object.keys(patch).find((key) => !EVENT_FIELDS.has(key));
   if (unknown) return { ok: false, error: `Unknown calendar event field: ${unknown}.` };
@@ -121,7 +121,7 @@ export function updateCalendarEvent(data: BridgeData, id: string, patch: Record<
   return { ok: true, data: { ...data, calendarEvents: nextEvents, updatedAt: Date.now() }, event, created: false };
 }
 
-export function deleteCalendarEvent(data: BridgeData, id: string): { ok: true; data: BridgeData; event: CalendarEvent } | { ok: false; error: string } {
+export function deleteCalendarEvent(data: BaseData, id: string): { ok: true; data: BaseData; event: CalendarEvent } | { ok: false; error: string } {
   const events = data.calendarEvents ?? [];
   const event = events.find((candidate) => candidate.id === id);
   if (!event) return { ok: false, error: "Calendar event not found." };

@@ -4,9 +4,9 @@ import Sparkle
 import SwiftUI
 
 @main
-struct BridgeApp: App {
+struct BaseApp: App {
     @StateObject private var model = WebModel()
-    @StateObject private var store = BridgeStore()
+    @StateObject private var store = BaseStore()
 
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -18,7 +18,7 @@ struct BridgeApp: App {
         WindowGroup {
             ContentView(model: model, store: store)
                 .background(WindowConfigurator())
-                .onAppear { BridgeGlobalShortcut.shared.start() }
+                .onAppear { BaseGlobalShortcut.shared.start() }
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 1180, height: 800)
@@ -26,7 +26,7 @@ struct BridgeApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
-            BridgeCommands(model: model)
+            BaseCommands(model: model)
             CommandMenu("Sync") {
                 Button("Sync Offline Changes") { Task { await store.sync() } }
                     .keyboardShortcut("R", modifiers: [.command, .shift])
@@ -35,12 +35,12 @@ struct BridgeApp: App {
     }
 }
 
-struct BridgeCommands: Commands {
+struct BaseCommands: Commands {
     @ObservedObject var model: WebModel
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("Show Base") { BridgeGlobalShortcut.shared.activate() }
+            Button("Show Base") { BaseGlobalShortcut.shared.activate() }
                 .keyboardShortcut(" ", modifiers: [.control, .option])
             Button("Home") { model.goHome() }
                 .keyboardShortcut("H", modifiers: [.command, .shift])
@@ -116,10 +116,10 @@ struct WindowConfigurator: NSViewRepresentable {
 }
 
 /// Carbon handles the real global shortcut without Accessibility permission.
-/// Fn/Globe remains as a convenience fallback for existing Bridge installs.
+/// Fn/Globe remains as a convenience fallback for existing Base installs.
 @MainActor
-final class BridgeGlobalShortcut {
-    static let shared = BridgeGlobalShortcut()
+final class BaseGlobalShortcut {
+    static let shared = BaseGlobalShortcut()
 
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?
@@ -149,7 +149,7 @@ final class BridgeGlobalShortcut {
                     &identifier
                 )
                 guard status == noErr, identifier.id == 1 else { return OSStatus(eventNotHandledErr) }
-                Task { @MainActor in BridgeGlobalShortcut.shared.activate() }
+                Task { @MainActor in BaseGlobalShortcut.shared.activate() }
                 return noErr
             },
             1,

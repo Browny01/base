@@ -56,7 +56,7 @@ enum JSONValue: Codable, Equatable {
     }
 }
 
-struct BridgeRecord: Identifiable, Equatable {
+struct BaseRecord: Identifiable, Equatable {
     let fields: [String: JSONValue]
 
     var id: String { string("id") }
@@ -99,7 +99,7 @@ struct SyncEnvelope: Decodable {
     let configured: Bool?
 }
 
-enum BridgeDate {
+enum BaseDate {
     static let timestamp: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

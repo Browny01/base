@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import { useStoredPref, writeStored } from "@/lib/prefs";
-import type { BridgeData } from "@/lib/store";
+import type { BaseData } from "@/lib/store";
 import {
   DEFAULT_LIST_SORT, LIST_SORTS, isListSort, sortItems, sortLabel, type ListSort,
 } from "@/lib/list-sort";
@@ -416,7 +416,7 @@ function DensityMenu({ value, onChange }: { value: ListDensity; onChange: (d: Li
 }
 
 export function ListPage({ cfg }: { cfg: ListPageConfig }) {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const items = (data[cfg.dataKey] as unknown as LazyItem[]) ?? [];
 
   const [showForm, setShowForm] = useState(false);
@@ -424,8 +424,8 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   const [showCompleted, setShowCompleted] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  const sortKey = `bridge_list_sort_${cfg.dataKey}`;
-  const densityKey = `bridge_list_density_${cfg.dataKey}`;
+  const sortKey = `base_list_sort_${cfg.dataKey}`;
+  const densityKey = `base_list_density_${cfg.dataKey}`;
 
   const storedSort = useStoredPref(sortKey, DEFAULT_LIST_SORT);
   const storedDensity = useStoredPref(densityKey, cfg.defaultDensity ?? "compact");
@@ -440,7 +440,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   function changeDensity(next: ListDensity) { writeStored(densityKey, next); }
 
   function write(next: LazyItem[]) {
-    mutate((d) => ({ ...d, [cfg.dataKey]: next }) as BridgeData);
+    mutate((d) => ({ ...d, [cfg.dataKey]: next }) as BaseData);
   }
 
   function addItem(v: FormValues) {

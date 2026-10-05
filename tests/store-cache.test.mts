@@ -2,7 +2,7 @@
 // Run: node --experimental-strip-types tests/store-cache.test.mts
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { BridgeData } from "../lib/store.ts";
+import type { BaseData } from "../lib/store.ts";
 
 // Minimal localStorage + window shim, installed before importing the store.
 const store = new Map<string, string>();
@@ -31,7 +31,7 @@ const seed = () => ({
 });
 
 test("migrations still apply on first read", () => {
-  store.set("bridge_data", JSON.stringify(seed()));
+  store.set("base_data", JSON.stringify(seed()));
   const d = getData();
   assert.equal(d.incomeEntries[0].type, "income", "legacy earned -> income");
   assert.equal(d.habits[0].emoji, "⭐", "missing habit emoji defaulted");
@@ -50,7 +50,7 @@ test("updateData applies the updater and persists", () => {
   const next = updateData((d) => ({ ...d, wikiPages: [...d.wikiPages, { id: "w2", parentId: null, title: "Two", icon: "📄", blocks: [], createdAt: "", updatedAt: "" }] }));
   assert.equal(next.wikiPages.length, 2);
   assert.equal(getData().wikiPages.length, 2, "cache reflects the write");
-  assert.equal(JSON.parse(store.get("bridge_data")!).wikiPages.length, 2, "localStorage reflects the write");
+  assert.equal(JSON.parse(store.get("base_data")!).wikiPages.length, 2, "localStorage reflects the write");
 });
 
 test("migrations leave already-valid records untouched (no needless churn)", () => {
@@ -70,8 +70,8 @@ test("migrateAll normalises legacy data injected from the server", () => {
     habits: [{ id: "h9", name: "Legacy", reminderTime: null }],
     projects: [{ id: "p9", name: "Legacy project" }],
   };
-  // A legacy record is deliberately not a valid BridgeData — that is the point.
-  const merged = migrateAll({ ...DEFAULT, ...serverRecord } as unknown as BridgeData);
+  // A legacy record is deliberately not a valid BaseData — that is the point.
+  const merged = migrateAll({ ...DEFAULT, ...serverRecord } as unknown as BaseData);
   assert.equal(merged.incomeEntries[0].type, "spent", "legacy paid -> spent");
   assert.equal(merged.habits[0].emoji, "⭐", "missing emoji defaulted");
   assert.equal(merged.habits[0].type, "button", "missing type defaulted");
@@ -90,12 +90,12 @@ test("migrateAll purges expired trash from server data", () => {
 
 test("trash older than 14 days is purged on read", () => {
   const old = new Date(Date.now() - 20 * 24 * 3600 * 1000).toISOString();
-  store.set("bridge_data", JSON.stringify({ ...structuredClone(DEFAULT), wikiPages: [
+  store.set("base_data", JSON.stringify({ ...structuredClone(DEFAULT), wikiPages: [
     { id: "gone", parentId: null, title: "G", icon: "📄", blocks: [], deletedAt: old, createdAt: "", updatedAt: "" },
     { id: "kept", parentId: null, title: "K", icon: "📄", blocks: [], deletedAt: new Date().toISOString(), createdAt: "", updatedAt: "" },
   ] }));
   // Force a fresh read the way a cross-tab write would.
-  storageListener?.({ key: "bridge_data" });
+  storageListener?.({ key: "base_data" });
   const d = getData();
   assert.equal(d.wikiPages.length, 1, "expired trash dropped");
   assert.equal(d.wikiPages[0].id, "kept");
@@ -103,9 +103,9 @@ test("trash older than 14 days is purged on read", () => {
 
 test("a storage event from another tab invalidates the cache", () => {
   const before = getData();
-  store.set("bridge_data", JSON.stringify({ ...structuredClone(DEFAULT), shoppingList: [{ id: "s1", name: "S", category: "other", price: 1, priority: 2, checked: false, createdAt: "" }] }));
+  store.set("base_data", JSON.stringify({ ...structuredClone(DEFAULT), shoppingList: [{ id: "s1", name: "S", category: "other", price: 1, priority: 2, checked: false, createdAt: "" }] }));
   assert.equal(getData().shoppingList.length, 0, "stale until the event fires");
-  storageListener?.({ key: "bridge_data" });
+  storageListener?.({ key: "base_data" });
   const after = getData();
   assert.notEqual(after, before, "re-read after invalidation");
   assert.equal(after.shoppingList.length, 1, "cross-tab write picked up");

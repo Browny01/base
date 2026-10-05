@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
 import { prepareProjectLogo } from "@/lib/project-logo";
 import type { ProjectColor, ProjectCategory } from "@/lib/store";
@@ -9,6 +9,7 @@ import { Plus, FolderKanban, ChevronRight, Star, Layers, Upload, X } from "lucid
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ProjectLogo } from "@/components/project-logo";
+import { HANDOFF_OPEN_NEW_PROJECT, LEGACY_HANDOFF_OPEN_NEW_PROJECT, consumeHandoff } from "@/lib/base-storage";
 
 const COLORS: ProjectColor[] = [
   "indigo", "cyan", "emerald", "yellow", "red", "purple", "orange", "pink",
@@ -72,10 +73,12 @@ function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: s
 }
 
 export function ProjectsPage() {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const [showForm, setShowForm] = useState(false);
   // ⌘K → "New project" opens the form on arrival
-  useEffect(() => { try { if (localStorage.getItem("bridge_open_new_project")) { localStorage.removeItem("bridge_open_new_project"); setShowForm(true); } } catch {} }, []);
+  useEffect(() => {
+    if (consumeHandoff(HANDOFF_OPEN_NEW_PROJECT, [LEGACY_HANDOFF_OPEN_NEW_PROJECT])) setShowForm(true);
+  }, []);
   const [form, setForm] = useState<{
     name: string; description: string; color: ProjectColor;
     category: ProjectCategory; logoUrl: string | null;

@@ -17,7 +17,7 @@ final class WebModel: NSObject, ObservableObject {
 
     private var observers: [NSKeyValueObservation] = []
     private let pathMonitor = NWPathMonitor()
-    private let monitorQueue = DispatchQueue(label: "app.bridge.web-connectivity")
+    private let monitorQueue = DispatchQueue(label: "app.base.web-connectivity")
 
     override init() {
         let config = WKWebViewConfiguration()
@@ -91,8 +91,8 @@ final class WebModel: NSObject, ObservableObject {
         """)
     }
 
-    func openNewTask() { runHandoff("bridge_open_new_task", path: "/tasks") }
-    func openNewProject() { runHandoff("bridge_open_new_project", path: "/projects") }
+    func openNewTask() { runHandoff("base_open_new_task", legacy: "bridge_open_new_task", path: "/tasks") }
+    func openNewProject() { runHandoff("base_open_new_project", legacy: "bridge_open_new_project", path: "/projects") }
     func zoomIn() { webView.pageZoom += 0.1 }
     func zoomOut() { webView.pageZoom = max(0.3, webView.pageZoom - 0.1) }
     func zoomReset() { webView.pageZoom = 1.0 }
@@ -107,9 +107,15 @@ final class WebModel: NSObject, ObservableObject {
         window?.makeKeyAndOrderFront(nil)
     }
 
-    private func runHandoff(_ key: String, path: String) {
+    // Writes both the current and the legacy key. The web app shipped before the
+    // rename only knows the legacy name, and users update that app on their own
+    // schedule — dropping it here would silently break their New Task shortcut.
+    private func runHandoff(_ key: String, legacy: String, path: String) {
         let script = """
-        try { localStorage.setItem('\(key)', '1'); } catch {}
+        try {
+          localStorage.setItem('\(key)', '1');
+          localStorage.setItem('\(legacy)', '1');
+        } catch {}
         window.location.href = '\(path)';
         """
         webView.evaluateJavaScript(script) { [weak self] _, error in
@@ -117,7 +123,7 @@ final class WebModel: NSObject, ObservableObject {
         }
     }
 
-    private func isBridgeHost(_ url: URL?) -> Bool {
+    private func isBaseHost(_ url: URL?) -> Bool {
         url?.host == Self.homeURL.host
     }
 
@@ -135,7 +141,7 @@ extension WebModel: WKNavigationDelegate {
     ) {
         let url = navigationAction.request.url
         if navigationAction.navigationType == .linkActivated,
-           let url, !isBridgeHost(url), url.scheme?.hasPrefix("http") == true {
+           let url, !isBaseHost(url), url.scheme?.hasPrefix("http") == true {
             NSWorkspace.shared.open(url)
             decisionHandler(.cancel)
             return
@@ -192,7 +198,7 @@ extension WebModel: WKUIDelegate {
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
         guard let url = navigationAction.request.url else { return nil }
-        if isBridgeHost(url) { webView.load(navigationAction.request) }
+        if isBaseHost(url) { webView.load(navigationAction.request) }
         else { NSWorkspace.shared.open(url) }
         return nil
     }

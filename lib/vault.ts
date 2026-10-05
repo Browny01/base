@@ -14,7 +14,7 @@
 
 import type { SecretBlob } from "@/lib/ai-settings";
 
-const SESSION_SECRET_KEY = "bridge_vault_secret";
+const SESSION_SECRET_KEY = "base_vault_secret";
 const ITERATIONS = 210_000;
 
 function toBase64(bytes: Uint8Array): string {

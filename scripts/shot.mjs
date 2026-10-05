@@ -24,8 +24,8 @@ for (const s of shots) {
   const ctx = await browser.newContext({ viewport: { width: s.w, height: s.h }, deviceScaleFactor: 2 });
   const page = await login(ctx);
   await page.evaluate(({ theme, nav }) => {
-    localStorage.setItem("bridge_theme", theme);
-    localStorage.setItem("bridge_nav_mode", nav);
+    localStorage.setItem("base_theme", theme);
+    localStorage.setItem("base_nav_mode", nav);
   }, s);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await page.evaluate(({ theme, nav }) => {

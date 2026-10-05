@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useTheme } from "@/lib/theme-context";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { visiblePages, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
 import { ChevronsLeft, Sun, Moon } from "lucide-react";
 
@@ -42,7 +42,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
-  const { data } = useBridge();
+  const { data } = useBase();
   const isDark = theme === "dark";
 
   const pages = visiblePages(data.navPrefs);

@@ -2,8 +2,8 @@
 // The golden rule: locked (and trashed) notes pages must NEVER leave this file.
 
 import { Redis } from "@upstash/redis";
-import type { BridgeData, WikiBlock, WikiPage } from "@/lib/store";
-import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
+import type { BaseData, WikiBlock, WikiPage } from "@/lib/store";
+import { safeWriteBaseData } from "@/lib/autonomy-persistence";
 import {
   claimAutonomyTaskInData,
   reapExpiredAutonomyLeases,
@@ -11,7 +11,7 @@ import {
   type AtomicAutonomyResult,
   type SubmitAutonomyInput,
 } from "@/lib/autonomy-control";
-import { mutateBridgeDataAtomically, readVersionedBridgeData } from "@/lib/versioned-bridge-store";
+import { mutateBaseDataAtomically, readVersionedBaseData } from "@/lib/versioned-base-store";
 
 export function mcpRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
@@ -20,20 +20,20 @@ export function mcpRedis(): Redis | null {
   return new Redis({ url, token });
 }
 
-export async function readRawData(): Promise<BridgeData | null> {
+export async function readRawData(): Promise<BaseData | null> {
   const redis = mcpRedis();
   if (!redis) return null;
-  const snapshot = await readVersionedBridgeData(redis);
-  return snapshot.data as unknown as BridgeData;
+  const snapshot = await readVersionedBaseData(redis);
+  return snapshot.data as unknown as BaseData;
 }
 
 // MCP writes deliberately go through the same Redis key as the web app. The
 // route handler keeps the current raw state around while applying a mutation,
 // so protected notes are retained even though they are never returned to MCP.
-export async function writeRawData(data: BridgeData): Promise<boolean> {
+export async function writeRawData(data: BaseData): Promise<boolean> {
   const redis = mcpRedis();
   if (!redis) return false;
-  await safeWriteBridgeData(redis, data, true);
+  await safeWriteBaseData(redis, data, true);
   return true;
 }
 
@@ -41,7 +41,7 @@ export async function reapExpiredAutonomyLeasesAtomic(): Promise<{ ok: boolean; 
   const redis = mcpRedis();
   if (!redis) return { ok: false, reaped: 0, at: new Date().toISOString(), error: "Base data is not configured." };
   const at = new Date().toISOString();
-  const mutation = await mutateBridgeDataAtomically(redis, (current) => {
+  const mutation = await mutateBaseDataAtomically(redis, (current) => {
     const reaped = reapExpiredAutonomyLeases(current, at);
     return {
       data: reaped.data,
@@ -55,7 +55,7 @@ export async function reapExpiredAutonomyLeasesAtomic(): Promise<{ ok: boolean; 
 export async function claimAutonomyTask(taskId: string, runId: string, agent: string, model: string, startedAt: string): Promise<AtomicAutonomyResult> {
   const redis = mcpRedis();
   if (!redis) return { ok: false, error: "Base data is not configured." };
-  const mutation = await mutateBridgeDataAtomically(redis, (current) => {
+  const mutation = await mutateBaseDataAtomically(redis, (current) => {
     const claim = claimAutonomyTaskInData(current, { taskId, runId, agent, model, startedAt });
     return { data: claim.data, result: claim.result, write: claim.changed };
   });
@@ -65,7 +65,7 @@ export async function claimAutonomyTask(taskId: string, runId: string, agent: st
 export async function submitAutonomyResult(input: SubmitAutonomyInput): Promise<AtomicAutonomyResult> {
   const redis = mcpRedis();
   if (!redis) return { ok: false, error: "Base data is not configured." };
-  const mutation = await mutateBridgeDataAtomically(redis, (current) => {
+  const mutation = await mutateBaseDataAtomically(redis, (current) => {
     const submitted = submitAutonomyResultInData(current, input);
     return { data: submitted.data, result: submitted.result, write: submitted.changed };
   });
@@ -76,7 +76,7 @@ export async function submitAutonomyResult(input: SubmitAutonomyInput): Promise<
 export const isReadableNote = (p: WikiPage) => !p.locked && !p.deletedAt;
 
 // Strip locked/trashed notes from the blob so nothing downstream can leak them.
-export function sanitize(d: BridgeData): BridgeData {
+export function sanitize(d: BaseData): BaseData {
   return { ...d, wikiPages: (d.wikiPages ?? []).filter(isReadableNote) };
 }
 

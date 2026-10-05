@@ -1,12 +1,12 @@
 import SwiftUI
 
 @main
-struct BridgeIOSApp: App {
-    @StateObject private var store = BridgeStore()
+struct BaseIOSApp: App {
+    @StateObject private var store = BaseStore()
 
     var body: some Scene {
         WindowGroup {
-            BridgeRootView(store: store)
+            BaseRootView(store: store)
         }
     }
 }

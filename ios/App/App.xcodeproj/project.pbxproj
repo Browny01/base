@@ -7,15 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3916C4C245D629DF0CD07ADE /* BridgeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F46F757067608199DDF3EB /* BridgeWidget.swift */; };
+		3916C4C245D629DF0CD07ADE /* BaseWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F46F757067608199DDF3EB /* BaseWidget.swift */; };
 		44DAC6B12B0AB6C5BE3A4081 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 74AF4CCE00CE3575EF9F6285 /* Foundation.framework */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
-		A10000000000000000000011 /* BridgeData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* BridgeData.swift */; };
-		A10000000000000000000012 /* BridgeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* BridgeStore.swift */; };
-		A10000000000000000000013 /* BridgeViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* BridgeViews.swift */; };
-		EA841DB8E09EF713CF51FBB6 /* BridgeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 93797444408492BB94C7A2E3 /* BridgeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A10000000000000000000011 /* BaseData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* BaseData.swift */; };
+		A10000000000000000000012 /* BaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* BaseStore.swift */; };
+		A10000000000000000000013 /* BaseViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* BaseViews.swift */; };
+		EA841DB8E09EF713CF51FBB6 /* BaseWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 93797444408492BB94C7A2E3 /* BaseWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,7 +24,7 @@
 			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 2BA1A963AF3DA7E2020AF885;
-			remoteInfo = BridgeWidgetExtension;
+			remoteInfo = BaseWidgetExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -35,7 +35,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				EA841DB8E09EF713CF51FBB6 /* BridgeWidgetExtension.appex in Embed Foundation Extensions */,
+				EA841DB8E09EF713CF51FBB6 /* BaseWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -49,12 +49,12 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		74AF4CCE00CE3575EF9F6285 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		93797444408492BB94C7A2E3 /* BridgeWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BridgeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		93797444408492BB94C7A2E3 /* BaseWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaseWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B921FFBF69D4C43BFD78FF1D /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C7F46F757067608199DDF3EB /* BridgeWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BridgeWidget.swift; sourceTree = "<group>"; };
-		A10000000000000000000001 /* BridgeData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeData.swift; sourceTree = "<group>"; };
-		A10000000000000000000002 /* BridgeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeStore.swift; sourceTree = "<group>"; };
-		A10000000000000000000003 /* BridgeViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeViews.swift; sourceTree = "<group>"; };
+		C7F46F757067608199DDF3EB /* BaseWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaseWidget.swift; sourceTree = "<group>"; };
+		A10000000000000000000001 /* BaseData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseData.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* BaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseStore.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* BaseViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,8 +82,8 @@
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
 				902BA8DCCD60A7990D493154 /* Frameworks */,
-				52BBB77EA280F189FD426C52 /* BridgeWidget */,
-				A10000000000000000000020 /* BridgeCore */,
+				52BBB77EA280F189FD426C52 /* BaseWidget */,
+				A10000000000000000000020 /* BaseCore */,
 			);
 			sourceTree = "<group>";
 		};
@@ -91,7 +91,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
-				93797444408492BB94C7A2E3 /* BridgeWidgetExtension.appex */,
+				93797444408492BB94C7A2E3 /* BaseWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -107,13 +107,13 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		52BBB77EA280F189FD426C52 /* BridgeWidget */ = {
+		52BBB77EA280F189FD426C52 /* BaseWidget */ = {
 			isa = PBXGroup;
 			children = (
-				C7F46F757067608199DDF3EB /* BridgeWidget.swift */,
+				C7F46F757067608199DDF3EB /* BaseWidget.swift */,
 				B921FFBF69D4C43BFD78FF1D /* Info.plist */,
 			);
-			path = BridgeWidget;
+			path = BaseWidget;
 			sourceTree = SOURCE_ROOT;
 		};
 		902BA8DCCD60A7990D493154 /* Frameworks */ = {
@@ -132,23 +132,23 @@
 			name = iOS;
 			sourceTree = "<group>";
 		};
-		A10000000000000000000020 /* BridgeCore */ = {
+		A10000000000000000000020 /* BaseCore */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000001 /* BridgeData.swift */,
-				A10000000000000000000002 /* BridgeStore.swift */,
-				A10000000000000000000003 /* BridgeViews.swift */,
+				A10000000000000000000001 /* BaseData.swift */,
+				A10000000000000000000002 /* BaseStore.swift */,
+				A10000000000000000000003 /* BaseViews.swift */,
 			);
-			name = BridgeCore;
-			path = ../../native/BridgeCore;
+			name = BaseCore;
+			path = ../../native/BaseCore;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2BA1A963AF3DA7E2020AF885 /* BridgeWidgetExtension */ = {
+		2BA1A963AF3DA7E2020AF885 /* BaseWidgetExtension */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A1E596062D0AEEB80A7CCF76 /* Build configuration list for PBXNativeTarget "BridgeWidgetExtension" */;
+			buildConfigurationList = A1E596062D0AEEB80A7CCF76 /* Build configuration list for PBXNativeTarget "BaseWidgetExtension" */;
 			buildPhases = (
 				EB42F56BE9934C8D2B27CD7D /* Sources */,
 				F5A8145DB48DC5FC36C93402 /* Frameworks */,
@@ -158,9 +158,9 @@
 			);
 			dependencies = (
 			);
-			name = BridgeWidgetExtension;
-			productName = BridgeWidgetExtension;
-			productReference = 93797444408492BB94C7A2E3 /* BridgeWidgetExtension.appex */;
+			name = BaseWidgetExtension;
+			productName = BaseWidgetExtension;
+			productReference = 93797444408492BB94C7A2E3 /* BaseWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 		504EC3031FED79650016851F /* App */ = {
@@ -216,7 +216,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
-				2BA1A963AF3DA7E2020AF885 /* BridgeWidgetExtension */,
+				2BA1A963AF3DA7E2020AF885 /* BaseWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -246,9 +246,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
-				A10000000000000000000011 /* BridgeData.swift in Sources */,
-				A10000000000000000000012 /* BridgeStore.swift in Sources */,
-				A10000000000000000000013 /* BridgeViews.swift in Sources */,
+				A10000000000000000000011 /* BaseData.swift in Sources */,
+				A10000000000000000000012 /* BaseStore.swift in Sources */,
+				A10000000000000000000013 /* BaseViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,7 +256,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3916C4C245D629DF0CD07ADE /* BridgeWidget.swift in Sources */,
+				3916C4C245D629DF0CD07ADE /* BaseWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -265,8 +265,8 @@
 /* Begin PBXTargetDependency section */
 		BF2F3B5730753DFEB237A246 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			name = BridgeWidgetExtension;
-			target = 2BA1A963AF3DA7E2020AF885 /* BridgeWidgetExtension */;
+			name = BaseWidgetExtension;
+			target = 2BA1A963AF3DA7E2020AF885 /* BaseWidgetExtension */;
 			targetProxy = CA145273E4528753FC5984F4 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -443,7 +443,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = SHNN8GS53Y;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = BridgeWidget/Info.plist;
+				INFOPLIST_FILE = BaseWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -469,7 +469,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = SHNN8GS53Y;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = BridgeWidget/Info.plist;
+				INFOPLIST_FILE = BaseWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -507,7 +507,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1E596062D0AEEB80A7CCF76 /* Build configuration list for PBXNativeTarget "BridgeWidgetExtension" */ = {
+		A1E596062D0AEEB80A7CCF76 /* Build configuration list for PBXNativeTarget "BaseWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7F1DA39005A351DA5625D179 /* Release */,

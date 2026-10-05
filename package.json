@@ -1,5 +1,5 @@
 {
-  "name": "bridge",
+  "name": "base",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "node --no-warnings --import ./tests/resolve-alias.mjs --experimental-strip-types --test tests/*.test.mts",
     "ios": "open ios/App/App.xcodeproj",
     "mac:gen": "cd macos && xcodegen generate",
-    "mac": "cd macos && xcodegen generate && open Bridge.xcodeproj",
+    "mac": "cd macos && xcodegen generate && open Base.xcodeproj",
     "mac:install": "./scripts/install_mac.sh",
     "mac:release": "./scripts/release_mac.sh"
   },

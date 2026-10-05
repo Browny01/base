@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const refresh = randId(32);
     await saveToken(access);
     await saveRefresh(refresh);
-    return j({ access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh, scope: "bridge" });
+    return j({ access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh, scope: "base" });
   }
 
   if (grant === "refresh_token") {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     if (!(await validateRefresh(rt))) return oauthErr("invalid_grant", "Refresh token is invalid or expired.");
     const access = randId(32);
     await saveToken(access);
-    return j({ access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: rt, scope: "bridge" });
+    return j({ access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: rt, scope: "base" });
   }
 
   return oauthErr("unsupported_grant_type", `grant_type '${grant}' is not supported.`);

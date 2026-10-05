@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useBridge } from "@/lib/hooks";
-import type { BridgeData } from "@/lib/store";
+import { useBase } from "@/lib/hooks";
+import type { BaseData } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Check, ChevronDown, ChevronUp, Trash2, type LucideIcon } from "lucide-react";
 
@@ -50,14 +50,14 @@ export function CardListPage<T extends MediaCardLike>({
   filterBar?: ReactNode;
   filter?: (item: T) => boolean;
 }) {
-  const { mutate } = useBridge();
+  const { mutate } = useBase();
   const [showForm, setShowForm] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
   function write(next: T[]) {
-    mutate((d) => ({ ...d, [config.dataKey]: next }) as unknown as BridgeData);
+    mutate((d) => ({ ...d, [config.dataKey]: next }) as unknown as BaseData);
   }
 
   function append(item: T) {
@@ -99,7 +99,7 @@ export function CardListPage<T extends MediaCardLike>({
   return (
     <div className="p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">{config.title}</h1>
         <button
           onClick={() => setShowForm((v) => !v)}

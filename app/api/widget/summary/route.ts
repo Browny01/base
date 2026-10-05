@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { readCurrentData } from "@/lib/bridge-data";
-import { bridgeAgentToken } from "@/lib/env";
+import { readCurrentData } from "@/lib/base-data";
+import { baseAgentToken } from "@/lib/env";
 import { calcStreak } from "@/lib/utils";
 
 // Read-only summary for the iOS home-screen widget. Guarded by a token (query
-// ?token= or x-bridge-token header) so it can be fetched from the WidgetKit
+// ?token= or x-base-token header) so it can be fetched from the WidgetKit
 // timeline provider without the app running. Single-user app → one shared blob.
 export const dynamic = "force-dynamic";
 
@@ -28,8 +28,13 @@ const day = (v: unknown): string => (typeof v === "string" ? v.slice(0, 10) : ""
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const token = url.searchParams.get("token") || req.headers.get("x-bridge-token") || "";
-  const expected = bridgeAgentToken();
+  // The old header name stays accepted: an installed widget on an iPhone keeps
+  // sending it until the user updates to a build built after the rename.
+  const token = url.searchParams.get("token")
+    || req.headers.get("x-base-token")
+    || req.headers.get("x-bridge-token")
+    || "";
+  const expected = baseAgentToken();
   if (token !== expected) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const redis = getRedis();

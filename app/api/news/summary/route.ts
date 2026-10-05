@@ -25,7 +25,7 @@ async function summarize(request: BriefingRequest) {
   // Keyed by a digest of the caller's key, so two accounts never share a cached
   // briefing but the key itself is not part of the Redis key.
   const who = apiKey ? createHash("sha256").update(apiKey).digest("hex").slice(0, 8) : "env";
-  const key = `bridge:news:summary:v5:${provider}:${model}:${who}:${hour}`;
+  const key = `base:news:summary:v5:${provider}:${model}:${who}:${hour}`;
   const redis = mcpRedis();
 
   if (redis) {

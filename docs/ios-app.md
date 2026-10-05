@@ -30,7 +30,7 @@ In Xcode:
 5. Press Run. On first use, iOS may ask you to enable Developer Mode and trust the
    developer certificate in **Settings > General > VPN & Device Management**.
 
-The `BridgeWidgetExtension` target is embedded automatically. Its bundle
+The `BaseWidgetExtension` target is embedded automatically. Its bundle
 identifier must remain prefixed by the app bundle identifier when changing IDs.
 
 ## Native features
@@ -51,7 +51,7 @@ available offline.
 
 ## Offline sync
 
-`native/BridgeCore/BridgeStore.swift` writes the complete Base JSON snapshot and
+`native/BaseCore/BaseStore.swift` writes the complete Base JSON snapshot and
 pending operations to the app's Application Support directory. Every native edit:
 
 1. Updates the local snapshot immediately.
@@ -86,4 +86,4 @@ changes continue to deploy independently to Vercel.
 Long-press the Home Screen, tap `+`, search for Base, and choose a widget size.
 The widget uses `/api/widget/summary` and refreshes separately from the app's
 offline store. If the production authentication token changes, update
-`BridgeAPI.token` in `ios/App/BridgeWidget/BridgeWidget.swift`.
+`BaseAPI.token` in `ios/App/BaseWidget/BaseWidget.swift`.

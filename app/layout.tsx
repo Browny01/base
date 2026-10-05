@@ -22,7 +22,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",              // extend into the safe areas (notch / home indicator)
   themeColor: "#0a0a0b",
 };
@@ -34,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Apply persisted theme before paint to avoid a flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('bridge_theme')||'dark';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('bridge_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('bridge_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('dark');document.documentElement.dataset.nav='sidebar'}`,
+            __html: `try{var t=localStorage.getItem('base_theme')||'dark';document.documentElement.classList.add(t==='dark'?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('base_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('base_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('dark');document.documentElement.dataset.nav='sidebar'}`,
           }}
         />
       </head>

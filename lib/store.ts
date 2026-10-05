@@ -629,7 +629,7 @@ export interface BodyMetrics {
   photos?: ProgressPhoto[];
 }
 
-export interface BridgeData {
+export interface BaseData {
   dataRevision?: number;
   tasks: Task[];
   calendarEvents: CalendarEvent[];
@@ -675,7 +675,7 @@ export interface BridgeData {
   updatedAt?: number;
 }
 
-export const DEFAULT: BridgeData = {
+export const DEFAULT: BaseData = {
   tasks: [],
   calendarEvents: [],
   focusSessions: [],
@@ -740,7 +740,7 @@ export const DEFAULT: BridgeData = {
 // `return { ...data, habits: data.habits.map(...) }` re-allocated every habit,
 // project, income entry, board item and board drawing on every keystroke.
 
-function migrateIncomeTypes(data: BridgeData): BridgeData {
+function migrateIncomeTypes(data: BaseData): BaseData {
   for (const e of data.incomeEntries) {
     const t = e.type as string;
     if (t === "earned" || t === "invoiced" || t === "paid") {
@@ -758,7 +758,7 @@ function migrateIncomeTypes(data: BridgeData): BridgeData {
   return data;
 }
 
-function migrateHabits(data: BridgeData): BridgeData {
+function migrateHabits(data: BaseData): BaseData {
   for (const raw of data.habits) {
     const h = raw as unknown as Record<string, unknown>;
     if (!h.emoji || !h.type) {
@@ -781,7 +781,7 @@ function migrateHabits(data: BridgeData): BridgeData {
   return data;
 }
 
-function migrateProjects(data: BridgeData): BridgeData {
+function migrateProjects(data: BaseData): BaseData {
   for (const raw of data.projects) {
     if (!(raw as unknown as Record<string, unknown>).category) {
       return {
@@ -797,7 +797,7 @@ function migrateProjects(data: BridgeData): BridgeData {
 }
 
 // Ensure at least one board exists and every item/drawing is assigned to one.
-function migrateBoards(data: BridgeData): BridgeData {
+function migrateBoards(data: BaseData): BaseData {
   let out = data;
   let boards = out.boards ?? [];
   if (boards.length === 0) {
@@ -818,7 +818,7 @@ function migrateBoards(data: BridgeData): BridgeData {
 
 // Permanently drop notes pages that have been in the Trash for over 14 days.
 const TRASH_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-function purgeOldTrash(data: BridgeData): BridgeData {
+function purgeOldTrash(data: BaseData): BaseData {
   const now = Date.now();
   const expired = (t?: string | null) => !!t && now - new Date(t).getTime() > TRASH_TTL_MS;
   let out = data;
@@ -832,19 +832,21 @@ function purgeOldTrash(data: BridgeData): BridgeData {
   return out;
 }
 
-const DATA_KEY = "bridge_data";
-const LEGACY_KEY = "nexus_data";
+const DATA_KEY = "base_data";
+// Installs upgraded from the Nexus and Bridge eras keep their data: the first
+// read copies the old blob forward, exactly as the server-side keys do.
+const PREVIOUS_KEYS = ["bridge_data", "nexus_data"];
 
 // In-memory mirror of localStorage.
 //
 // getData() used to re-read and JSON.parse the entire record — then run four
 // migration passes over it — on every single call. hooks.ts calls getData()
-// once per bridge_update listener, and six useBridge() consumers are mounted
+// once per base_update listener, and six useBase() consumers are mounted
 // app-wide (Sidebar, CommandBar, Dock, BottomNav, KeyboardShortcuts + the
 // page), so every keystroke-burst in Notes parsed the whole dataset six times.
 // The mirror is dropped whenever another tab writes to storage, so cross-tab
 // sync still works.
-let cache: BridgeData | null = null;
+let cache: BaseData | null = null;
 let watchingStorage = false;
 
 function watchExternalWrites() {
@@ -852,13 +854,13 @@ function watchExternalWrites() {
   watchingStorage = true;
   window.addEventListener("storage", (e) => {
     // key === null means localStorage.clear() fired.
-    if (e.key === null || e.key === DATA_KEY || e.key === LEGACY_KEY) cache = null;
+    if (e.key === null || e.key === DATA_KEY || PREVIOUS_KEYS.includes(e.key)) cache = null;
   });
 }
 
 // Drops the "@" prefix and folds legacy tags onto the current taxonomy so
 // existing tasks keep their category instead of collapsing into "Other".
-function migrateTaskTags(data: BridgeData): BridgeData {
+function migrateTaskTags(data: BaseData): BaseData {
   if (!Array.isArray(data.tasks)) return data;
   let changed = false;
   const tasks = data.tasks.map((t) => {
@@ -874,7 +876,7 @@ function migrateTaskTags(data: BridgeData): BridgeData {
 // stored chat threads/folders/skills are dropped here rather than left to rot
 // in every install's blob. The old `chatSettings` model becomes the briefing's
 // starting pick, so an existing user doesn't have to choose one again.
-function migrateAwayChat(data: BridgeData): BridgeData {
+function migrateAwayChat(data: BaseData): BaseData {
   const legacy = data as unknown as Record<string, unknown>;
   const hasLegacyChat = ["chatThreads", "chatFolders", "chatSkills", "chatSettings"].some((key) => key in legacy);
   const missingProfile = !data.profile;
@@ -888,13 +890,13 @@ function migrateAwayChat(data: BridgeData): BridgeData {
     for (const key of ["chatThreads", "chatFolders", "chatSkills", "chatSettings"]) delete out[key];
   }
   out.profile = { ...DEFAULT_PROFILE, ...((legacy.profile ?? {}) as Partial<UserProfile>) };
-  return out as unknown as BridgeData;
+  return out as unknown as BaseData;
 }
 
 // An install that already has data predates onboarding, so it counts as set up —
 // otherwise every existing copy would be nagged into the wizard on first visit.
 // A genuinely new install has an empty shell and still gets the wizard.
-function migrateExistingInstall(data: BridgeData): BridgeData {
+function migrateExistingInstall(data: BaseData): BaseData {
   if (data.profile?.onboardedAt) return data;
   const used =
     (data.tasks?.length ?? 0) > 0 ||
@@ -912,16 +914,23 @@ function migrateExistingInstall(data: BridgeData): BridgeData {
 // shape. Callers that inject data from outside localStorage must use this
 // explicitly: load() only re-parses on a cache miss, so previously-pulled
 // server data would otherwise sit unmigrated in the cache until a reload.
-export function migrateAll(data: BridgeData): BridgeData {
+export function migrateAll(data: BaseData): BaseData {
   return migrateExistingInstall(migrateAwayChat(purgeOldTrash(migrateTaskTags(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data))))))));
 }
 
-function loadFromStorage(): BridgeData {
+function loadFromStorage(): BaseData {
   if (typeof window === "undefined") return DEFAULT;
   try {
-    const raw = localStorage.getItem(DATA_KEY) ?? localStorage.getItem(LEGACY_KEY);
-    if (raw && !localStorage.getItem(DATA_KEY)) {
-      localStorage.setItem(DATA_KEY, raw);
+    let raw = localStorage.getItem(DATA_KEY);
+    if (!raw) {
+      for (const key of PREVIOUS_KEYS) {
+        const previous = localStorage.getItem(key);
+        if (previous) {
+          localStorage.setItem(DATA_KEY, previous);
+          raw = previous;
+          break;
+        }
+      }
     }
     const parsed = raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
     return migrateAll(parsed);
@@ -930,27 +939,27 @@ function loadFromStorage(): BridgeData {
   }
 }
 
-function load(): BridgeData {
+function load(): BaseData {
   if (cache) return cache;
   watchExternalWrites();
   cache = loadFromStorage();
   return cache;
 }
 
-function save(data: BridgeData) {
+function save(data: BaseData) {
   cache = data;
   if (typeof window === "undefined") return;
   localStorage.setItem(DATA_KEY, JSON.stringify(data));
 }
 
-export function getData(): BridgeData {
+export function getData(): BaseData {
   return load();
 }
 
-export function updateData(updater: (d: BridgeData) => BridgeData) {
+export function updateData(updater: (d: BaseData) => BaseData) {
   const next = updater(load());
   save(next);
-  window.dispatchEvent(new Event("bridge_update"));
+  window.dispatchEvent(new Event("base_update"));
   return next;
 }
 

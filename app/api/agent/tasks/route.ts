@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { readCurrentData } from "@/lib/bridge-data";
-import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
-import { bridgeAgentToken } from "@/lib/env";
-import { normalizeTaskTag, type BridgeData as StoreBridgeData } from "@/lib/store";
+import { readCurrentData } from "@/lib/base-data";
+import { safeWriteBaseData } from "@/lib/autonomy-persistence";
+import { baseAgentToken } from "@/lib/env";
+import { normalizeTaskTag, type BaseData as StoreBaseData } from "@/lib/store";
 
 type Priority = "P1" | "P2" | "P3";
 type RecurringFreq = "daily" | "weekly" | "monthly" | null;
@@ -21,7 +21,7 @@ interface Task {
   projectId?: string;
 }
 
-interface BridgeData {
+interface BaseData {
   tasks?: Task[];
   updatedAt?: number;
   [key: string]: unknown;
@@ -38,7 +38,7 @@ function getRedis(): Redis | null {
 }
 
 function isAuthorized(req: NextRequest) {
-  const token = bridgeAgentToken();
+  const token = baseAgentToken();
   return Boolean(token && req.headers.get("authorization") === `Bearer ${token}`);
 }
 
@@ -46,11 +46,11 @@ function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
-async function readData(redis: Redis): Promise<BridgeData> {
-  let data = await readCurrentData(redis) as BridgeData | string | null;
+async function readData(redis: Redis): Promise<BaseData> {
+  let data = await readCurrentData(redis) as BaseData | string | null;
   if (typeof data === "string") {
     try {
-      data = JSON.parse(data) as BridgeData;
+      data = JSON.parse(data) as BaseData;
     } catch {
       data = {};
     }
@@ -58,9 +58,9 @@ async function readData(redis: Redis): Promise<BridgeData> {
   return data && typeof data === "object" && !Array.isArray(data) ? data : {};
 }
 
-async function writeData(redis: Redis, data: BridgeData) {
+async function writeData(redis: Redis, data: BaseData) {
   const next = { ...data, tasks: data.tasks ?? [], updatedAt: Date.now() };
-  await safeWriteBridgeData(redis, next as unknown as StoreBridgeData, true);
+  await safeWriteBaseData(redis, next as unknown as StoreBaseData, true);
   return next;
 }
 

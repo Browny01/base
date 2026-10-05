@@ -23,13 +23,13 @@ export function AccentProvider({ children }: { children: React.ReactNode }) {
   const [accent, setAccentState] = useState(DEFAULT);
 
   useEffect(() => {
-    const saved = localStorage.getItem("bridge_accent");
+    const saved = localStorage.getItem("base_accent");
     if (saved) { setAccentState(saved); document.documentElement.style.setProperty("--accent", saved); }
   }, []);
 
   const setAccent = (v: string) => {
     setAccentState(v);
-    try { localStorage.setItem("bridge_accent", v); } catch {}
+    try { localStorage.setItem("base_accent", v); } catch {}
     document.documentElement.style.setProperty("--accent", v);
   };
 

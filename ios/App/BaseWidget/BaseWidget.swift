@@ -2,7 +2,7 @@ import WidgetKit
 import SwiftUI
 
 // ── Data ─────────────────────────────────────────────────────────────────────
-struct BridgeSummary: Codable {
+struct BaseSummary: Codable {
     var tasksLeft: Int = 0
     var doneToday: Int = 0
     var habitsDone: Int = 0
@@ -13,19 +13,19 @@ struct BridgeSummary: Codable {
     var portfolio: Double? = nil
     var portfolioPct: Double? = nil
 
-    static let sample = BridgeSummary(
+    static let sample = BaseSummary(
         tasksLeft: 5, doneToday: 3, habitsDone: 4, habitsTotal: 5, streak: 7,
         revenueToday: 240, revenueTarget: 1000, portfolio: 12480, portfolioPct: 3.2
     )
 }
 
-enum BridgeAPI {
+enum BaseAPI {
     // Personal single-user app. The token matches the server default
-    // (BRIDGE_AGENT_TOKEN / BRIDGE_PASSWORD, default 151715).
+    // (BASE_AGENT_TOKEN / BASE_PASSWORD, legacy BRIDGE_* names still work).
     static let base = "https://base.lucasbrown.xyz"
     static let token = "151715"
 
-    static func fetchSummary() async -> BridgeSummary {
+    static func fetchSummary() async -> BaseSummary {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         df.timeZone = .current
@@ -42,7 +42,7 @@ enum BridgeAPI {
             req.timeoutInterval = 12
             req.cachePolicy = .reloadIgnoringLocalCacheData
             let (data, _) = try await URLSession.shared.data(for: req)
-            return try JSONDecoder().decode(BridgeSummary.self, from: data)
+            return try JSONDecoder().decode(BaseSummary.self, from: data)
         } catch {
             return .init()
         }
@@ -50,23 +50,23 @@ enum BridgeAPI {
 }
 
 // ── Timeline ─────────────────────────────────────────────────────────────────
-struct BridgeEntry: TimelineEntry {
+struct BaseEntry: TimelineEntry {
     let date: Date
-    let summary: BridgeSummary
+    let summary: BaseSummary
 }
 
-struct BridgeProvider: TimelineProvider {
-    func placeholder(in context: Context) -> BridgeEntry {
-        BridgeEntry(date: Date(), summary: .sample)
+struct BaseProvider: TimelineProvider {
+    func placeholder(in context: Context) -> BaseEntry {
+        BaseEntry(date: Date(), summary: .sample)
     }
-    func getSnapshot(in context: Context, completion: @escaping (BridgeEntry) -> Void) {
-        Task { completion(BridgeEntry(date: Date(), summary: context.isPreview ? .sample : await BridgeAPI.fetchSummary())) }
+    func getSnapshot(in context: Context, completion: @escaping (BaseEntry) -> Void) {
+        Task { completion(BaseEntry(date: Date(), summary: context.isPreview ? .sample : await BaseAPI.fetchSummary())) }
     }
-    func getTimeline(in context: Context, completion: @escaping (Timeline<BridgeEntry>) -> Void) {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<BaseEntry>) -> Void) {
         Task {
-            let summary = await BridgeAPI.fetchSummary()
+            let summary = await BaseAPI.fetchSummary()
             let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date().addingTimeInterval(1800)
-            completion(Timeline(entries: [BridgeEntry(date: Date(), summary: summary)], policy: .after(next)))
+            completion(Timeline(entries: [BaseEntry(date: Date(), summary: summary)], policy: .after(next)))
         }
     }
 }
@@ -127,7 +127,7 @@ struct ProgressBar: View {
 
 // ── Views ────────────────────────────────────────────────────────────────────
 struct SmallView: View {
-    let s: BridgeSummary
+    let s: BaseSummary
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 5) {
@@ -151,7 +151,7 @@ struct SmallView: View {
 }
 
 struct MediumView: View {
-    let s: BridgeSummary
+    let s: BaseSummary
     private var revPct: Double { s.revenueTarget > 0 ? s.revenueToday / s.revenueTarget : 0 }
 
     var body: some View {
@@ -181,9 +181,9 @@ struct MediumView: View {
     }
 }
 
-struct BridgeWidgetEntryView: View {
+struct BaseWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
-    var entry: BridgeProvider.Entry
+    var entry: BaseProvider.Entry
 
     var body: some View {
         Group {
@@ -199,11 +199,11 @@ struct BridgeWidgetEntryView: View {
 }
 
 // ── Widget ───────────────────────────────────────────────────────────────────
-struct BridgeWidget: Widget {
-    let kind = "BridgeWidget"
+struct BaseWidget: Widget {
+    let kind = "BaseWidget"
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: BridgeProvider()) { entry in
-            BridgeWidgetEntryView(entry: entry)
+        StaticConfiguration(kind: kind, provider: BaseProvider()) { entry in
+            BaseWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Base")
         .description("Today's tasks, streak, habits, and revenue vs target.")
@@ -212,6 +212,6 @@ struct BridgeWidget: Widget {
 }
 
 @main
-struct BridgeWidgetBundle: WidgetBundle {
-    var body: some Widget { BridgeWidget() }
+struct BaseWidgetBundle: WidgetBundle {
+    var body: some Widget { BaseWidget() }
 }

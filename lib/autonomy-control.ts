@@ -5,7 +5,7 @@ import {
   normalizeAutonomySettings,
   type AutonomyTaskLike,
 } from "./autonomy.ts";
-import type { BridgeDataRecord } from "./versioned-bridge-store.ts";
+import type { BaseDataRecord } from "./versioned-base-store.ts";
 
 export type AtomicAutonomyResult = {
   ok: boolean;
@@ -34,12 +34,12 @@ export type SubmitAutonomyInput = {
 };
 
 type DataMutation = {
-  data: BridgeDataRecord;
+  data: BaseDataRecord;
   result: AtomicAutonomyResult;
   changed: boolean;
 };
 
-function tasksIn(data: BridgeDataRecord): Array<Record<string, unknown>> {
+function tasksIn(data: BaseDataRecord): Array<Record<string, unknown>> {
   return Array.isArray(data.tasks)
     ? data.tasks.filter((task): task is Record<string, unknown> => Boolean(task) && typeof task === "object" && !Array.isArray(task))
     : [];
@@ -86,7 +86,7 @@ function withoutActiveLease(task: Record<string, unknown>, expiredAt: string, re
   return next;
 }
 
-export function reapExpiredAutonomyLeases(data: BridgeDataRecord, nowIso: string): { data: BridgeDataRecord; reaped: number } {
+export function reapExpiredAutonomyLeases(data: BaseDataRecord, nowIso: string): { data: BaseDataRecord; reaped: number } {
   const now = parseTime(nowIso);
   if (now == null) return { data, reaped: 0 };
   let reaped = 0;
@@ -103,7 +103,7 @@ export function reapExpiredAutonomyLeases(data: BridgeDataRecord, nowIso: string
     : { data, reaped: 0 };
 }
 
-export function claimAutonomyTaskInData(data: BridgeDataRecord, input: ClaimAutonomyInput): DataMutation {
+export function claimAutonomyTaskInData(data: BaseDataRecord, input: ClaimAutonomyInput): DataMutation {
   const startedMs = parseTime(input.startedAt);
   if (startedMs == null) return { data, result: { ok: false, error: "Invalid claim timestamp." }, changed: false };
 
@@ -180,7 +180,7 @@ export function claimAutonomyTaskInData(data: BridgeDataRecord, input: ClaimAuto
   return { data: nextData, result: { ok: true, task: claimed, runId: input.runId }, changed: true };
 }
 
-export function submitAutonomyResultInData(data: BridgeDataRecord, input: SubmitAutonomyInput): DataMutation {
+export function submitAutonomyResultInData(data: BaseDataRecord, input: SubmitAutonomyInput): DataMutation {
   const tasks = tasksIn(data);
   const targetIndex = tasks.findIndex((task) => task.id === input.taskId);
   if (targetIndex < 0) return { data, result: { ok: false, error: "Task not found." }, changed: false };

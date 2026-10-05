@@ -5,11 +5,11 @@
 // the store is the switch, so it never nags an install that's already set up.
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { needsOnboarding } from "@/lib/profile";
 
 export function FirstRunRedirect() {
-  const { data, loaded } = useBridge();
+  const { data, loaded } = useBase();
   const router = useRouter();
 
   useEffect(() => {

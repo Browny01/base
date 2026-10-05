@@ -36,14 +36,14 @@ shortcut in **System Settings > Keyboard > Keyboard Shortcuts**.
 
 ## Website and offline behavior
 
-`macos/Bridge/WebView.swift` loads the production URL in a persistent `WKWebView`,
+`macos/Base/WebView.swift` loads the production URL in a persistent `WKWebView`,
 including the normal website navigation, settings, uploads, AI tools, and browser
 session. External links open in the default browser, while Base links stay in
 the app.
 
 If initial navigation fails, `ContentView` displays native screens for Today,
 Tasks, Projects, Notes, Habits, Focus, Finance, and cached News. Edits are saved
-locally and queued by `native/BridgeCore/BridgeStore.swift`. Network.framework
+locally and queued by `native/BaseCore/BaseStore.swift`. Network.framework
 retries the website and synchronizes native changes after connectivity returns.
 
 Cloud-generated features still require internet. News displays the last cached
@@ -52,14 +52,14 @@ briefing while offline.
 ## Project layout
 
 ```text
-native/BridgeCore/
-  BridgeData.swift       JSON-preserving record model
-  BridgeStore.swift      local snapshot, queue, reachability, sync
-  BridgeViews.swift      shared iPhone/Mac SwiftUI screens
+native/BaseCore/
+  BaseData.swift       JSON-preserving record model
+  BaseStore.swift      local snapshot, queue, reachability, sync
+  BaseViews.swift      shared iPhone/Mac SwiftUI screens
 macos/
   project.yml            XcodeGen source of truth
-  Bridge/
-    BridgeApp.swift      app lifecycle, global shortcut, Sparkle
+  Base/
+    BaseApp.swift      app lifecycle, global shortcut, Sparkle
     ContentView.swift    website host and native fallback switch
     WebView.swift        persistent Base web view and navigation
     Info.plist           app and Sparkle configuration

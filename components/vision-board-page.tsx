@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useReducer, type ReactNode } from "react";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { getData } from "@/lib/store";
 import { uid, cn } from "@/lib/utils";
-import type { BoardItem, BoardDrawing, NoteColor, DrawTool, BridgeData } from "@/lib/store";
+import type { BoardItem, BoardDrawing, NoteColor, DrawTool, BaseData } from "@/lib/store";
 import {
   ImagePlus, StickyNote, Trash2, Pencil, Check, Sparkles, ChevronDown,
   Plus, X, Brush, MousePointer2, Pen, Minus, ArrowUpRight, Square, Circle, Eraser,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 // Slice of state the Vision Board undo/redo history snapshots.
-type BoardSnap = Pick<BridgeData, "boards" | "boardItems" | "boardDrawings">;
+type BoardSnap = Pick<BaseData, "boards" | "boardItems" | "boardDrawings">;
 
 // Canvas dimensions — a generous 2D space you can scroll around like a corkboard.
 const CANVAS_W = 2600;
@@ -110,7 +110,7 @@ type DragState = {
 };
 
 export function VisionBoardPage() {
-  const { data, mutate } = useBridge();
+  const { data, mutate } = useBase();
   const boards = data.boards ?? [];
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -121,20 +121,20 @@ export function VisionBoardPage() {
 
   // ── Active board ───────────────────────────────────────────────────────────
   const [activeBoardId, setActiveBoardId] = useState<string>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("bridge_vision_active") || "" : "");
+    typeof window !== "undefined" ? localStorage.getItem("base_vision_active") || "" : "");
   const activeId = boards.some((b) => b.id === activeBoardId) ? activeBoardId : (boards[0]?.id ?? "");
   const activeBoard = boards.find((b) => b.id === activeId);
 
   function selectBoard(id: string) {
     setActiveBoardId(id);
-    if (typeof window !== "undefined") localStorage.setItem("bridge_vision_active", id);
+    if (typeof window !== "undefined") localStorage.setItem("base_vision_active", id);
   }
 
   // Open a specific board when navigated here from the command bar.
   useEffect(() => {
     const h = (e: Event) => selectBoard((e as CustomEvent<string>).detail);
-    window.addEventListener("bridge:open-vision", h);
-    return () => window.removeEventListener("bridge:open-vision", h);
+    window.addEventListener("base:open-vision", h);
+    return () => window.removeEventListener("base:open-vision", h);
   }, []);
 
   // ── UI state ───────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ export function VisionBoardPage() {
   }, []);
 
   // History-recording mutation: snapshot the board slice, then apply.
-  const commit = useCallback((updater: (d: BridgeData) => BridgeData) => {
+  const commit = useCallback((updater: (d: BaseData) => BaseData) => {
     past.current.push(snapshot());
     if (past.current.length > 80) past.current.shift();
     future.current = [];
@@ -486,7 +486,7 @@ export function VisionBoardPage() {
   const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) ?? null;
 
   return (
-    <div className="relative w-full h-[calc(100dvh-3.5rem)] overflow-hidden bg-[var(--surface-2)]">
+    <div className="relative w-full flex-1 min-h-0 overflow-hidden bg-[var(--surface-2)]">
       {/* Canvas viewport */}
       <div
         ref={scrollRef}
@@ -610,11 +610,11 @@ export function VisionBoardPage() {
         <div className="fixed inset-0 z-40" onClick={() => { setBoardMenuOpen(false); setDrawMenuOpen(false); }} />
       )}
 
-      <div className="absolute top-3 left-3 z-50 flex items-center gap-2">
+      <div className="absolute top-3 left-3 right-3 sm:right-auto z-50 flex items-center gap-2">
         <div className="relative">
         <button
           onClick={() => { setBoardMenuOpen((v) => !v); setDrawMenuOpen(false); }}
-          className="flex items-center gap-2 pl-3 pr-2.5 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm hover:border-[var(--border-2)] transition-colors max-w-[240px]"
+          className="flex items-center gap-2 pl-3 pr-2.5 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm hover:border-[var(--border-2)] transition-colors max-w-[calc(100vw-7rem)] sm:max-w-[240px]"
         >
           <span className="text-sm font-medium text-[var(--text)] truncate">{activeBoard?.name ?? "Board"}</span>
           <ChevronDown className={cn("w-4 h-4 text-[var(--faint)] transition-transform", boardMenuOpen && "rotate-180")} />
@@ -703,18 +703,18 @@ export function VisionBoardPage() {
       </div>
 
       {/* ── Floating: tools (top-right) ─────────────────────────────────────── */}
-      <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
+      <div className="absolute top-16 xl:top-3 right-3 z-50 flex items-center gap-2">
         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onFiles(e.target.files)} />
 
         <button
-          onClick={() => fileRef.current?.click()}
+          aria-label="Add photo" onClick={() => fileRef.current?.click()}
           className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--border-2)] text-[var(--text)] text-xs font-medium rounded-xl shadow-sm transition-colors"
         >
           <ImagePlus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Add Photo</span>
         </button>
 
         <button
-          onClick={addNote}
+          aria-label="Add note" onClick={addNote}
           className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--border-2)] text-[var(--text)] text-xs font-medium rounded-xl shadow-sm transition-colors"
         >
           <StickyNote className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Add Note</span>
@@ -722,7 +722,7 @@ export function VisionBoardPage() {
 
         <input ref={musicRef} type="file" accept="audio/*,.mp3" className="hidden" onChange={(e) => addMusic(e.target.files)} />
         <button
-          onClick={() => musicRef.current?.click()}
+          aria-label="Add music" onClick={() => musicRef.current?.click()}
           className="flex items-center gap-1.5 px-3 py-2 bg-[var(--surface)] border border-[var(--border)] hover:border-[var(--border-2)] text-[var(--text)] text-xs font-medium rounded-xl shadow-sm transition-colors"
         >
           <Music className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Add Music</span>

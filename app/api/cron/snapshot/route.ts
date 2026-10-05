@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import type { BridgeData, Wallet } from "@/lib/store";
-import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
+import type { BaseData, Wallet } from "@/lib/store";
+import { safeWriteBaseData } from "@/lib/autonomy-persistence";
+import { DATA_KEY } from "@/lib/base-data";
 
 // This route is hit by a Vercel Cron Job once a day. It recomputes the
 // portfolio's total AUD value server-side (no browser needed) and appends a
@@ -10,8 +11,6 @@ import { safeWriteBridgeData } from "@/lib/autonomy-persistence";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-const KEY = "bridge:data";
 
 function getRedis(): Redis | null {
   const url   = process.env.UPSTASH_REDIS_REST_URL   || process.env.KV_REST_API_URL;
@@ -112,8 +111,8 @@ async function run(req: NextRequest) {
   if (!redis) return NextResponse.json({ ok: false, error: "redis not configured" });
 
   // Load current data blob (may be double-encoded)
-  let data = (await redis.get(KEY)) as BridgeData | string | null;
-  if (typeof data === "string") { try { data = JSON.parse(data) as BridgeData; } catch { data = null; } }
+  let data = (await redis.get(DATA_KEY)) as BaseData | string | null;
+  if (typeof data === "string") { try { data = JSON.parse(data) as BaseData; } catch { data = null; } }
   if (!data || typeof data !== "object") return NextResponse.json({ ok: false, error: "no data" });
 
   const wallets = data.wallets ?? [];
@@ -136,12 +135,12 @@ async function run(req: NextRequest) {
   else snapshots.push({ date: today, totalAud: grandTotal });
   snapshots.sort((a, b) => a.date.localeCompare(b.date));
 
-  const next: BridgeData = {
+  const next: BaseData = {
     ...data,
     portfolioSnapshots: snapshots.slice(-365),
     updatedAt: Date.now(),
   };
-  await safeWriteBridgeData(redis, next, true);
+  await safeWriteBaseData(redis, next, true);
 
   return NextResponse.json({ ok: true, date: today, totalAud: grandTotal, wallets: wallets.length, snapshots: next.portfolioSnapshots.length });
 }

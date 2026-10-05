@@ -1,4 +1,4 @@
-import type { BridgeData, Brief, BriefType } from "@/lib/store";
+import type { BaseData, Brief, BriefType } from "@/lib/store";
 
 export const BRIEF_TYPES = ["morning_coo", "weekly_business_review", "content_opportunity"] as const satisfies readonly BriefType[];
 
@@ -15,7 +15,7 @@ export type BriefInput = {
 };
 
 export type BriefUpsertResult =
-  | { ok: true; data: BridgeData; record: Brief; created: boolean }
+  | { ok: true; data: BaseData; record: Brief; created: boolean }
   | { ok: false; error: string };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -100,7 +100,7 @@ export function briefIdempotencyKey(brief: Pick<BriefInput, "type" | "generatedA
     : `${brief.type}:date:${brief.generatedAt.slice(0, 10)}`;
 }
 
-export function upsertBriefCollection(data: BridgeData, rawInput: Record<string, unknown>, stamp = new Date().toISOString()): BriefUpsertResult {
+export function upsertBriefCollection(data: BaseData, rawInput: Record<string, unknown>, stamp = new Date().toISOString()): BriefUpsertResult {
   const validated = validateBriefInput(rawInput);
   if (!validated.ok) return validated;
 

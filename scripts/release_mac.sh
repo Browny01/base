@@ -10,7 +10,7 @@
 #      repo `bridge-mac-releases` and marks that release as latest.
 #
 # Installed copies check that feed and prompt to update. Run this whenever shared
-# native SwiftUI code, BridgeApp.swift, or native configuration changes.
+# native SwiftUI code, BaseApp.swift, or native configuration changes.
 #
 # Usage:  ./scripts/release_mac.sh <version> [release notes]
 #   e.g.  ./scripts/release_mac.sh 0.2.0 "Adds a native menu-bar shortcut"

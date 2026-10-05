@@ -20,16 +20,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <ConfirmProvider>
         <KeyboardShortcuts />
         <FirstRunRedirect />
-        <div className="flex h-full bg-[var(--bg)]">
+        <div className="flex h-dvh overflow-hidden bg-[var(--bg)]">
           {/* Sidebar — desktop, when nav mode = sidebar */}
           <div className="nx-desktop-sidebar hidden md:flex shrink-0">
             <Sidebar />
           </div>
 
           {/* Main column */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
             <TopBar />
-            <main className="nx-main flex-1 overflow-y-auto">
+            <main className="nx-main flex-1 min-h-0 overflow-y-auto overscroll-contain">
               <ContentContainer>{children}</ContentContainer>
             </main>
           </div>

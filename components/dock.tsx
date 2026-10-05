@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme-context";
-import { useBridge } from "@/lib/hooks";
+import { useBase } from "@/lib/hooks";
 import { visiblePages, isHidden, DEFAULT_DOCK, PAGE_BY_KEY, type NavPage } from "@/lib/nav-config";
 
 const isActive = (pathname: string, href: string) =>
@@ -51,7 +51,7 @@ function DockIcon({ item, active, scale, hovered, onHover }: {
 export function Dock() {
   const pathname = usePathname();
   const { theme, toggle: toggleTheme } = useTheme();
-  const { data } = useBridge();
+  const { data } = useBase();
   const isDark = theme === "dark";
   const [hover, setHover] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
