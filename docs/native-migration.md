@@ -97,8 +97,10 @@ the old deployment; v2 receipts and desktop sessions are additive Redis keys.
 ## Phase status
 
 Phase 1: desktop/sync implementation and documented Linux functional checks are
-implemented. Actual macOS verification will be run by the user; real staging
-integrations and signed-update validation remain pending. Phase 1 is not yet
+implemented. The user reports eight passing checks on a MacBook Air M3 with
+16 GB RAM, running macOS Tahoe 26.5.2. The scope of those checks is being
+clarified; real staging integrations and signed-update validation remain pending.
+Phase 1 is not yet
 complete. Phase 2 and phase 3 have not started.
 Actual results, hardware verification and remaining limitations will be recorded
 here before any phase advances.

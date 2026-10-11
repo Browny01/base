@@ -1,8 +1,9 @@
 # Phase 1 desktop verification
 
 Phase 1 remains **incomplete** until actual macOS build/runtime results and the
-remaining integration checks below have been supplied. The user has volunteered
-to run the macOS checks. Phase 2 and phase 3 have not started.
+remaining integration checks below have been supplied. The user has reported
+passing Mac checks; their scope is being clarified below. Phase 2 and phase 3
+have not started.
 
 ## Build and run
 
@@ -136,6 +137,20 @@ curl -X POST http://127.0.0.1:3456/test/control -H 'Content-Type: application/js
 Retries are bounded (five exponential-backoff attempts). Reconnect, foreground
 activation, new edits and “Sync now” restart synchronization; no idle poller runs.
 Close the fixture after testing and sign out of its account in the app.
+
+## macOS results reported by the user
+
+- Hardware: MacBook Air M3, 16 GB RAM.
+- OS: macOS Tahoe 26.5.2, as reported by the user.
+- Result: “8 checks passed, no errors or failures.”
+- Verification scope: awaiting clarification of whether this means the eight
+  Rust unit tests or also the bundled app build/runtime, offline restart and
+  reconnection checks. The sync destination (local fixture or hosted staging)
+  has not yet been reported.
+- Intel runtime and Mac performance measurements have not been reported.
+
+This records the user's evidence without inferring unreported checks. Do not
+mark Phase 1 complete or start Phase 2 until the required gate is established.
 
 ## macOS checklist for the user
 
