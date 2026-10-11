@@ -185,3 +185,8 @@ HTTP fixture is never reported as a production integration or macOS runtime test
 The implementation is committed as `0057960` (`feat: add locally bundled Tauri
 desktop with durable offline sync`). Keep the baseline `81f65be` available for
 source rollback; no production deployment was performed.
+
+The Phase 2 implementation and its Linux evidence are documented in
+[Desktop design and performance](desktop-phase2.md). The redesigned Mac build,
+Mac profiling and deferred hosted reconnection check remain open; no Phase 3
+work has begun.

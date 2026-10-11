@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Dock } from "@/components/dock";
 import { BottomNav } from "@/components/bottom-nav";
@@ -14,6 +14,7 @@ import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { usePathname } from "./navigation";
 import { DesktopControls } from "./desktop-controls";
 import { useUnsaved, useWorkspaceScope } from "./store";
+import { PageSkeleton } from "@/components/ui/page-heading";
 
 class PageRecovery extends Component<{children:ReactNode},{error:Error|null}> {
   state:{error:Error|null}={error:null};
@@ -56,17 +57,26 @@ function Route() {
     default: return path.startsWith("/projects/") ? <Project id={decodeURIComponent(path.slice(10))} /> : <div className="p-6">Page not found. Use the sidebar to return to your workspace.</div>;
   }
 }
+function ReportReady() {
+  useEffect(()=>{
+    let second=0;
+    const first=requestAnimationFrame(()=>{second=requestAnimationFrame(()=>window.dispatchEvent(new Event("base:page-ready")));});
+    return ()=>{cancelAnimationFrame(first);cancelAnimationFrame(second);};
+  },[]);
+  return null;
+}
 export function App() {
   const unsaved=useUnsaved();
   const path=usePathname(),scope=useWorkspaceScope();
   return <ThemeProvider><AccentProvider><SidebarProvider><NavModeProvider><ToastProvider><ConfirmProvider>
     <KeyboardShortcuts />
+    <a className="base-skip-link" href="#base-main" onClick={event=>{event.preventDefault();document.getElementById("base-main")?.focus();}}>Skip to content</a>
     <div className="flex h-dvh overflow-hidden bg-[var(--bg)]">
       <div className="nx-desktop-sidebar hidden md:flex shrink-0"><Sidebar /></div>
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <TopBar /><DesktopControls />
-        <main inert={unsaved} className="nx-main flex-1 min-h-0 overflow-y-auto overscroll-contain"><ContentContainer>
-          <PageRecovery key={`${scope}:${path}`}><Suspense fallback={<div role="status" className="p-6 text-[var(--muted)]">Opening workspace…</div>}><Route /></Suspense></PageRecovery>
+        <main id="base-main" tabIndex={-1} inert={unsaved} className="nx-main flex-1 min-h-0 overflow-y-auto overscroll-contain"><ContentContainer>
+          <PageRecovery key={`${scope}:${path}`}><Suspense fallback={<PageSkeleton />}><Route /><ReportReady /></Suspense></PageRecovery>
         </ContentContainer></main>
       </div>
       <div className="nx-desktop-dock"><Dock /></div>

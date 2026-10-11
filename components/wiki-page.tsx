@@ -413,7 +413,7 @@ export function WikiPage() {
   const searchResults = searching ? pages.filter((p) => searchIds.has(p.id)) : [];
 
   return (
-    <div className="flex flex-1 min-h-0 bg-[var(--bg)] relative">
+    <div className="notes-page flex flex-1 min-h-0 bg-[var(--surface)] relative">
       {/* mobile drawer backdrop */}
       {sidebarOpen && <div className="md:hidden fixed inset-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] bg-black/40 backdrop-blur-[2px] nx-fade" onClick={() => setSidebarOpen(false)} />}
 
@@ -733,7 +733,7 @@ export function WikiPage() {
                 <p className="text-sm text-[var(--muted)] mb-4">No pages yet.</p>
                 <button
                   onClick={() => createPage(null)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors"
                 >
                   <Plus className="w-4 h-4" /> Create your first page
                 </button>
@@ -781,7 +781,7 @@ function LockScreen({ onUnlock }: { onUnlock: (pw: string) => Promise<boolean> }
         <button
           onClick={() => void submit()}
           disabled={busy}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-xl transition-colors"
+          className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-xl transition-colors"
         >
           <LockOpen className="w-3.5 h-3.5" /> {busy ? "Verifying…" : "Unlock"}
         </button>

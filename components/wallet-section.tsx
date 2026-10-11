@@ -329,7 +329,7 @@ export function WalletSection({ onTotalUpdate }: Props) {
             </button>
             <button
               onClick={addWallet}
-              className="px-4 py-1.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-medium rounded-lg transition-colors"
+              className="px-4 py-1.5 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-medium rounded-lg transition-colors"
             >
               Add Wallet
             </button>

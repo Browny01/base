@@ -1,5 +1,7 @@
 "use client";
 
+import { canvasItemVisible, type CanvasViewport } from "@/lib/vision-viewport";
+
 import { BaseImage } from "@/lib/image";
 
 import { apiFetch } from "@/lib/api-client";
@@ -12,7 +14,7 @@ import type { BoardItem, BoardDrawing, NoteColor, DrawTool, BaseData } from "@/l
 import {
   ImagePlus, StickyNote, Trash2, Pencil, Check, Sparkles, ChevronDown,
   Plus, X, Brush, MousePointer2, Pen, Minus, ArrowUpRight, Square, Circle, Eraser,
-  Undo2, Redo2, Music,
+  Undo2, Redo2, Music, Hand, ZoomIn, ZoomOut,
 } from "lucide-react";
 
 // Slice of state the Vision Board undo/redo history snapshots.
@@ -122,6 +124,26 @@ export function VisionBoardPage() {
   const svgRef = useRef<SVGSVGElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const musicRef = useRef<HTMLInputElement>(null);
+
+  const [zoom,setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  const [panning,setPanning] = useState(false);
+  const panRef = useRef<{x:number;y:number;left:number;top:number}|null>(null);
+  const [viewport,setViewport] = useState<CanvasViewport>({x:0,y:0,width:CANVAS_W,height:CANVAS_H});
+  useEffect(()=>{
+    const el=scrollRef.current;if(!el)return;
+    let frame=0;
+    const update=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>setViewport({x:el.scrollLeft/zoom,y:el.scrollTop/zoom,width:el.clientWidth/zoom,height:el.clientHeight/zoom}));};
+    const observer=new ResizeObserver(update);observer.observe(el);el.addEventListener("scroll",update,{passive:true});update();
+    return ()=>{cancelAnimationFrame(frame);observer.disconnect();el.removeEventListener("scroll",update);};
+  },[zoom]);
+  function changeZoom(next:number){
+    next=Math.min(1.75,Math.max(0.5,next));
+    const el=scrollRef.current;
+    const center=el?{x:(el.scrollLeft+el.clientWidth/2)/zoom,y:(el.scrollTop+el.clientHeight/2)/zoom}:null;
+    zoomRef.current=next;setZoom(next);
+    if(el&&center)requestAnimationFrame(()=>{el.scrollLeft=center.x*next-el.clientWidth/2;el.scrollTop=center.y*next-el.clientHeight/2;});
+  }
 
   // ── Active board ───────────────────────────────────────────────────────────
   const [activeBoardId, setActiveBoardId] = useState<string>(() =>
@@ -265,8 +287,8 @@ export function VisionBoardPage() {
     if (!el) return { x: 200, y: 160 };
     const jitter = () => Math.round((Math.random() - 0.5) * 80);
     return {
-      x: Math.min(CANVAS_W - 280, el.scrollLeft + el.clientWidth / 2 - 120 + jitter()),
-      y: Math.min(CANVAS_H - 220, el.scrollTop + el.clientHeight / 2 - 90 + jitter()),
+      x: Math.min(CANVAS_W - 280, (el.scrollLeft + el.clientWidth / 2) / zoomRef.current - 120 + jitter()),
+      y: Math.min(CANVAS_H - 220, (el.scrollTop + el.clientHeight / 2) / zoomRef.current - 90 + jitter()),
     };
   }, []);
 
@@ -352,8 +374,8 @@ export function VisionBoardPage() {
     function onMove(e: PointerEvent) {
       const d = dragRef.current;
       if (!d) return;
-      const dx = e.clientX - d.startX;
-      const dy = e.clientY - d.startY;
+      const dx = (e.clientX - d.startX) / zoomRef.current;
+      const dy = (e.clientY - d.startY) / zoomRef.current;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) d.moved = true;
       setDraft((prev) => {
         if (!prev || prev.id !== d.id) return prev;
@@ -392,7 +414,7 @@ export function VisionBoardPage() {
   // ── Drawing ────────────────────────────────────────────────────────────────
   function coords(e: React.PointerEvent) {
     const rect = canvasRef.current?.getBoundingClientRect();
-    return { x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0) };
+    return { x: (e.clientX - (rect?.left ?? 0)) / zoomRef.current, y: (e.clientY - (rect?.top ?? 0)) / zoomRef.current };
   }
   function startDraw(e: React.PointerEvent) {
     if (tool === "select" || tool === "eraser") return;
@@ -444,7 +466,7 @@ export function VisionBoardPage() {
     function onMove(e: PointerEvent) {
       const dd = drawDragRef.current;
       if (!dd) return;
-      const dx = e.clientX - dd.startX, dy = e.clientY - dd.startY;
+      const dx = (e.clientX - dd.startX) / zoomRef.current, dy = (e.clientY - dd.startY) / zoomRef.current;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dd.moved = true;
       const off = { id: dd.id, dx, dy };
       drawOffsetRef.current = off;
@@ -493,24 +515,30 @@ export function VisionBoardPage() {
   const selectedOffset = drawOffset?.id === selectedDrawingId ? drawOffset : { dx: 0, dy: 0 };
 
   return (
-    <div className="relative w-full flex-1 min-h-0 overflow-hidden bg-[var(--surface-2)]">
+    <div className="vision-page relative w-full flex-1 min-h-0 overflow-hidden bg-[var(--surface-2)]">
       {/* Canvas viewport */}
       <div
         ref={scrollRef}
         className="absolute inset-0 isolate overflow-auto"
+        tabIndex={0} aria-label="Vision board canvas"
+        onPointerDownCapture={event=>{if(!panning&&event.button!==1)return;event.preventDefault();event.stopPropagation();const el=scrollRef.current!;panRef.current={x:event.clientX,y:event.clientY,left:el.scrollLeft,top:el.scrollTop};el.setPointerCapture(event.pointerId);}}
+        onPointerMoveCapture={event=>{const pan=panRef.current,el=scrollRef.current;if(!pan||!el)return;event.stopPropagation();el.scrollLeft=pan.left-(event.clientX-pan.x);el.scrollTop=pan.top-(event.clientY-pan.y);}}
+        onPointerUpCapture={()=>{panRef.current=null;}}
+        onPointerCancel={()=>{panRef.current=null;}}
         style={{
+          cursor: panning ? "grab" : undefined,
           backgroundImage: "radial-gradient(circle, var(--border) 1px, transparent 1px)",
           backgroundSize: "22px 22px",
         }}
       >
-        <div
+        <div style={{width:CANVAS_W*zoom,height:CANVAS_H*zoom}}><div
           ref={canvasRef}
           className="relative"
-          style={{ width: CANVAS_W, height: CANVAS_H }}
+          style={{ width: CANVAS_W, height: CANVAS_H, transform:`scale(${zoom})`,transformOrigin:"top left" }}
           onPointerDown={() => { if (tool === "select") setSelectedDrawingId(null); }}
         >
           {items.length === 0 && drawings.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="absolute flex items-center justify-center pointer-events-none" style={{left:viewport.x+viewport.width/2,top:viewport.y+viewport.height/2,transform:"translate(-50%,-50%)"}}>
               <div className="text-center text-[var(--faint)]">
                 <Sparkles className="w-8 h-8 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">This board is empty.</p>
@@ -519,7 +547,7 @@ export function VisionBoardPage() {
             </div>
           )}
 
-          {items.map((raw) => {
+          {items.filter(item=>item.id===editingId||item.id===draft?.id||canvasItemVisible(item,viewport)).map((raw) => {
             const it = renderItem(raw);
             const isEditing = editingId === it.id;
             const dragging = draft?.id === it.id;
@@ -605,7 +633,7 @@ export function VisionBoardPage() {
               </button>
           )}
         </div>
-      </div>
+      </div></div>
 
       {/* ── Floating: board selector (top-left) ─────────────────────────────── */}
       {(boardMenuOpen || drawMenuOpen) && (
@@ -702,6 +730,13 @@ export function VisionBoardPage() {
             <Redo2 className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-sm">
+        <button className="base-icon-button" aria-label="Pan canvas" aria-pressed={panning} onClick={()=>setPanning(value=>!value)}><Hand className="h-4 w-4"/></button>
+        <button className="base-icon-button" aria-label="Zoom out" disabled={zoom<=0.5} onClick={()=>changeZoom(zoom-0.25)}><ZoomOut className="h-4 w-4"/></button>
+        <button className="px-2 text-xs tabular" aria-label="Reset zoom" onClick={()=>changeZoom(1)}>{Math.round(zoom*100)}%</button>
+        <button className="base-icon-button" aria-label="Zoom in" disabled={zoom>=1.75} onClick={()=>changeZoom(zoom+0.25)}><ZoomIn className="h-4 w-4"/></button>
       </div>
 
       {/* ── Floating: tools (top-right) ─────────────────────────────────────── */}
@@ -913,6 +948,8 @@ function PhotoCard({
           src={item.src}
           alt={item.caption || "photo"}
           draggable={false}
+          loading="lazy"
+          decoding="async"
           className="w-full rounded-[3px] object-cover block pointer-events-none"
           style={{ aspectRatio: `${item.width} / ${item.height}` }}
         />

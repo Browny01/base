@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useReducer, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { WikiPage, WikiFolder } from "@/lib/store";
+import { useAppActive } from "@/lib/activity";
 
 type Node = { x: number; y: number; vx: number; vy: number };
 type Edge = { s: string; t: string; kind: "child" | "link" };
@@ -37,6 +38,10 @@ export function WikiGraph({
 
   const alpha = useRef(1);
   const running = useRef(false);
+  const appActive = useAppActive();
+  const enabled = useRef(appActive);
+  const frame = useRef(0);
+  const pageIds = useMemo(() => new Set(pages.map(page => page.id)), [pages]);
   const drag = useRef<{ id: string; moved: boolean } | null>(null);
   const panDrag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
 
@@ -54,7 +59,7 @@ export function WikiGraph({
       out.push({ s, t, kind });
     };
     pages.forEach((p) => {
-      if (p.parentId && pages.some((q) => q.id === p.parentId)) add(p.parentId, p.id, "child");
+      if (p.parentId && pageIds.has(p.parentId)) add(p.parentId, p.id, "child");
       const text = p.blocks.map((b) => b.text).join(" ");
       for (const m of text.matchAll(/\[\[([^\]]+)\]\]/g)) {
         const target = byTitle.get(m[1].trim().toLowerCase());
@@ -62,7 +67,7 @@ export function WikiGraph({
       }
     });
     return out;
-  }, [pages]);
+  }, [pages, pageIds]);
 
   const degree = useMemo(() => {
     const d = new Map<string, number>();
@@ -103,7 +108,7 @@ export function WikiGraph({
         p.set(pg.id, { x: Math.cos(ang) * r, y: Math.sin(ang) * r, vx: 0, vy: 0 });
       }
     });
-    for (const id of [...p.keys()]) if (!pages.some((pg) => pg.id === id)) p.delete(id);
+    for (const id of [...p.keys()]) if (!pageIds.has(id)) p.delete(id);
 
     const a = alpha.current;
     if (a > 0.005) {
@@ -164,18 +169,25 @@ export function WikiGraph({
   useEffect(() => { stepRef.current = step; });
 
   const ensureRunning = useCallback(() => {
-    if (running.current) return;
+    if (running.current || !enabled.current) return;
     running.current = true;
     const loop = () => {
+      if (!enabled.current) { running.current = false; return; }
       const active = stepRef.current();
       render();
-      if (active || drag.current) requestAnimationFrame(loop);
+      if (active || drag.current) frame.current = requestAnimationFrame(loop);
       else running.current = false;
     };
-    requestAnimationFrame(loop);
+    frame.current = requestAnimationFrame(loop);
   }, []);
   const reheat = useCallback((v = 0.6) => { alpha.current = Math.max(alpha.current, v); ensureRunning(); }, [ensureRunning]);
 
+  useEffect(() => {
+    enabled.current = appActive;
+    if (appActive) ensureRunning();
+    else { cancelAnimationFrame(frame.current); running.current = false; drag.current = null; panDrag.current = null; }
+    return () => { enabled.current = false; cancelAnimationFrame(frame.current); running.current = false; };
+  }, [appActive, ensureRunning]);
   useEffect(() => { reheat(1); }, [pages.length, edges.length, folders.length, pageFolder, reheat]);
 
   // Pointer interaction (drag nodes, pan background).

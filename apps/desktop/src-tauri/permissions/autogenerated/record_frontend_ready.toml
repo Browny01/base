@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-record-frontend-ready"
+description = "Enables the record_frontend_ready command without any pre-configured scope."
+commands.allow = ["record_frontend_ready"]
+
+[[permission]]
+identifier = "deny-record-frontend-ready"
+description = "Denies the record_frontend_ready command without any pre-configured scope."
+commands.deny = ["record_frontend_ready"]

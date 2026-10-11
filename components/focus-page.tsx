@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useEffectEvent, useRef } from "react";
+import { useAppActive } from "@/lib/activity";
+import { PageHeading } from "./ui/page-heading";
+import { remainingFocusSeconds, elapsedFocusMinutes } from "@/lib/focus-clock";
 import { useBase } from "@/lib/hooks";
 import { uid, getToday, formatTime } from "@/lib/utils";
 import { TASK_TAGS, taskTagLabel, type TaskTag } from "@/lib/store";
@@ -17,60 +20,75 @@ const TAGS = TASK_TAGS;
 
 export function FocusPage() {
   const { data, mutate } = useBase();
+  const active=useAppActive();
   const [modeIdx, setModeIdx] = useState(0);
   const [seconds, setSeconds] = useState(MODES[0].mins * 60);
   const [running, setRunning] = useState(false);
   const [immersive, setImmersive] = useState(false);
   const [tag, setTag] = useState<TaskTag>("work");
   const [notes, setNotes] = useState("");
-  const [sessionStart, setSessionStart] = useState<number | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deadline = useRef<number | null>(null);
+  const completed = useRef(false);
+  const [sessionStarted,setSessionStarted] = useState(false);
 
   const totalSecs = MODES[modeIdx].mins * 60;
   const progress = ((totalSecs - seconds) / totalSecs) * 100;
 
+  const finish = useEffectEvent(() => {
+    if (completed.current) return;
+    completed.current=true;
+    setRunning(false);setSeconds(0);deadline.current=null;setSessionStarted(false);
+    logSession(MODES[modeIdx].mins);
+    window.dispatchEvent(new Event("base:focus-complete"));
+    void new Audio("/chime.mp3").play().catch(()=>{});
+  });
   useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setSeconds((s) => {
-          if (s <= 1) {
-            clearInterval(intervalRef.current!);
-            setRunning(false);
-            logSession(MODES[modeIdx].mins);
-            window.dispatchEvent(new Event("base:focus-complete"));
-            try { new Audio("/chime.mp3").play(); } catch {}
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
+    if (!running || deadline.current===null) return;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let completion: ReturnType<typeof setTimeout>;
+    const update = () => {
+      const left=remainingFocusSeconds(deadline.current ?? Date.now(),Date.now());
+      if(left===0) { finish(); return; }
+      if(active&&!document.hidden)setSeconds(left);
+    };
+    const scheduleCompletion = () => {
+      const left=remainingFocusSeconds(deadline.current ?? Date.now(),Date.now());
+      if(!left){finish();return;}
+      completion=setTimeout(scheduleCompletion,left*1000);
+    };
+    const visibility = () => {
+      if(interval)clearInterval(interval);
+      update();
+      if(active&&!document.hidden)interval=setInterval(update,1000);
+    };
+    visibility();scheduleCompletion();
+    document.addEventListener("visibilitychange",visibility);
+    return () => { if(interval)clearInterval(interval);clearTimeout(completion);document.removeEventListener("visibilitychange",visibility); };
+  }, [running,active]);
 
   function start() {
-    if (!running && seconds === totalSecs) setSessionStart(Date.now());
+    if(seconds===0)return;
+    deadline.current=Date.now()+seconds*1000;completed.current=false;setSessionStarted(true);
     setRunning(true);
   }
 
   function pause() {
+    if(deadline.current!==null)setSeconds(remainingFocusSeconds(deadline.current,Date.now()));
+    deadline.current=null;
     setRunning(false);
   }
 
   function reset() {
     setRunning(false);
     setSeconds(MODES[modeIdx].mins * 60);
-    setSessionStart(null);
+    deadline.current=null;setSessionStarted(false);
   }
 
   function selectMode(idx: number) {
     setRunning(false);
     setModeIdx(idx);
     setSeconds(MODES[idx].mins * 60);
-    setSessionStart(null);
+    deadline.current=null;setSessionStarted(false);
   }
 
   function logSession(durationMins: number) {
@@ -84,7 +102,8 @@ export function FocusPage() {
   }
 
   function logManual() {
-    const elapsed = sessionStart ? Math.round((Date.now() - sessionStart) / 60000) : MODES[modeIdx].mins;
+    const left=running&&deadline.current!==null?remainingFocusSeconds(deadline.current,Date.now()):seconds;
+    const elapsed = sessionStarted ? elapsedFocusMinutes(totalSecs,left) : MODES[modeIdx].mins;
     logSession(elapsed);
     reset();
     setNotes("");
@@ -97,23 +116,20 @@ export function FocusPage() {
   const todayMins = todaySessions.reduce((s, f) => s + f.durationMins, 0);
 
   return (
-    <div className={cn("min-h-screen transition-colors", immersive ? "bg-[var(--text)]" : "bg-[var(--surface)]")}>
+    <div className={cn("focus-page min-h-full transition-colors", immersive ? "bg-[var(--bg)]" : "bg-[var(--bg)]")}>
       <div className={cn("p-6 max-w-xl mx-auto", immersive && "flex flex-col items-center justify-center min-h-screen")}>
         {!immersive && (
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--text)]">Deep Work</h1>
-              <p className="text-sm text-[var(--muted)]">Today: {todayMins}m focused</p>
-            </div>
-            <button onClick={() => setImmersive(true)} className="text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+          <PageHeading title="Focus" description={`${todayMins} minutes of focused time today.`}>
+            <button aria-label="Enter distraction-free focus" onClick={() => setImmersive(true)} className="base-button base-button-secondary">
               <Maximize2 className="w-5 h-5" />
             </button>
-          </div>
+          </PageHeading>
         )}
 
         {immersive && (
           <button
             onClick={() => setImmersive(false)}
+            aria-label="Leave distraction-free focus"
             className="absolute top-4 right-4 text-[var(--faint)] hover:text-[var(--text)] transition-colors"
           >
             <Minimize2 className="w-5 h-5" />
@@ -154,7 +170,7 @@ export function FocusPage() {
                 strokeLinecap="round"
                 strokeDasharray={circumference}
                 strokeDashoffset={dash}
-                className="transition-all duration-1000"
+                className="transition-[stroke-dashoffset] duration-300"
               />
             </svg>
             <div className="text-center">
@@ -168,17 +184,19 @@ export function FocusPage() {
         <div className="flex items-center justify-center gap-4 mb-8">
           <button
             onClick={reset}
+            aria-label="Reset timer"
             className="p-3 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] transition-colors"
           >
             <RotateCcw className="w-5 h-5" />
           </button>
           <button
             onClick={running ? pause : start}
-            className="px-10 py-3 rounded-full bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] font-semibold flex items-center gap-2 transition-colors"
+            disabled={!running && seconds === 0}
+            className="px-10 py-3 rounded-full bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] font-semibold flex items-center gap-2 transition-colors"
           >
             {running ? <><Pause className="w-5 h-5" /> Pause</> : <><Play className="w-5 h-5" /> Start</>}
           </button>
-          {sessionStart && !running && (
+          {sessionStarted && !running && (
             <button
               onClick={logManual}
               className="p-3 rounded-full bg-[var(--chip)] border border-[var(--border-2)] text-[var(--text)] hover:bg-[var(--chip-2)] transition-colors text-xs px-4"

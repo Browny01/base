@@ -1,0 +1,18 @@
+{
+  "duration_seconds": 30.0,
+  "cpu_percent_one_core": 0.1,
+  "processes": [
+    461321,
+    461339,
+    461342
+  ],
+  "process_set_stable": true,
+  "memory_before": {
+    "rss_mib": 717.76,
+    "pss_mib": 446.53
+  },
+  "memory_after": {
+    "rss_mib": 713.77,
+    "pss_mib": 442.14
+  }
+}

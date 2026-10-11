@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Check, Eye, EyeOff, KeyRound, Layers, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -531,7 +533,7 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
 }
 
 export function SettingsPage() {
-  const { theme, setTheme } = useTheme();
+  const { preference, setTheme } = useTheme();
   const { accent, setAccent } = useAccent();
   const { collapsed, toggle } = useSidebar();
   const { mode, setMode } = useNavMode();
@@ -544,16 +546,8 @@ export function SettingsPage() {
   const setNavPrefs = (prefs: NavPrefs) => mutate((d) => ({ ...d, navPrefs: prefs }));
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-[var(--chip)] flex items-center justify-center">
-            <Settings className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
-          </div>
-          <h1 className="text-2xl font-bold text-[var(--text)]">Settings</h1>
-        </div>
-        <p className="text-sm text-[var(--muted)]">Preferences for the Base workspace.</p>
-      </div>
+    <div className="base-page settings-page">
+      <PageHeading title="Settings" description="Preferences for your Base workspace." />
 
       <div className="grid lg:grid-cols-2 gap-4">
         <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
@@ -564,12 +558,14 @@ export function SettingsPage() {
 
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Theme</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button aria-pressed={preference === "system"} onClick={()=>setTheme("system")} className={cn("flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",preference === "system"?"bg-[var(--text)] text-[var(--bg)] border-[var(--text)]":"bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]")}><MonitorCog className="w-4 h-4"/> System</button>
               <button
+                aria-pressed={preference === "light"}
                 onClick={() => setTheme("light")}
                 className={cn(
                   "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
-                  theme === "light"
+                  preference === "light"
                     ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
                     : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]"
                 )}
@@ -578,10 +574,11 @@ export function SettingsPage() {
                 Light
               </button>
               <button
+                aria-pressed={preference === "dark"}
                 onClick={() => setTheme("dark")}
                 className={cn(
                   "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
-                  theme === "dark"
+                  preference === "dark"
                     ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
                     : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]"
                 )}

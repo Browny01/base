@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+
 import { BaseImage } from "@/lib/image";
 
 import { useRef, useState } from "react";
@@ -342,7 +344,7 @@ function ItemForm({
         </button>
         <button
           onClick={submit}
-          className="px-5 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-semibold rounded-lg transition-colors"
+          className="px-5 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-semibold rounded-lg transition-colors"
         >
           {submitLabel}
         </button>
@@ -528,10 +530,10 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   const totalCost = unchecked.reduce((sum, i) => sum + i.price, 0);
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="base-page list-page">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">{cfg.title}</h1>
+      <PageHeading title={cfg.title} description={`${unchecked.length} remaining · ${checked.length} completed`}>
+
         <div className="flex items-center gap-3">
           {totalCost > 0 && (
             <span className="text-sm font-medium tabular text-[var(--muted)]">
@@ -540,13 +542,13 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
           )}
           <button
             onClick={() => { setShowForm((v) => !v); setEditingId(null); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-medium rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-medium rounded-lg transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             {cfg.addLabel}
           </button>
         </div>
-      </div>
+      </PageHeading>
 
       {/* Progress bar */}
       <div className="w-full bg-[var(--chip)] rounded-full h-1.5 mb-4">

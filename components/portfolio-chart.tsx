@@ -86,7 +86,7 @@ export function PortfolioChart({ snapshots, currentTotal }: Props) {
   const isPositive = chartData.length >= 2
     ? (chartData[chartData.length - 1]?.value ?? 0) >= (chartData[0]?.value ?? 0)
     : true;
-  const lineColor = isPositive ? "#0a0a0a" : "#0a0a0a";
+  const lineColor = isPositive ? "var(--c-emerald)" : "var(--c-rose)";
 
   const totalDisplay = currentValue !== null
     ? formatAUD(currentValue)
@@ -176,7 +176,7 @@ export function PortfolioChart({ snapshots, currentTotal }: Props) {
             : "Need at least 2 data points to draw a chart."}
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={200} debounce={100}>
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
@@ -184,17 +184,17 @@ export function PortfolioChart({ snapshots, currentTotal }: Props) {
                 <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
             <XAxis
               dataKey="date"
-              tick={{ fill: "#737373", fontSize: 10 }}
+              tick={{ fill: "var(--faint)", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
               domain={["auto", "auto"]}
-              tick={{ fill: "#737373", fontSize: 10 }}
+              tick={{ fill: "var(--faint)", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               width={72}
@@ -204,10 +204,10 @@ export function PortfolioChart({ snapshots, currentTotal }: Props) {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#0a0a0a",
-                border: "1px solid #262626",
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border-2)",
                 borderRadius: "8px",
-                color: "#0a0a0a",
+                color: "var(--text)",
                 fontSize: "12px",
               }}
               formatter={(v: unknown) => [formatAUD(Number(v)), "Portfolio"]}
@@ -219,6 +219,7 @@ export function PortfolioChart({ snapshots, currentTotal }: Props) {
               strokeWidth={2}
               fill="url(#portfolioGrad)"
               dot={false}
+              isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>

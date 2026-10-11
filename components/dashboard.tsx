@@ -4,33 +4,35 @@ import { BaseImage } from "@/lib/image";
 
 import { apiFetch } from "@/lib/api-client";
 
-import { useId, useRef, useState, useEffect } from "react";
+import { useId, useRef, useState, useEffect, useMemo } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday } from "@/lib/utils";
 import { firstName } from "@/lib/profile";
 import { TASK_TAGS, type Priority, type Task, type TaskTag, type BaseData, type Bookmark } from "@/lib/store";
 import { PRIORITY_META, priorityLabel } from "@/lib/task-sort";
 import { useConfirm } from "@/lib/confirm-context";
-import { Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, X, Timer, NotebookText, CreditCard, Pencil, Trash2, Globe, ImagePlus } from "lucide-react";
+import { SlidersHorizontal, ChevronLeft, ChevronRight, CalendarDays, Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, X, Timer, NotebookText, CreditCard, Pencil, Trash2, Globe, ImagePlus } from "lucide-react";
 import Link from "@/lib/link";
 import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
 import { ProjectLogo } from "@/components/project-logo";
-import { Responsive, noCompactor, useContainerWidth, type Layout, type ResponsiveLayouts } from "react-grid-layout";
-import "react-grid-layout/css/styles.css";
-import "react-resizable/css/styles.css";
+import { useQuickActions } from "@/lib/quick-actions";
+import { PageHeading } from "./ui/page-heading";
+import { useStoredPref, writeStored } from "@/lib/prefs";
+import { readDashboardWidgets, moveDashboardWidget, reorderDashboardWidget, DEFAULT_DASHBOARD_WIDGETS, type DashboardWidget } from "@/lib/dashboard-widgets";
+
 
 const PRIORITIES = PRIORITY_META;
 const TAGS = TASK_TAGS;
 const PRIO_RANK: Record<Priority, number> = { P1: 0, P2: 1, P3: 2 };
 
-type DashboardBreakpoint = "lg" | "md" | "sm" | "xs" | "xxs";
-type WidgetId = "tasks-metric" | "revenue-metric" | "news" | "tasks" | "projects" | "bookmarks" | "focus" | "notes" | "payments";
+type WidgetId = DashboardWidget;
 
 const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "tasks-metric", label: "Tasks left" },
   { id: "revenue-metric", label: "Revenue" },
   { id: "tasks", label: "Priority tasks" },
+  { id: "calendar", label: "Calendar preview" },
   { id: "news", label: "News briefing" },
   { id: "projects", label: "Projects" },
   { id: "bookmarks", label: "Bookmarks" },
@@ -38,66 +40,6 @@ const WIDGETS: { id: WidgetId; label: string }[] = [
   { id: "notes", label: "Recent notes" },
   { id: "payments", label: "Upcoming payments" },
 ];
-
-const DEFAULT_WIDGET_IDS: WidgetId[] = ["tasks-metric", "revenue-metric", "tasks", "news", "projects", "bookmarks"];
-
-const BREAKPOINTS: Record<DashboardBreakpoint, number> = { lg: 1180, md: 900, sm: 680, xs: 420, xxs: 0 };
-const GRID_COLUMNS: Record<DashboardBreakpoint, number> = { lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 };
-
-const DEFAULT_LAYOUTS: ResponsiveLayouts<DashboardBreakpoint> = {
-  lg: [
-    { i: "tasks-metric", x: 0, y: 0, w: 6, h: 5, minW: 3, minH: 4 },
-    { i: "revenue-metric", x: 6, y: 0, w: 6, h: 5, minW: 3, minH: 5 },
-    { i: "tasks", x: 0, y: 5, w: 6, h: 12, minW: 3, minH: 6 },
-    { i: "news", x: 6, y: 5, w: 6, h: 12, minW: 4, minH: 6 },
-    { i: "projects", x: 0, y: 17, w: 12, h: 9, minW: 4, minH: 6 },
-    { i: "bookmarks", x: 0, y: 26, w: 12, h: 9, minW: 4, minH: 6 },
-    { i: "focus", x: 0, y: 35, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "notes", x: 4, y: 35, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "payments", x: 8, y: 35, w: 4, h: 8, minW: 3, minH: 6 },
-  ],
-  md: [
-    { i: "tasks-metric", x: 0, y: 0, w: 4, h: 5, minW: 2, minH: 4 },
-    { i: "revenue-metric", x: 4, y: 0, w: 4, h: 5, minW: 3, minH: 5 },
-    { i: "tasks", x: 0, y: 5, w: 4, h: 12, minW: 3, minH: 6 },
-    { i: "news", x: 4, y: 5, w: 4, h: 12, minW: 3, minH: 6 },
-    { i: "projects", x: 0, y: 17, w: 8, h: 9, minW: 4, minH: 6 },
-    { i: "bookmarks", x: 0, y: 26, w: 8, h: 9, minW: 4, minH: 6 },
-    { i: "focus", x: 0, y: 35, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "notes", x: 4, y: 35, w: 4, h: 8, minW: 3, minH: 6 },
-    { i: "payments", x: 0, y: 43, w: 4, h: 8, minW: 3, minH: 6 },
-  ],
-  sm: [], xs: [], xxs: [],
-};
-
-function stackedLayout(cols: number): Layout {
-  const metricWidth = cols >= 4 ? Math.floor(cols / 2) : cols;
-  const metricsPerRow = Math.max(1, Math.floor(cols / metricWidth));
-  const metricHeight = 5;
-  const metricCount = WIDGETS.filter(({ id }) => id.endsWith("metric")).length;
-  const contentStart = Math.ceil(metricCount / metricsPerRow) * metricHeight;
-  let contentY = contentStart;
-  return WIDGETS.map(({ id }, index) => {
-    const isMetric = id.endsWith("metric");
-    const metricIndex = WIDGETS.slice(0, index).filter((widget) => widget.id.endsWith("metric")).length;
-    const height = isMetric ? 5 : id === "news" ? 10 : id === "tasks" || id === "projects" || id === "bookmarks" ? 11 : 8;
-    const y = isMetric ? Math.floor(metricIndex / metricsPerRow) * metricHeight : contentY;
-    if (!isMetric) contentY += height;
-    return {
-      i: id,
-      x: isMetric ? (metricIndex % metricsPerRow) * metricWidth : 0,
-      y,
-      w: isMetric ? metricWidth : cols,
-      h: height,
-      minW: isMetric ? Math.min(2, cols) : Math.min(3, cols),
-      minH: isMetric ? 4 : 6,
-    };
-  });
-}
-
-DEFAULT_LAYOUTS.sm = stackedLayout(GRID_COLUMNS.sm);
-DEFAULT_LAYOUTS.xs = stackedLayout(GRID_COLUMNS.xs);
-DEFAULT_LAYOUTS.xxs = stackedLayout(GRID_COLUMNS.xxs);
 
 const COLOR_DOT: Record<string, string> = {
   indigo: "bg-[var(--c-indigo)]", cyan: "bg-[var(--c-cyan)]", emerald: "bg-[var(--c-emerald)]",
@@ -110,9 +52,9 @@ function taskCompletionDay(task: Task): string {
 }
 
 // ── local YYYY-MM-DD for the last `n` days, oldest → newest ──────────────────
-function lastNDays(n: number): string[] {
+function lastNDays(n: number, today?:string): string[] {
   const out: string[] = [];
-  const d = new Date();
+  const d = today?new Date(`${today}T12:00:00`):new Date();
   for (let i = n - 1; i >= 0; i--) {
     const x = new Date(d);
     x.setDate(d.getDate() - i);
@@ -169,6 +111,7 @@ async function fileToIcon(file: File): Promise<string> {
 
 export function Dashboard() {
   const { data, mutate } = useBase();
+  const quick=useQuickActions();
   const now = new Date();
   const today = getToday(data.profile?.timezone);
 
@@ -177,16 +120,17 @@ export function Dashboard() {
   const [quickTag, setQuickTag] = useState<TaskTag>("work");
   const [showQuickForm, setShowQuickForm] = useState(false);
   const [revenuePeriod, setRevenuePeriod] = useState<"day" | "week" | "month">("day");
-  // The dashboard is intentionally fixed: no saved layout to read, no width to
-  // measure, so it paints on first render instead of waiting on a layout pass.
-  const { width: gridWidth, containerRef: gridContainerRef, mounted: gridMounted } = useContainerWidth({ measureBeforeMount: true });
+  const [customizing, setCustomizing] = useState(false);
+  const [dragWidget,setDragWidget]=useState<WidgetId|null>(null);
+  const [overWidget,setOverWidget]=useState<WidgetId|null>(null);
+  const storedWidgets = useStoredPref("base_dashboard_widgets_v1", JSON.stringify(DEFAULT_DASHBOARD_WIDGETS));
+  const widgetIds = useMemo(()=>readDashboardWidgets(storedWidgets),[storedWidgets]);
+  const saveWidgets = (widgets: WidgetId[]) => writeStored("base_dashboard_widgets_v1",JSON.stringify(widgets));
 
   // ── Stats ──────────────────────────────────────────────────────────────────
-  const todayTasks = data.tasks.filter((t) => !t.done && (t.dueDate === today || !t.dueDate));
+  const todayTasks = useMemo(()=>data.tasks.filter((t) => !t.done && (t.dueDate === today || !t.dueDate)),[data.tasks,today]);
   const doneTodayCount = data.tasks.filter((t) => t.done && taskCompletionDay(t) === today).length;
-  const priorityTasks = [...data.tasks]
-    .filter((t) => !t.done)
-    .sort((a, b) => PRIO_RANK[a.priority] - PRIO_RANK[b.priority] || a.createdAt.localeCompare(b.createdAt));
+  const priorityTasks = useMemo(()=>data.tasks.filter((t) => !t.done).sort((a, b) => PRIO_RANK[a.priority] - PRIO_RANK[b.priority] || a.createdAt.localeCompare(b.createdAt)),[data.tasks]);
 
   const todayIncome = data.incomeEntries
     .filter((e) => e.date === today && e.type === "income")
@@ -197,7 +141,7 @@ export function Dashboard() {
 
   // Revenue over the selected window (day / rolling 7 days / calendar month).
   const monthPrefix = today.slice(0, 7);
-  const weekStart = lastNDays(7)[0];
+  const weekStart = lastNDays(7,today)[0];
   const sumIncome = (pred: (date: string) => boolean) =>
     data.incomeEntries.filter((e) => e.type === "income" && pred(e.date)).reduce((s, e) => s + e.amount, 0);
   const revenueByPeriod: Record<"day" | "week" | "month", number> = {
@@ -207,11 +151,15 @@ export function Dashboard() {
   };
 
   // ── Real-data mini-series for the metric sparklines (no fabricated data) ─────
-  const days14 = lastNDays(14);
-  const tasksDoneSeries = days14.map((d) => data.tasks.filter((t) => t.done && taskCompletionDay(t) === d).length);
-  const revenueSeries = days14.map((d) =>
-    data.incomeEntries.filter((e) => e.date === d && e.type === "income").reduce((s, e) => s + e.amount, 0),
-  );
+  const days14 = useMemo(()=>lastNDays(14,today),[today]);
+  const tasksDoneSeries = useMemo(()=>{
+    const counts=new Map<string,number>();for(const task of data.tasks)if(task.done){const day=taskCompletionDay(task);counts.set(day,(counts.get(day)??0)+1);}
+    return days14.map(day=>counts.get(day)??0);
+  },[data.tasks,days14]);
+  const revenueSeries = useMemo(()=>{
+    const totals=new Map<string,number>();for(const entry of data.incomeEntries)if(entry.type==="income")totals.set(entry.date,(totals.get(entry.date)??0)+entry.amount);
+    return days14.map(day=>totals.get(day)??0);
+  },[data.incomeEntries,days14]);
 
   function addQuickTask() {
     if (!quickTitle.trim()) return;
@@ -248,6 +196,11 @@ export function Dashboard() {
 
   function renderWidget(id: WidgetId) {
     switch (id) {
+      case "calendar":
+        return <WidgetPanel title="On the calendar" icon={<CalendarDays className="h-[15px] w-[15px]"/>} href="/calendar">
+          {(data.calendarEvents ?? []).filter(event=>event.startDate>=today).sort((a,b)=>a.startDate.localeCompare(b.startDate)).slice(0,5).map(event=><Link key={event.id} href="/calendar" className="flex items-start gap-3 border-b border-[var(--border)] py-3 last:border-0"><span className="base-calendar-date"><span>{new Date(`${event.startDate}T12:00:00`).toLocaleDateString(undefined,{month:"short"})}</span><strong>{event.startDate.slice(-2)}</strong></span><span className="min-w-0"><span className="block truncate text-[13px] font-medium">{event.title}</span><span className="block mt-1 text-xs text-[var(--muted)]">{event.allDay?"All day":event.startTime||"Scheduled"}</span></span></Link>)}
+          {!(data.calendarEvents ?? []).some(event=>event.startDate>=today)&&<WidgetEmpty>Your calendar has a little breathing room.</WidgetEmpty>}
+        </WidgetPanel>;
       case "tasks-metric":
         return <MetricCard icon={<CheckSquare style={{ width: 16, height: 16 }} strokeWidth={1.9} />} iconColor="var(--muted)" label="Tasks Left" value={todayTasks.length.toString()} sub={`${doneTodayCount} done today`} series={tasksDoneSeries} seriesColor="var(--muted)" href="/tasks" />;
       case "revenue-metric":
@@ -368,38 +321,22 @@ export function Dashboard() {
   }
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6">
-      {/* ── Greeting ── */}
-      <header className="relative mb-6">
-        <p className="text-[13px] text-[var(--muted)] font-medium mb-1.5">{formatDate(now)}</p>
-        <h1 className="text-[2rem] sm:text-[2.6rem] font-bold text-[var(--text)] leading-[1.05] tracking-tight">
-          {`Good ${greetText}${greetName ? `, ${greetName}` : ""}.`}
-        </h1>
-      </header>
-
-      <div ref={gridContainerRef} className="dashboard-grid -mx-3">
-        {gridMounted && (
-          <Responsive<DashboardBreakpoint>
-            width={gridWidth}
-            layouts={DEFAULT_LAYOUTS}
-            breakpoints={BREAKPOINTS}
-            cols={GRID_COLUMNS}
-            rowHeight={24}
-            margin={[12, 12]}
-            containerPadding={[12, 0]}
-            compactor={noCompactor}
-            dragConfig={{ enabled: false }}
-            resizeConfig={{ enabled: false }}
-          >
-            {DEFAULT_WIDGET_IDS.map((id) => (
-              <div key={id} className="dashboard-widget">
-                <div className="dashboard-widget-content">{renderWidget(id)}</div>
-              </div>
-            ))}
-          </Responsive>
-        )}
-      </div>
-
+    <div className="base-page dashboard-page">
+      <PageHeading title={`Good ${greetText}${greetName ? `, ${greetName}` : ""}.`} description={`${formatDate(now)} · A little clarity for your day.`}>
+        <button className="base-button base-button-secondary" onClick={()=>setCustomizing(!customizing)} aria-expanded={customizing}><SlidersHorizontal className="h-3.5 w-3.5"/> Customize</button>
+        <button onClick={quick.newTask} className="base-button base-button-primary"><Plus className="h-3.5 w-3.5"/> New task</button>
+      </PageHeading>
+      {customizing && <section className="base-dashboard-settings" aria-label="Dashboard widgets">
+        <div className="flex items-center justify-between mb-3"><h2 className="text-sm font-semibold">Make this space yours</h2><button className="text-xs underline" onClick={()=>saveWidgets([...DEFAULT_DASHBOARD_WIDGETS])}>Reset layout</button></div>
+        <p className="mb-4 text-xs text-[var(--muted)]">Choose your widgets and their order. Drag the panels or use the arrow buttons. This layout is saved on this device.</p>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{WIDGETS.map(widget=><div key={widget.id} className="flex items-center gap-2 rounded-md border border-[var(--border)] p-2">
+          <label className="flex flex-1 items-center gap-2 text-xs"><input type="checkbox" checked={widgetIds.includes(widget.id)} onChange={event=>saveWidgets(event.target.checked?[...widgetIds,widget.id]:widgetIds.filter(id=>id!==widget.id))}/>{widget.label}</label>
+          <button aria-label={`Move ${widget.label} earlier`} disabled={widgetIds.indexOf(widget.id)<=0} onClick={()=>saveWidgets(moveDashboardWidget(widgetIds,widget.id,-1))} className="base-widget-nudge"><ChevronLeft className="h-3.5 w-3.5"/></button>
+          <button aria-label={`Move ${widget.label} later`} disabled={!widgetIds.includes(widget.id)||widgetIds.indexOf(widget.id)===widgetIds.length-1} onClick={()=>saveWidgets(moveDashboardWidget(widgetIds,widget.id,1))} className="base-widget-nudge"><ChevronRight className="h-3.5 w-3.5"/></button>
+        </div>)}</div>
+      </section>}
+      <div className="base-dashboard-grid">{widgetIds.map(id=><section key={id} draggable={customizing} onDragStart={event=>{setDragWidget(id);event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",id);}} onDragOver={event=>{if(!dragWidget)return;event.preventDefault();setOverWidget(id);}} onDrop={event=>{event.preventDefault();if(dragWidget)saveWidgets(reorderDashboardWidget(widgetIds,dragWidget,id));setDragWidget(null);setOverWidget(null);}} onDragEnd={()=>{setDragWidget(null);setOverWidget(null);}} className={`base-dashboard-widget ${id.endsWith("metric")?"base-dashboard-metric":""} ${customizing?"base-widget-arranging":""} ${overWidget===id?"base-widget-drop":""}`} aria-label={WIDGETS.find(widget=>widget.id===id)?.label}>{renderWidget(id)}</section>)}</div>
+      {!widgetIds.length && <div className="base-empty"><h2>Your dashboard, your call</h2><p>Use Customize to add the widgets you want to see.</p></div>}
     </div>
   );
 }

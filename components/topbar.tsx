@@ -1,29 +1,46 @@
 "use client";
 
 import Link from "@/lib/link";
-import { Keyboard } from "lucide-react";
+import { Keyboard, Plus, ChevronDown } from "lucide-react";
+import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { CommandBar } from "@/components/command-bar";
 import { openShortcutSheet } from "@/lib/shortcuts";
 import { useBase } from "@/lib/hooks";
 import { initialOf } from "@/lib/profile";
 import { BrowserSyncStatus } from "./browser-sync-status";
+import { usePathname } from "@/lib/navigation";
+import { PAGE_BY_HREF, SETTINGS_PAGE } from "@/lib/nav-config";
+import { useQuickActions } from "@/lib/quick-actions";
 
 export function TopBar() {
   const { data } = useBase();
+  const path = usePathname();
+  const quick = useQuickActions();
+  const current = path.startsWith("/projects/") ? data.projects.find(project=>project.id===path.slice(10))?.name || "Project" : path === "/settings" ? SETTINGS_PAGE.label : PAGE_BY_HREF.get(path)?.label || "Workspace";
 
   return (
     <header
-      className="sticky top-0 z-30 shrink-0 bg-[var(--bg)]/80 backdrop-blur-xl border-b border-[var(--border)]"
+      className="base-topbar sticky top-0 z-30 shrink-0 bg-[var(--surface)] border-b border-[var(--border)]"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="h-14 flex items-center gap-3 px-3 sm:px-4">
+      <div className="h-12 flex items-center gap-3 px-3 sm:px-5">
+        <nav aria-label="Breadcrumb" className="hidden md:flex min-w-0 items-center gap-2 text-xs">
+          <Link href="/" className="text-[var(--muted)]">Base</Link><span aria-hidden="true" className="text-[var(--faint)]">/</span><span className="truncate max-w-44 font-medium" aria-current="page">{current}</span>
+        </nav>
         {/* Centered command / search trigger */}
-        <div className="flex-1 min-w-0 flex justify-center">
+        <div className="flex-1 min-w-0 flex justify-end">
           <CommandBar />
         </div>
 
         {/* Right: shortcuts + account */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <Dropdown.Root><Dropdown.Trigger className="base-button base-button-secondary hidden sm:flex" aria-label="Create new item"><Plus className="h-3.5 w-3.5"/> New <ChevronDown className="h-3 w-3"/></Dropdown.Trigger>
+            <Dropdown.Portal><Dropdown.Content align="end" sideOffset={6} className="base-menu" aria-label="Create new item">
+              <Dropdown.Item className="base-menu-item" onSelect={quick.newTask}>New task <kbd>⇧ N</kbd></Dropdown.Item>
+              <Dropdown.Item className="base-menu-item" onSelect={quick.newEvent}>New event <kbd>⇧ E</kbd></Dropdown.Item>
+              <Dropdown.Item className="base-menu-item" onSelect={quick.newProject}>New project <kbd>⇧ O</kbd></Dropdown.Item>
+            </Dropdown.Content></Dropdown.Portal>
+          </Dropdown.Root>
           <BrowserSyncStatus />
           <button
             onClick={openShortcutSheet}

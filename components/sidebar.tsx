@@ -9,7 +9,8 @@ import { useSidebar } from "@/lib/sidebar-context";
 import { useTheme } from "@/lib/theme-context";
 import { useBase } from "@/lib/hooks";
 import { visiblePages, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
-import { ChevronsLeft, Sun, Moon } from "lucide-react";
+import { ChevronsLeft, Sun, Moon, ChevronsRight } from "lucide-react";
+import { firstName, initialOf } from "@/lib/profile";
 
 const isActive = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
@@ -22,11 +23,13 @@ function NavLink({ item, pathname, collapsed }: { item: NavPage; pathname: strin
     <Link
       href={item.href}
       title={collapsed ? item.label : undefined}
+      aria-label={collapsed ? item.label : undefined}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex items-center rounded-[7px] text-[13.5px] transition-colors min-h-[34px]",
+        "base-nav-link relative flex items-center rounded-md text-[13px] transition-colors min-h-[32px]",
         collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
         active
-          ? "bg-[var(--surface-2)] text-[var(--text)] font-medium"
+          ? "base-nav-active text-[var(--text)] font-medium"
           : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] font-normal"
       )}
     >
@@ -54,26 +57,29 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col h-full sticky top-0 shrink-0 transition-all duration-200 ease-out",
-        "border-r border-[var(--border)] bg-[var(--bg)]",
+        "base-sidebar flex flex-col h-full sticky top-0 shrink-0 transition-[width] duration-200 ease-out",
+        "border-r border-[var(--border)] bg-[var(--bg-side)]",
         collapsed ? "w-[64px]" : "w-[252px]"
       )}
     >
       {/* On macOS the left of this header is occupied by the native traffic lights. */}
       <div className={cn(
-        "flex items-center h-14 shrink-0 gap-1",
+        "flex items-center h-12 shrink-0 gap-2",
         collapsed ? "justify-center" : "px-3"
       )}>
-        <BaseImage
+        <Link href="/" aria-label="Base home" className="base-brand-mark"><BaseImage
           src="/base-icon-transparent.png"
           alt="Base"
-          className="w-9 h-9 object-contain shrink-0"
-        />
+          className="w-5 h-5 object-contain shrink-0"
+        /></Link>
+        {!collapsed && <span className="text-[14px] font-semibold tracking-tight">Base <span className="font-normal text-[var(--faint)]">/ Personal</span></span>}
         {!collapsed && (
           <button
             onClick={toggle}
             className="ml-auto p-1.5 rounded-md text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
             title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+            aria-expanded={!collapsed}
           >
             <ChevronsLeft className="w-4 h-4" />
           </button>
@@ -81,7 +87,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2.5 py-2 flex flex-col gap-3 overflow-y-auto">
+      <nav aria-label="Main navigation" className="flex-1 px-2 py-2 flex flex-col gap-4 overflow-y-auto">
         {sections.map((section) => (
           <div key={section} className="flex flex-col gap-0.5">
             {!collapsed ? (
@@ -105,8 +111,10 @@ export function Sidebar() {
             onClick={toggle}
             className="mx-auto flex items-center justify-center w-9 h-9 rounded-[7px] text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
             title="Expand sidebar"
+            aria-label="Expand sidebar"
+            aria-expanded={!collapsed}
           >
-            <ChevronsLeft className="w-4 h-4 rotate-180" />
+            <ChevronsRight className="w-4 h-4" />
           </button>
         )}
 
@@ -118,6 +126,7 @@ export function Sidebar() {
           <button
             onClick={toggleTheme}
             title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             className="shrink-0 flex items-center justify-center rounded-[7px] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors w-9 h-9"
           >
             {isDark
@@ -125,6 +134,10 @@ export function Sidebar() {
               : <Moon className="shrink-0" style={{ width: 17, height: 17 }} strokeWidth={1.8} />}
           </button>
         </div>
+        {!collapsed && <Link href="/settings" className="flex items-center gap-2.5 rounded-md px-2 py-2 hover:bg-[var(--surface-2)]">
+          <span className="base-avatar">{initialOf(data.profile)}</span>
+          <span className="min-w-0"><span className="block truncate text-[12.5px] font-medium">{firstName(data.profile) || "Your workspace"}</span><span className="block text-[11px] text-[var(--faint)]">Personal command center</span></span>
+        </Link>}
       </div>
     </aside>
   );

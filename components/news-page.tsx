@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+
 import { BaseImage } from "@/lib/image";
 
 import { apiFetch } from "@/lib/api-client";
@@ -125,7 +127,7 @@ function MarketChart({ asset }: { asset: AssetData | null }) {
         </div>
       </div>
       {data.length > 1 ? (
-        <ResponsiveContainer width="100%" height={170}>
+        <ResponsiveContainer width="100%" height={170} debounce={100}>
           <AreaChart data={data}>
             <defs>
               <linearGradient id="market-detail" x1="0" y1="0" x2="0" y2="1">
@@ -133,13 +135,13 @@ function MarketChart({ asset }: { asset: AssetData | null }) {
                 <stop offset="95%" stopColor="var(--text)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="date" tick={{ fill: "#737373", fontSize: 10 }} tickLine={false} axisLine={false} interval={6} />
-            <YAxis domain={["auto", "auto"]} tick={{ fill: "#737373", fontSize: 10 }} tickLine={false} axisLine={false} width={52} />
+            <XAxis dataKey="date" tick={{ fill: "var(--faint)", fontSize: 10 }} tickLine={false} axisLine={false} interval={6} />
+            <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--faint)", fontSize: 10 }} tickLine={false} axisLine={false} width={52} />
             <Tooltip
-              contentStyle={{ backgroundColor: "#0a0a0a", border: "1px solid #262626", borderRadius: "8px", color: "#fff", fontSize: "12px" }}
+              contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "8px", color: "var(--text)", fontSize: "12px" }}
               formatter={(v: unknown) => [formatPrice(Number(v)), asset.symbol]}
             />
-            <Area type="monotone" dataKey="price" stroke="var(--text)" strokeWidth={2} fill="url(#market-detail)" dot={false} />
+            <Area type="monotone" dataKey="price" stroke="var(--text)" strokeWidth={2} fill="url(#market-detail)" dot={false} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       ) : (
@@ -560,12 +562,8 @@ export function NewsPage() {
   }, []);
 
   return (
-    <div className="min-h-full p-4 sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--faint)]">Feeds / Markets / Creators</p>
-          <h1 className="mt-1 text-2xl font-bold text-[var(--text)]">News</h1>
-        </div>
+    <div className="base-page news-page min-h-full">
+      <PageHeading title="News" description="Your daily briefing, markets and creators.">
         <div className="flex items-center gap-3">
           {lastRefreshed && <span className="text-xs text-[var(--muted)]">Updated {lastRefreshed.toLocaleTimeString()}</span>}
           <button onClick={loadAll} disabled={chartsLoading || newsLoading} className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-40">
@@ -573,7 +571,7 @@ export function NewsPage() {
             Refresh
           </button>
         </div>
-      </div>
+      </PageHeading>
 
       <div className="mb-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>

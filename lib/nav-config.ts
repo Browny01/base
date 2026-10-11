@@ -45,7 +45,7 @@ export const SETTINGS_PAGE: NavPage = {
   section: "", keywords: "preferences appearance theme navigation",
 };
 
-export const DEFAULT_SIDEBAR_ORDER = ALL_PAGES.map((p) => p.key);
+export const DEFAULT_SIDEBAR_ORDER = ["dashboard", "tasks", "calendar", "focus", "projects", "notes", "vision", "finance", "money", "news", "wishlist", "readinglist", "watchlist"];
 export const DEFAULT_BOTTOM_TABS = ["dashboard", "projects", "tasks"];
 
 // The always-visible desktop dock row (everything else sits in "More").

@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AccentProvider } from "@/lib/accent-context";
 
-const geist = Geist({
-  subsets: ["latin"],
+const geist = localFont({
+  src: "../public/fonts/geist-latin.woff2",
+  weight: "100 900",
   variable: "--font-sans",
   display: "swap",
 });
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Apply persisted theme before paint to avoid a flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('base_theme')||'dark';document.documentElement.classList.add(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('base_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('base_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('dark');document.documentElement.dataset.nav='sidebar'}`,
+            __html: `try{var t=localStorage.getItem('base_theme')||'system';document.documentElement.classList.add(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light');document.documentElement.dataset.nav=localStorage.getItem('base_nav_mode')==='dock'?'dock':'sidebar';var a=localStorage.getItem('base_accent');if(a)document.documentElement.style.setProperty('--accent',a)}catch(e){document.documentElement.classList.add('dark');document.documentElement.dataset.nav='sidebar'}`,
           }}
         />
       </head>

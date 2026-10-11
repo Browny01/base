@@ -1,0 +1,50 @@
+[
+  {
+    "run": 1,
+    "samples": [
+      {
+        "native_to_first_route_ms": 1061,
+        "frontend_to_first_route_ms": 651
+      },
+      {
+        "scroll_frames": 119,
+        "p50_ms": 16,
+        "p95_ms": 20,
+        "max_ms": 28,
+        "rendered_rows": 26
+      }
+    ]
+  },
+  {
+    "run": 2,
+    "samples": [
+      {
+        "native_to_first_route_ms": 834,
+        "frontend_to_first_route_ms": 578
+      },
+      {
+        "scroll_frames": 119,
+        "p50_ms": 14,
+        "p95_ms": 19,
+        "max_ms": 26,
+        "rendered_rows": 26
+      }
+    ]
+  },
+  {
+    "run": 3,
+    "samples": [
+      {
+        "native_to_first_route_ms": 831,
+        "frontend_to_first_route_ms": 576.0000000000001
+      },
+      {
+        "scroll_frames": 119,
+        "p50_ms": 15,
+        "p95_ms": 20,
+        "max_ms": 23,
+        "rendered_rows": 26
+      }
+    ]
+  }
+]

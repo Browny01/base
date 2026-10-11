@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+
 import { BaseImage } from "@/lib/image";
 
 import { useState, type ReactNode } from "react";
@@ -99,18 +101,18 @@ export function CardListPage<T extends MediaCardLike>({
   const done = view.filter((i) => i.checked).sort(orderSort);
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="base-page card-list-page">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-        <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">{config.title}</h1>
+      <PageHeading title={config.title} description={`${unchecked.length} to explore · ${done.length} completed`}>
+
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-medium rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-medium rounded-lg transition-colors"
         >
           <PlusIcon />
           {config.addLabel}
         </button>
-      </div>
+      </PageHeading>
 
       {/* Progress bar */}
       <div className="w-full bg-[var(--chip)] rounded-full h-1.5 mb-6">

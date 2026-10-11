@@ -173,7 +173,7 @@ function AddWatch({ items, close, append }: {
           </div>
           <button
             onClick={() => addYt(yt)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-semibold rounded-lg transition-colors shrink-0"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-semibold rounded-lg transition-colors shrink-0"
           >
             <Plus className="w-3.5 h-3.5" /> Add
           </button>

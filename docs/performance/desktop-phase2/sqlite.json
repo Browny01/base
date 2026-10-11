@@ -1,0 +1,7 @@
+{
+  "document_bytes": 2971431,
+  "sqlite_cached_read_ms_median": 1.7290378455072641,
+  "sqlite_cached_read_ms_p95": 1.9479426555335522,
+  "python_json_decode_ms_median": 23.76113086938858,
+  "samples": 100
+}

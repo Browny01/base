@@ -1,0 +1,6 @@
+{
+  "native_release_sha256": "aac95e9cb822e2810cdad1889d892a658263b3344e35f531be4bac5e3bae9acc",
+  "source_parent": "3f34f50",
+  "platform": "Linux x86-64/X11 software WebKitGTK 2.52.6",
+  "sample_note": "Startup/task/focus samples preceded final chart/graph refinements; large-note and chart samples use the final release. Startup/task execution paths were unchanged by those refinements."
+}

@@ -23,6 +23,8 @@ fn main() {
             "read_offline_source",
             "verify_note_password",
             "set_local_note_password",
+            "record_frontend_ready",
+            "record_scroll_sample",
         ]),
     ))
     .expect("Tauri build setup failed");

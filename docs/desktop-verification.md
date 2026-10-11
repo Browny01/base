@@ -1,5 +1,8 @@
 # Phase 1 desktop verification
 
+For the redesigned build, current measurements, screenshots and the additional
+Mac checklist, see [Phase 2 design and performance](desktop-phase2.md).
+
 Phase 1's desktop implementation is committed. The user confirms actual Mac
 build, launch and offline persistence checks and explicitly authorizes Phase 2
 before hosted-backend reconnection verification. That cloud check is **pending**,
@@ -112,7 +115,8 @@ These are functional smoke checks, not comprehensive page-by-page regression,
 GPU, battery or large-workload performance measurements. An Xvfb test does not
 verify Wayland behavior. Production Upstash Lua execution, real third-party
 credentials, signed updates, notifications and print dialogs need the checks
-below. Phase 2 will perform full profiling and visual redesign after the gate.
+below. Phase 2's redesign and Linux measurements are recorded in the linked
+report; hosted sync remains deferred under the user's revised phase gate.
 
 ## Isolated service for native transport checks
 
@@ -275,4 +279,5 @@ verified. Mac build/launch/offline checks are confirmed by the user. Hosted
 reconnection and integration verification, signed updates and remaining native
 service checks remain pending. The original full Phase 1 verification criteria
 are not yet met; the user explicitly authorizes the UI upgrade first. Phase 2
-can proceed with that documented exception. Phase 3 has not begun.
+has proceeded with that documented exception. Its Mac verification remains
+pending. Phase 3 has not begun.

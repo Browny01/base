@@ -378,7 +378,7 @@ function ProjectDetailView({ id }: { id: string }) {
             <div className="flex items-start gap-3 min-w-0">
               <ProjectLogo src={project.logoUrl} color={project.color} name={project.name} size="lg" />
               <div className="min-w-0">
-                <h1 className={cn("text-2xl font-bold tracking-tight mb-1 truncate", COLOR_TEXT[project.color])}>{project.name}</h1>
+                <h1 className={cn("base-page-title mb-1 truncate", COLOR_TEXT[project.color])}>{project.name}</h1>
                 {project.description && <p className="text-sm text-[var(--muted)]">{project.description}</p>}
               </div>
             </div>
@@ -447,7 +447,7 @@ function ProjectDetailView({ id }: { id: string }) {
       {tab === "tasks" && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <button onClick={() => setShowTaskForm(!showTaskForm)} className="flex items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors">
+            <button onClick={() => setShowTaskForm(!showTaskForm)} className="flex items-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors">
               <Plus className="w-4 h-4" /> Add Task
             </button>
           </div>
@@ -464,7 +464,7 @@ function ProjectDetailView({ id }: { id: string }) {
                   {TAGS.map((t) => <option key={t.value} value={t.value}>{t.emoji} {t.label}</option>)}
                 </select>
                 <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} />
-                <button onClick={addTask} className="ml-auto px-3 py-1 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs rounded-lg transition-colors">Add</button>
+                <button onClick={addTask} className="ml-auto px-3 py-1 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs rounded-lg transition-colors">Add</button>
               </div>
             </div>
           )}
@@ -503,7 +503,7 @@ function ProjectDetailView({ id }: { id: string }) {
           )}
 
           <div className="flex justify-end mb-6">
-            <button onClick={() => setShowMilestoneForm(v => !v)} className="flex items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors">
+            <button onClick={() => setShowMilestoneForm(v => !v)} className="flex items-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors">
               <Plus className="w-4 h-4" /> Add Milestone
             </button>
           </div>
@@ -514,7 +514,7 @@ function ProjectDetailView({ id }: { id: string }) {
               <div className="flex gap-3 items-center">
                 <label className="text-xs text-[var(--muted)] shrink-0">Target date</label>
                 <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={milestoneDue} onChange={(e) => setMilestoneDue(e.target.value)} />
-                <button onClick={addMilestone} className="ml-auto px-4 py-1 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs rounded-lg transition-colors">Add</button>
+                <button onClick={addMilestone} className="ml-auto px-4 py-1 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs rounded-lg transition-colors">Add</button>
               </div>
             </div>
           )}
@@ -588,7 +588,7 @@ function ProjectDetailView({ id }: { id: string }) {
                 <h2 className="text-sm font-semibold text-[var(--text)]">Uploaded Files</h2>
                 <p className="text-xs text-[var(--faint)] mt-0.5">Images, PDFs, docs, spreadsheets, zips and more.</p>
               </div>
-              <label className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors cursor-pointer">
+              <label className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors cursor-pointer">
                 <Upload className="w-4 h-4" />
                 Upload Files
                 <input
@@ -715,7 +715,7 @@ function ProjectDetailView({ id }: { id: string }) {
                   <p className="text-sm text-[var(--faint)] mb-4">No documents yet</p>
                   <button
                     onClick={createDoc}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors mx-auto"
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors mx-auto"
                   >
                     <Plus className="w-4 h-4" /> Create Document
                   </button>
@@ -734,7 +734,7 @@ function ProjectDetailView({ id }: { id: string }) {
           <div className="flex gap-2">
             <input className="flex-1 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]" placeholder="https://..." value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addLink()} />
             <input className="w-40 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]" placeholder="Label (optional)" value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addLink()} />
-            <button onClick={addLink} className="px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4" /></button>
+            <button onClick={addLink} className="px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors"><Plus className="w-4 h-4" /></button>
           </div>
           {projectLinks.length === 0 ? (
             <p className="text-sm text-[var(--faint)] text-center py-8">No links yet.</p>
@@ -792,7 +792,7 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit }: {
           <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text)] focus:outline-none" value={editForm.dueDate} onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))} />
           <div className="ml-auto flex gap-1">
             <button onClick={() => setEditing(false)} className="px-2 py-1 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors flex items-center gap-1"><X className="w-3 h-3" /> Cancel</button>
-            <button onClick={saveEdit} className="px-3 py-1 text-xs bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] rounded-lg transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Save</button>
+            <button onClick={saveEdit} className="px-3 py-1 text-xs bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] rounded-lg transition-colors flex items-center gap-1"><Check className="w-3 h-3" /> Save</button>
           </div>
         </div>
       </div>

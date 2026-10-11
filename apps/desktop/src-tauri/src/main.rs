@@ -2,6 +2,7 @@ mod database;
 mod imports;
 mod lifecycle;
 mod note_lock;
+mod performance;
 mod transport;
 mod updates;
 fn main() {
@@ -9,6 +10,7 @@ fn main() {
 }
 fn base_run() {
     tauri::Builder::default()
+        .manage(performance::Startup::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             use tauri::Manager;
             if let Some(window) = app.get_webview_window("main") {
@@ -118,7 +120,9 @@ fn base_run() {
             imports::activate_offline_workspace,
             imports::read_offline_source,
             note_lock::verify_note_password,
-            note_lock::set_local_note_password
+            note_lock::set_local_note_password,
+            performance::record_frontend_ready,
+            performance::record_scroll_sample
         ])
         .build(tauri::generate_context!())
         .expect("Base desktop failed to initialize")

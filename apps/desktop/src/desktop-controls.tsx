@@ -21,7 +21,7 @@ export function DesktopControls() {
   const text = status.saving ? "Saving on this device…" : status.syncing ? "Synchronizing…" : status.local ? "Local workspace" : status.pending ? `${status.pending} changes saved locally` : "Saved on this device";
   const action = async (fn: () => Promise<unknown>) => { setBusy(true); setError(""); try { await fn(); } catch (e) { setError(String(e)); } finally { setBusy(false); } };
   return <>
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-1.5 text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-5 py-1.5 text-[11px]">
       <span role="status" aria-live="polite" className="text-[var(--muted)]">{text}{status.conflicts ? ` · ${status.conflicts} conflicts to review` : ""}</span>
       <div className="flex items-center gap-3">
         {!status.local && <button onClick={() => void sync()} disabled={status.syncing}>Sync now</button>}
@@ -38,7 +38,7 @@ export function DesktopControls() {
         <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void action(async () => { await connect(origin, password); setPassword(""); }); }}>
           <label className="grid gap-1 text-sm">Service URL<input type="url" required value={origin} onChange={e => setOrigin(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
           <label className="grid gap-1 text-sm">Base password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
-          <button disabled={busy || status.saving || status.hasUnsaved} className="rounded-lg bg-[var(--text)] px-3 py-2 text-sm text-[var(--bg)]">{busy ? "Connecting…" : "Connect / renew session"}</button>
+          <button disabled={busy || status.saving || status.hasUnsaved} className="rounded-lg bg-[var(--action)] px-3 py-2 text-sm text-[var(--on-action)]">{busy ? "Connecting…" : "Connect / renew session"}</button>
         </form>
         {status.local && <form className="my-3 grid gap-2" onSubmit={event=>{event.preventDefault();void action(async()=>{await native("set_local_note_password",{scope:workspace?.scope,password:notePassword});setNotePassword("");});}}>
           <label className="grid gap-1 text-sm">Local note password<input type="password" required autoComplete="new-password" value={notePassword} onChange={event=>setNotePassword(event.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>

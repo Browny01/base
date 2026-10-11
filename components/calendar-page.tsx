@@ -1,9 +1,15 @@
 "use client";
 
+import { EditorDialog } from "./ui/editor-dialog";
+import { PageHeading } from "./ui/page-heading";
+import { VirtualList } from "./ui/virtual-list";
+
+import { useStoredPref, writeStored } from "@/lib/prefs";
+
 import { apiFetch } from "@/lib/api-client";
 
 import Link from "@/lib/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { memo, FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, CalendarDays, CheckSquare, ChevronLeft, ChevronRight, Clock,
   CreditCard, Dumbbell, ExternalLink, Flag, GraduationCap, Loader2, MapPin,
@@ -153,12 +159,18 @@ export function CalendarPage() {
   const today = dateKey(new Date());
   const [anchor, setAnchor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12));
   const [selectedDay, setSelectedDay] = useState(today);
+  const storedView=useStoredPref("base_calendar_view","month");
+  const view=storedView==="week"||storedView==="agenda"?storedView:"month";
   const [enabled, setEnabled] = useState<Record<SourceKey, boolean>>(() => Object.fromEntries(SOURCES.map((source) => [source.key, true])) as Record<SourceKey, boolean>);
   const [calcom, setCalcom] = useState<CalcomBooking[]>([]);
   const [calcomState, setCalcomState] = useState<"loading" | "ready" | "unconfigured" | "error">("loading");
   const [editor, setEditor] = useState<{ open: boolean; event: CalendarEvent | null }>({ open: false, event: null });
 
-  const days = useMemo(() => monthGrid(anchor), [anchor]);
+  const days = useMemo(() => {
+    if(view!=="week")return monthGrid(anchor);
+    const selected=parseDateKey(selectedDay),offset=(selected.getDay()+6)%7;
+    return Array.from({length:7},(_,index)=>shiftDateKey(selectedDay,index-offset));
+  }, [anchor,selectedDay,view]);
   const rangeStart = days[0];
   const rangeEnd = days[days.length - 1];
 
@@ -260,6 +272,7 @@ export function CalendarPage() {
   const agenda = useMemo(() => visibleItems.filter((item) => coversDate(item.startDate, item.endDate, selectedDay)).sort(sortScheduleItems), [visibleItems, selectedDay]);
 
   function moveMonth(amount: number) {
+    if(view==="week") { const nextDay=shiftDateKey(selectedDay,amount*7);setSelectedDay(nextDay);setAnchor(parseDateKey(nextDay));return; }
     const next = addMonths(anchor, amount);
     setCalcomState("loading");
     setAnchor(next);
@@ -322,28 +335,19 @@ export function CalendarPage() {
   return (
     <div className="calendar-page min-h-full px-3 pb-[var(--app-bottom-clearance)] pt-4 sm:px-5 sm:pt-5 lg:px-7 lg:pt-6">
       <div className="mx-auto max-w-[1540px]">
-        <header className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <span className="h-px w-8 bg-[var(--border-2)]" />
-              <span className="eyebrow">Time, made visible</span>
-            </div>
-            <h1 className="text-[clamp(2rem,5vw,4.25rem)] font-semibold leading-[0.95] tracking-[-0.055em] text-[var(--text)]">
-              {anchor.toLocaleDateString("en-AU", { month: "long" })}
-              <span className="ml-2 font-normal text-[var(--faint)] sm:ml-3">{anchor.getFullYear()}</span>
-            </h1>
-          </div>
+        <PageHeading title={<>{anchor.toLocaleDateString("en-AU", { month: "long" })} <span className="font-normal text-[var(--muted)]">{anchor.getFullYear()}</span></>} description={view==="week"?`${formatSelectedDate(days[0])} – ${formatSelectedDate(days[6])}`:"Your events, tasks and milestones in one place."}>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
-              <button onClick={() => moveMonth(-1)} aria-label="Previous month" className="calendar-icon-button"><ChevronLeft className="h-4 w-4" /></button>
+              <button onClick={() => moveMonth(-1)} aria-label={view==="week"?"Previous week":"Previous month"} className="calendar-icon-button"><ChevronLeft className="h-4 w-4" /></button>
               <button onClick={goToday} className="h-8 rounded-lg px-3 text-[12px] font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]">Today</button>
-              <button onClick={() => moveMonth(1)} aria-label="Next month" className="calendar-icon-button"><ChevronRight className="h-4 w-4" /></button>
+              <button onClick={() => moveMonth(1)} aria-label={view==="week"?"Next week":"Next month"} className="calendar-icon-button"><ChevronRight className="h-4 w-4" /></button>
             </div>
             <button onClick={openNew} className="btn-primary flex h-[42px] items-center gap-2 rounded-xl px-4 text-[13px] font-semibold">
               <Plus className="h-4 w-4" /> New event
             </button>
           </div>
-        </header>
+        </PageHeading>
+        <div className="mb-4 flex gap-1 w-fit rounded-md bg-[var(--chip)] p-1" aria-label="Calendar view">{(["month","week","agenda"] as const).map(mode=><button key={mode} aria-pressed={view===mode} onClick={()=>writeStored("base_calendar_view",mode)} className={cn("rounded px-3 py-1.5 text-xs capitalize",view===mode?"bg-[var(--surface)] text-[var(--text)] shadow-sm":"text-[var(--muted)]")}>{mode}</button>)}</div>
 
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Calendar sources">
           {SOURCES.map((source) => (
@@ -359,7 +363,12 @@ export function CalendarPage() {
         </div>
 
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="overflow-hidden rounded-[20px] border border-[var(--border)] bg-[var(--surface)] shadow-[0_20px_70px_-45px_rgba(0,0,0,.8)]">
+          <section className="overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface)]">
+            {view==="agenda"?<div className="p-4">{days.filter(day=>parseDateKey(day).getMonth()===anchor.getMonth()).map(day=>{
+              const events=itemsByDay.get(day)??[];if(!events.length)return null;
+              return <div key={day} className="mb-5"><h2 className="mb-2 flex items-center justify-between text-xs font-semibold text-[var(--muted)]"><button onClick={()=>chooseDay(day)}>{formatSelectedDate(day)}</button><button aria-label={`Add event on ${day}`} onClick={()=>{chooseDay(day);openNew();}} className="calendar-icon-button"><Plus className="h-3.5 w-3.5"/></button></h2><ScheduleList items={events} onEdit={event=>setEditor({open:true,event})}/></div>;
+            })}{!days.some(day=>parseDateKey(day).getMonth()===anchor.getMonth()&&(itemsByDay.get(day)?.length??0)>0)&&<p className="base-empty">Nothing scheduled in this view. Add an event to get started.</p>}</div>:<>
+
             <div className="grid grid-cols-7 border-b border-[var(--border)] bg-[var(--surface-2)]/60">
               {WEEKDAYS.map((day) => <div key={day} className="px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">{day}</div>)}
             </div>
@@ -372,13 +381,13 @@ export function CalendarPage() {
                 return (
                   <button key={day} onClick={() => chooseDay(day)}
                     className={cn("calendar-day group relative min-h-[76px] border-b border-r border-[var(--border)] p-1.5 text-left sm:min-h-[104px] sm:p-2 lg:min-h-[122px]",
-                      index % 7 === 6 && "border-r-0", index >= 35 && "border-b-0", outside && "bg-[var(--bg)]/45", selected && "calendar-day-selected")}
+                      view==="week"&&"min-h-[300px] sm:min-h-[360px] lg:min-h-[360px]", index % 7 === 6 && "border-r-0", index >= 35 && "border-b-0", outside && "bg-[var(--bg)]/45", selected && "calendar-day-selected")}
                   >
                     <span className={cn("mb-1 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold tabular transition-colors",
                       day === today ? "bg-[var(--text)] text-[var(--bg)]" : selected ? "bg-[var(--chip-2)] text-[var(--text)]" : outside ? "text-[var(--faint)]" : "text-[var(--muted)] group-hover:text-[var(--text)]")}
                     >{date.getDate()}</span>
                     <div className="space-y-0.5 overflow-hidden">
-                      {dayItems.slice(0, 3).map((item) => (
+                      {dayItems.slice(0, view==="week"?10:3).map((item) => (
                         <span key={item.id} onClick={(event) => { event.stopPropagation(); if (item.event) setEditor({ open: true, event: item.event }); else chooseDay(day); }}
                           className="calendar-chip flex h-[17px] items-center gap-1 rounded px-1 text-[9px] font-semibold leading-none text-[var(--text)] sm:h-5 sm:px-1.5 sm:text-[10px]"
                           style={{ background: `color-mix(in srgb, ${item.color} 13%, transparent)`, borderLeftColor: item.color }}
@@ -387,15 +396,16 @@ export function CalendarPage() {
                           <span className="truncate">{item.title}</span>
                         </span>
                       ))}
-                      {dayItems.length > 3 && <span className="block px-1 text-[9px] font-semibold text-[var(--faint)]">+{dayItems.length - 3} more</span>}
+                      {dayItems.length > (view==="week"?10:3) && <span className="block px-1 text-[9px] font-semibold text-[var(--faint)]">+{dayItems.length - (view==="week"?10:3)} more · select day</span>}
                     </div>
                   </button>
                 );
               })}
             </div>
+</>}
           </section>
 
-          <aside className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-4 xl:sticky xl:top-[76px]">
+          <aside className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-4 xl:sticky xl:top-[76px]">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p className="eyebrow mb-1">Selected day</p>
@@ -413,9 +423,7 @@ export function CalendarPage() {
                 <span className="mt-1 block text-[11px] text-[var(--faint)]">Add something worth protecting.</span>
               </button>
             ) : (
-              <div className="space-y-2">
-                {agenda.map((item, index) => <AgendaItem key={item.id} item={item} index={index} onEdit={(event) => setEditor({ open: true, event })} />)}
-              </div>
+              <ScheduleList items={agenda} onEdit={event=>setEditor({open:true,event})}/>
             )}
 
             {calcomState === "loading" && enabled.calcom && <p className="mt-3 flex items-center gap-2 text-[10.5px] text-[var(--faint)]"><Loader2 className="h-3 w-3 animate-spin" /> Refreshing Cal.com</p>}
@@ -437,16 +445,20 @@ function sortScheduleItems(a: ScheduleItem, b: ScheduleItem): number {
   return (a.startTime || "").localeCompare(b.startTime || "") || a.title.localeCompare(b.title);
 }
 
-function AgendaItem({ item, index, onEdit }: { item: ScheduleItem; index: number; onEdit: (event: CalendarEvent) => void }) {
+function ScheduleList({items,onEdit}:{items:ScheduleItem[];onEdit:(event:CalendarEvent)=>void}) {
+  const render=(item:ScheduleItem)=><AgendaItem key={item.id} item={item} onEdit={onEdit}/>;
+  return items.length>100?<VirtualList items={items} label="Scheduled items">{render}</VirtualList>:<div className="space-y-2">{items.map(render)}</div>;
+}
+function AgendaItemComponent({ item, onEdit }: { item: ScheduleItem; onEdit: (event: CalendarEvent) => void }) {
   const content = (
-    <div className="group flex gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-3 transition-all hover:border-[var(--border-2)] hover:bg-[var(--surface-2)]" style={{ animationDelay: `${index * 28}ms` }}>
+    <div className="group flex gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-3 transition-colors hover:border-[var(--border-2)] hover:bg-[var(--surface-2)]">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ color: item.color, background: `color-mix(in srgb, ${item.color} 12%, transparent)` }}>
         {sourceIcon(item.source)}
       </div>
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2">
           <span className="text-[9.5px] font-semibold uppercase tracking-[0.12em]" style={{ color: item.color }}>{SOURCE_LABEL[item.source]}</span>
-          {item.event?.repeat !== "none" && <Repeat2 className="h-3 w-3 text-[var(--faint)]" />}
+          {item.event && item.event.repeat !== "none" && <Repeat2 className="h-3 w-3 text-[var(--faint)]" />}
         </div>
         <p className="truncate text-[13px] font-semibold text-[var(--text)]">{item.title}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-[var(--faint)]">
@@ -463,17 +475,14 @@ function AgendaItem({ item, index, onEdit }: { item: ScheduleItem; index: number
   return content;
 }
 
+const AgendaItem = memo(AgendaItemComponent);
+
 function EventEditor({ day, event, onClose, onSave, onDelete }: {
   day: string; event: CalendarEvent | null; onClose: () => void; onSave: (draft: EventDraft) => void; onDelete: (event: CalendarEvent) => void;
 }) {
   const [draft, setDraft] = useState<EventDraft>(() => event ? draftFromEvent(event) : blankDraft(day));
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const onKey = (keyboardEvent: KeyboardEvent) => { if (keyboardEvent.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   function submit(formEvent: FormEvent) {
     formEvent.preventDefault();
@@ -484,8 +493,8 @@ function EventEditor({ day, event, onClose, onSave, onDelete }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 px-0 backdrop-blur-[3px] sm:items-center sm:px-4" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget) onClose(); }}>
-      <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="event-editor-title" className="nx-slide-up max-h-[92vh] w-full overflow-y-auto rounded-t-[26px] border border-[var(--border)] bg-[var(--bg)] p-5 elevated sm:max-w-[620px] sm:rounded-[22px] sm:p-6">
+    <EditorDialog title={event?"Edit event":"New event"} onClose={onClose}>
+      <form onSubmit={submit}>
         <div className="mb-5 flex items-start justify-between">
           <div>
             <p className="eyebrow mb-1">{event ? "Edit entire series" : "Protect the time"}</p>
@@ -518,13 +527,13 @@ function EventEditor({ day, event, onClose, onSave, onDelete }: {
         </div>
 
         {error && <p role="alert" className="mt-4 flex items-center gap-2 text-[12px] font-medium text-[var(--c-rose)]"><AlertCircle className="h-4 w-4" />{error}</p>}
-        {event?.repeat !== "none" && <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[10.5px] text-[var(--muted)]">Changes apply to the entire repeating series.</p>}
+        {event && event.repeat !== "none" && <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[10.5px] text-[var(--muted)]">Changes apply to the entire repeating series.</p>}
 
         <div className="mt-6 flex items-center gap-2 border-t border-[var(--border)] pt-4">
           {event && <button type="button" onClick={() => onDelete(event)} className="flex h-9 items-center gap-2 rounded-lg px-2.5 text-[12px] font-semibold text-[var(--c-rose)] transition-colors hover:bg-[var(--surface-2)]"><Trash2 className="h-3.5 w-3.5" /> Delete</button>}
           <div className="ml-auto flex gap-2"><button type="button" onClick={onClose} className="btn-ghost h-9 rounded-lg px-3 text-[12px] font-semibold">Cancel</button><button type="submit" className="btn-primary h-9 rounded-lg px-4 text-[12px] font-semibold">{event ? "Save changes" : "Add event"}</button></div>
         </div>
       </form>
-    </div>
+    </EditorDialog>
   );
 }

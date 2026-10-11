@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+
 import { useState, useCallback } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, getToday, formatCurrency } from "@/lib/utils";
@@ -154,9 +156,8 @@ export function FinancePage() {
   const dueSoon = activeSubscriptions.filter((sub) => daysUntil(sub.dueDate, data.profile?.timezone) <= 7).length;
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">Finance</h1>
+    <div className="base-page finance-page">
+      <PageHeading title="Finance" description={"Income, subscriptions and your portfolio."}>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowSubForm(!showSubForm)}
@@ -167,13 +168,13 @@ export function FinancePage() {
           </button>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             Log Income
           </button>
         </div>
-      </div>
+      </PageHeading>
 
       {/* Portfolio Chart */}
       <PortfolioChart
@@ -354,7 +355,7 @@ export function FinancePage() {
           </div>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors">Cancel</button>
-            <button onClick={addEntry} className="px-4 py-1.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-medium rounded-lg transition-colors">
+            <button onClick={addEntry} className="px-4 py-1.5 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-medium rounded-lg transition-colors">
               Log Entry
             </button>
           </div>

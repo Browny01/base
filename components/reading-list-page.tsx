@@ -186,7 +186,7 @@ function AddBook({ close, append }: { close: () => void; append: (item: ReadingL
 
       <div className="flex gap-2 justify-end pt-1">
         <button onClick={close} className="px-4 py-2 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors">Cancel</button>
-        <button onClick={submit} className="px-5 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-semibold rounded-lg transition-colors">Add Book</button>
+        <button onClick={submit} className="px-5 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-semibold rounded-lg transition-colors">Add Book</button>
       </div>
     </div>
   );

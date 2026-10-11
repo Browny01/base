@@ -1,0 +1,5 @@
+{
+  "note_paragraphs": 1000,
+  "action_to_sqlite_observation_ms": 1544.9,
+  "method": "Includes xdotool typing and 30 ms polling; single smoke sample, not a latency benchmark"
+}

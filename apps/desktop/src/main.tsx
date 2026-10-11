@@ -71,6 +71,11 @@ if (!isTauri()) {
     await native("shutdown_ready");
   })().catch(error=>console.error("Close protection unavailable",String(error)));
   initialize().then(async () => {
+    window.addEventListener("base:page-ready",()=>{
+      void native<boolean>("record_frontend_ready",{frontendMs:performance.now()})
+        .then(async profileFrames=>{if(profileFrames)await (await import("./performance")).profileTaskScrolling();})
+        .catch(()=>{});
+    },{once:true});
     root.render(<App />);
     deepLink((await getCurrent()) ?? []);
     await onOpenUrl(deepLink);

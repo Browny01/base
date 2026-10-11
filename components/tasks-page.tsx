@@ -1,14 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { PageHeading } from "./ui/page-heading";
+
+import { memo, useRef, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { EmptyState } from "./ui/page-heading";
+import { RecordMenu } from "./ui/record-menu";
+import { VirtualList, useRetainVirtualRow } from "./ui/virtual-list";
 import { useHandoffForm } from "@/lib/handoff-form";
 import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, getToday } from "@/lib/utils";
 import { TASK_TAGS, normalizeTaskTag, taskTagLabel, type Task, type Priority, type TaskTag, type RecurringFreq } from "@/lib/store";
 import { DEFAULT_TASK_SORT, PRIORITY_META, TASK_SORTS, isTaskSort, priorityLabel, sortTasks, type TaskSort } from "@/lib/task-sort";
-import { useStoredPref, writeStored } from "@/lib/prefs";
-import { Plus, Trash2, RotateCcw, LayoutList, Columns3, Pencil, Check, X, ChevronDown, ChevronRight, ChevronUp, GripVertical, ArrowUpDown } from "lucide-react";
+import { readStored, useStoredPref, writeStored } from "@/lib/prefs";
+import { Plus, Trash2, RotateCcw, LayoutList, Columns3, Pencil, Check, X, ChevronDown, ChevronRight, ChevronUp, GripVertical, ArrowUpDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HANDOFF_OPEN_NEW_TASK, LEGACY_HANDOFF_OPEN_NEW_TASK } from "@/lib/base-storage";
 
@@ -35,6 +40,14 @@ export function TasksPage() {
   const { toast } = useToast();
   const [filter, setFilter] = useState<"all" | "today" | TaskTag>("all");
   const [view, setView] = useState<"list" | "kanban">("list");
+  const [query, setQuery] = useState(()=>readStored("base_task_search") || "");
+  const search = useDeferredValue(query.trim().toLocaleLowerCase());
+  useEffect(() => {
+    writeStored("base_task_search","");
+    const reveal = (event: Event) => { setQuery((event as CustomEvent<string>).detail); setFilter("all"); setView("list"); writeStored("base_task_search",""); };
+    window.addEventListener("base:search-tasks", reveal);
+    return () => window.removeEventListener("base:search-tasks", reveal);
+  }, []);
   const [showForm, setShowForm] = useHandoffForm(HANDOFF_OPEN_NEW_TASK, [LEGACY_HANDOFF_OPEN_NEW_TASK]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -47,13 +60,14 @@ export function TasksPage() {
   const today = getToday(data.profile?.timezone);
 
 
-  const filtered = data.tasks.filter((t) => {
+  const filtered = useMemo(()=>data.tasks.filter((t) => {
+    if (search && !`${t.title} ${taskTagLabel(t.tag)} ${(t.subtasks ?? []).map(s=>s.title).join(" ")}`.toLocaleLowerCase().includes(search)) return false;
     if (filter === "today") return t.dueDate === today && !t.done;
     if (filter === "all") return !t.done;
     return t.tag === filter && !t.done;
-  });
-  const doneTasks = data.tasks.filter((t) => t.done);
-  const ordered = sortTasks(filtered, sort);
+  }),[data.tasks,search,filter,today]);
+  const doneTasks = useMemo(()=>data.tasks.filter((t) => t.done && (!search || t.title.toLocaleLowerCase().includes(search))),[data.tasks,search]);
+  const ordered = useMemo(()=>sortTasks(filtered, sort),[filtered,sort]);
 
   function setSort(next: TaskSort) { writeStored(SORT_KEY, next); }
 
@@ -122,9 +136,8 @@ export function TasksPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text)]">Tasks</h1>
+    <div className="base-page tasks-page">
+      <PageHeading title="Tasks" description={`${ordered.length} open tasks · ${doneTasks.length} completed`}>
         <div className="flex items-center gap-2">
           <SortMenu value={sort} onChange={setSort} />
           {/* View toggle */}
@@ -136,11 +149,11 @@ export function TasksPage() {
               <Columns3 className="w-4 h-4" />
             </button>
           </div>
-          <button onClick={() => setShowForm(!showForm)} className="flex min-h-11 md:min-h-0 items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors">
+          <button onClick={() => setShowForm(!showForm)} className="flex min-h-11 md:min-h-0 items-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors">
             <Plus className="w-4 h-4" /> New Task
           </button>
         </div>
-      </div>
+      </PageHeading>
 
       {/* Add Form */}
       {showForm && (
@@ -174,11 +187,12 @@ export function TasksPage() {
           </div>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowForm(false)} className="px-3 py-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors">Cancel</button>
-            <button onClick={addTask} className="px-4 py-1.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-medium rounded-lg transition-colors">Add Task</button>
+            <button onClick={addTask} className="px-4 py-1.5 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-medium rounded-lg transition-colors">Add Task</button>
           </div>
         </div>
       )}
 
+      <div className="base-toolbar"><label className="base-search"><Search className="h-3.5 w-3.5 shrink-0"/><input aria-label="Search tasks" placeholder="Search tasks…" value={query} onChange={event=>setQuery(event.target.value)} /></label><span className="text-xs text-[var(--faint)]">{ordered.length} tasks</span></div>
       {/* Filter Tabs */}
       <div className="flex gap-1 mb-5 bg-[var(--surface)] p-1 rounded-lg w-fit border border-[var(--border)] max-w-full overflow-x-auto">
         {(["all", "today", ...TAGS.map((t) => t.value)] as const).map((f) => (
@@ -191,11 +205,11 @@ export function TasksPage() {
       {/* ── List View ── */}
       {view === "list" && (
         <>
-          <div className="space-y-2.5 mb-8">
+          <div className="base-task-list mb-8">
             {ordered.length === 0 ? (
-              <p className="text-base text-[var(--muted)] py-4 text-center">No tasks here. You&apos;re clear!</p>
+              <EmptyState title={query ? "No matching tasks" : "A little room to breathe"} description={query ? "Try a different title, category or subtask." : "You're clear here. Add a task when you're ready."}/>
             ) : (
-              ordered.map((task, idx) => (
+              <TaskCollection tasks={ordered}>{(task, idx) => (
                 <TaskRow
                   key={task.id}
                   task={task}
@@ -215,7 +229,7 @@ export function TasksPage() {
                   onNudge={nudge}
                   onDrop={(targetId) => { if (dragId) moveTo(dragId, targetId); setDragId(null); setOverId(null); }}
                 />
-              ))
+              )}</TaskCollection>
             )}
           </div>
           {doneTasks.length > 0 && (
@@ -318,9 +332,7 @@ function KanbanBoard({ filtered, doneTasks, today, onToggle, onDelete, onEdit }:
               {tasks.length === 0 ? (
                 <div className="border border-dashed border-[var(--border)] rounded-lg py-8 text-center text-[var(--faint)] text-xs">Empty</div>
               ) : (
-                tasks.map((task) => (
-                  <KanbanCard key={task.id} task={task} today={today} onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} />
-                ))
+                <TaskCollection tasks={tasks}>{task=><KanbanCard key={task.id} task={task} today={today} onToggle={onToggle} onDelete={onDelete} onEdit={onEdit} />}</TaskCollection>
               )}
             </div>
           </div>
@@ -330,12 +342,13 @@ function KanbanBoard({ filtered, doneTasks, today, onToggle, onDelete, onEdit }:
   );
 }
 
-function KanbanCard({ task, today, onToggle, onDelete, onEdit }: {
+function KanbanCardComponent({ task, today, onToggle, onDelete, onEdit }: {
   task: Task; today: string;
   onToggle: (id: string) => void; onDelete: (id: string) => void;
   onEdit: (id: string, updates: Partial<Task>) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  useRetainVirtualRow(task.id,editing);
   const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: normalizeTaskTag(task.tag), dueDate: task.dueDate ?? "" });
 
   function saveEdit() {
@@ -370,10 +383,10 @@ function KanbanCard({ task, today, onToggle, onDelete, onEdit }: {
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-3.5 group hover:border-[var(--border)] transition-colors">
       <div className="flex items-start gap-2.5">
         <button onClick={() => onToggle(task.id)} aria-label={task.done ? `Mark ${task.title} as not done` : `Mark ${task.title} as done`} className={cn("w-4 h-4 mt-1 rounded border flex items-center justify-center shrink-0 transition-colors", task.done ? "bg-[var(--text)] border-[var(--border-2)]" : "border-[var(--border-2)] hover:bg-[var(--chip)]")}>
-          {task.done && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-[var(--text)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+          {task.done && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-[var(--bg)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
         </button>
         <p className={cn("flex-1 text-[15px] leading-snug min-w-0", task.done ? "text-[var(--faint)] line-through" : "text-[var(--text)]")}>{task.title}</p>
-        <div className="opacity-0 group-hover:opacity-100 flex shrink-0 gap-0.5">
+        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex shrink-0 gap-0.5">
           <button onClick={() => setEditing(true)} title="Edit task" aria-label={`Edit ${task.title}`} className="p-0.5 text-[var(--faint)] hover:text-[var(--text)] transition-colors"><Pencil className="w-4 h-4" /></button>
           <button onClick={() => onDelete(task.id)} title="Delete task" aria-label={`Delete ${task.title}`} className="p-0.5 text-[var(--faint)] hover:text-[var(--text)] transition-colors"><Trash2 className="w-4 h-4" /></button>
         </div>
@@ -389,7 +402,9 @@ function KanbanCard({ task, today, onToggle, onDelete, onEdit }: {
 
 // ── List Row ────────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, today, onToggle, onDelete, onEdit, index, lastIndex, canReorder = false, dragId = null, overId = null, onDragStart, onDragOver, onDragLeave, onDragEnd, onDrop, onNudge }: {
+const KanbanCard = memo(KanbanCardComponent);
+
+function TaskRowComponent({ task, today, onToggle, onDelete, onEdit, index, lastIndex, canReorder = false, dragId = null, overId = null, onDragStart, onDragOver, onDragLeave, onDragEnd, onDrop, onNudge }: {
   task: Task; today: string;
   onToggle: (id: string) => void; onDelete: (id: string) => void;
   onEdit: (id: string, updates: Partial<Task>) => void;
@@ -400,19 +415,23 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit, index, lastIndex, ca
   onDrop?: (targetId: string) => void;
   onNudge?: (id: string, dir: -1 | 1) => void;
 }) {
+  const rowRef=useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [menuOpen,setMenuOpen] = useState(false);
+  useRetainVirtualRow(task.id, editing || expanded || menuOpen);
   const [newSub, setNewSub] = useState("");
   const [editForm, setEditForm] = useState({ title: task.title, priority: task.priority, tag: normalizeTaskTag(task.tag), dueDate: task.dueDate ?? "" });
 
   function saveEdit() {
     onEdit(task.id, { title: editForm.title.trim() || task.title, priority: editForm.priority, tag: normalizeTaskTag(editForm.tag), dueDate: editForm.dueDate || null });
     setEditing(false);
+    requestAnimationFrame(()=>rowRef.current?.focus());
   }
 
   if (editing) {
     return (
-      <div className="bg-[var(--surface)] border border-[var(--border-2)] rounded-xl p-4 space-y-3">
+      <div ref={rowRef} className="bg-[var(--surface)] border border-[var(--border-2)] rounded-xl p-4 space-y-3">
         <input autoFocus className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2.5 text-base text-[var(--text)] focus:outline-none focus:border-[var(--border-2)]" value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && saveEdit()} />
         <div className="flex gap-2 flex-wrap items-center">
           <div className="flex gap-1">
@@ -440,7 +459,11 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit, index, lastIndex, ca
   const draggable = Boolean(canReorder && onDragStart && onDragOver && onDragEnd && onDrop);
 
   return (
-    <div
+    <RecordMenu onOpenChange={setMenuOpen} actions={[{label:"Edit task",run:()=>setEditing(true)},{label:task.done?"Mark incomplete":"Complete task",run:()=>onToggle(task.id)},{label:"Subtasks",run:()=>setExpanded(true)},{label:"Delete task",run:()=>onDelete(task.id),danger:true}]}><div
+      ref={rowRef}
+      role="group"
+      tabIndex={0}
+      aria-label={task.title}
       draggable={draggable}
       onDragStart={(e) => { if (!draggable) return; e.dataTransfer.effectAllowed = "move"; onDragStart!(task.id); }}
       onDragEnd={() => { if (draggable) onDragEnd!(); }}
@@ -448,7 +471,7 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit, index, lastIndex, ca
       onDragLeave={() => { if (draggable) onDragLeave?.(null); }}
       onDrop={(e) => { if (!draggable) return; e.preventDefault(); onDrop!(task.id); }}
       className={cn(
-        "bg-[var(--surface)] border rounded-xl group transition-colors",
+        "base-task-row bg-[var(--surface)] border group transition-colors",
         overId === task.id ? "border-[var(--text)]" : "border-[var(--border)]",
         dragId === task.id && "opacity-40",
       )}
@@ -480,7 +503,7 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit, index, lastIndex, ca
         )}
 
         <button onClick={() => onToggle(task.id)} aria-label={task.done ? `Mark ${task.title} as not done` : `Mark ${task.title} as done`} className={cn("w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors", task.done ? "bg-[var(--text)] border-[var(--border-2)]" : "border-[var(--border-2)] hover:bg-[var(--chip)]")}>
-          {task.done && <svg viewBox="0 0 12 12" className="w-3 h-3 text-[var(--text)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+          {task.done && <svg viewBox="0 0 12 12" className="w-3 h-3 text-[var(--bg)]" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
         </button>
 
         <span className={cn("flex-1 text-[15px] leading-snug min-w-0 truncate", task.done ? "text-[var(--muted)] line-through" : "text-[var(--text)]")}>{task.title}</span>
@@ -512,9 +535,11 @@ function TaskRow({ task, today, onToggle, onDelete, onEdit, index, lastIndex, ca
           </div>
         </div>
       )}
-    </div>
+    </div></RecordMenu>
   );
 }
+
+const TaskRow = memo(TaskRowComponent);
 
 function computeNextDue(current: string | null, freq: "daily" | "weekly" | "monthly"): string {
   const base = current ? new Date(current) : new Date();
@@ -522,4 +547,8 @@ function computeNextDue(current: string | null, freq: "daily" | "weekly" | "mont
   else if (freq === "weekly") base.setDate(base.getDate() + 7);
   else base.setMonth(base.getMonth() + 1);
   return base.toISOString().split("T")[0];
+}
+
+function TaskCollection({ tasks, children }: { tasks: Task[]; children: (task: Task, index: number) => React.ReactNode }) {
+  return tasks.length > 100 ? <VirtualList items={tasks} label="Tasks">{children}</VirtualList> : <>{tasks.map((task,index)=><div key={task.id}>{children(task,index)}</div>)}</>;
 }

@@ -1,8 +1,10 @@
 "use client";
 
+import { PageHeading } from "./ui/page-heading";
+
 import { useHandoffForm } from "@/lib/handoff-form";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid } from "@/lib/utils";
 import { prepareProjectLogo } from "@/lib/project-logo";
@@ -36,8 +38,7 @@ function ProjectCard({ proj, taskCount, doneCount, linkCount, hasNote }: {
   return (
     <Link
       href={`/projects/${proj.id}`}
-      className="group block bg-[var(--surface)] border rounded-xl p-5 hover:scale-[1.01] transition-all"
-      style={{ borderColor: `${hex}59` }}
+      className="base-project-card group block bg-[var(--surface)] border border-[var(--border)] rounded-[10px] p-4 hover:border-[var(--border-2)] transition-colors"
     >
       <div className="flex items-start justify-between mb-3">
         <ProjectLogo src={proj.logoUrl} color={proj.color} name={proj.name} />
@@ -50,6 +51,7 @@ function ProjectCard({ proj, taskCount, doneCount, linkCount, hasNote }: {
       {proj.description && (
         <p className="text-xs text-[var(--muted)] mb-3 line-clamp-2">{proj.description}</p>
       )}
+      <div className="mb-3 flex items-center gap-2" aria-label={`${doneCount} of ${taskCount+doneCount} tasks completed`}><div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--chip)]"><div className="h-full rounded-full" style={{width:`${taskCount+doneCount?doneCount/(taskCount+doneCount)*100:0}%`,background:hex}}/></div><span className="text-[11px] tabular text-[var(--muted)]">{taskCount+doneCount?Math.round(doneCount/(taskCount+doneCount)*100):0}%</span></div>
       <div className="flex items-center gap-3 text-xs text-[var(--faint)]">
         {(taskCount + doneCount) > 0 && <span>{taskCount} tasks</span>}
         {linkCount > 0 && <span>{linkCount} links</span>}
@@ -116,28 +118,28 @@ export function ProjectsPage() {
   const side  = visibleProjects.filter((p) => p.category === "side");
   const archived = data.projects.filter((p) => p.archived);
 
-  function projectStats(id: string) {
-    return {
-      taskCount: data.tasks.filter((t) => t.projectId === id && !t.done).length,
-      doneCount: data.tasks.filter((t) => t.projectId === id && t.done).length,
-      linkCount: data.projectLinks.filter((l) => l.projectId === id).length,
-      hasNote: data.projectNotes.some((n) => n.projectId === id && n.content.trim()),
-    };
-  }
+  const stats = useMemo(() => {
+    const values = new Map<string, {taskCount:number;doneCount:number;linkCount:number;hasNote:boolean}>();
+    const entry = (id:string) => { let value=values.get(id);if(!value){value={taskCount:0,doneCount:0,linkCount:0,hasNote:false};values.set(id,value);}return value; };
+    for(const task of data.tasks)if(task.projectId){const value=entry(task.projectId);if(task.done)value.doneCount++;else value.taskCount++;}
+    for(const link of data.projectLinks)entry(link.projectId).linkCount++;
+    for(const note of data.projectNotes)if(note.content.trim())entry(note.projectId).hasNote=true;
+    return values;
+  },[data.tasks,data.projectLinks,data.projectNotes]);
+  const projectStats = (id:string) => stats.get(id) ?? {taskCount:0,doneCount:0,linkCount:0,hasNote:false};
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="base-page projects-page">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">Projects</h1>
+      <PageHeading title="Projects" description={"Milestones, documents and progress."}>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-sm font-medium rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Project
         </button>
-      </div>
+      </PageHeading>
 
       {/* New Project Form */}
       {showForm && (
@@ -240,7 +242,7 @@ export function ProjectsPage() {
           </div>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowForm(false)} className="px-4 py-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors">Cancel</button>
-            <button onClick={addProject} className="px-5 py-1.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-xs font-semibold rounded-lg transition-colors">
+            <button onClick={addProject} className="px-5 py-1.5 bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] text-xs font-semibold rounded-lg transition-colors">
               Create Project
             </button>
           </div>

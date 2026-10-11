@@ -1,0 +1,14 @@
+{
+  "light": {
+    "text_bg": 16.32,
+    "muted_surface2": 6.92,
+    "faint_surface2": 4.79,
+    "on_action": 5.58
+  },
+  "dark": {
+    "text_bg": 14.49,
+    "muted_surface2": 7.25,
+    "faint_surface2": 5.21,
+    "on_action": 7.1
+  }
+}

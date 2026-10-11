@@ -33,6 +33,8 @@
     "allow-activate-offline-workspace",
     "allow-read-offline-source",
     "allow-verify-note-password",
-    "allow-set-local-note-password"
+    "allow-set-local-note-password",
+    "allow-record-frontend-ready",
+    "allow-record-scroll-sample"
   ]
 }
