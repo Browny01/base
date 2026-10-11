@@ -3,9 +3,11 @@
 # Base
 
 Base is a personal command center for planning, focus, money, notes, projects,
-and AI-assisted daily work. It includes a Next.js web app plus native
-SwiftUI apps for iPhone and Mac. The native apps keep a local copy of Base data,
-queue edits without a connection, and merge those edits when the internet returns.
+and AI-assisted daily work. Its new Tauri desktop workspace bundles the React
+interface locally for Linux and macOS, with SQLite and durable offline edits.
+Next.js hosts the web application and cloud APIs. Existing SwiftUI iPhone and
+legacy Mac applications remain available during migration. Actual macOS
+verification is pending; see [desktop verification](docs/desktop-verification.md).
 
 ## Highlights
 
@@ -42,7 +44,10 @@ queue edits without a connection, and merge those edits when the internet return
 - **Native iPhone support** - SwiftUI dashboard, tasks, projects, notes, habits,
   focus, finance, cached news, offline mutation queue, and WidgetKit home-screen
   widget.
-- **Mac support** - the complete live Base interface in a native window, a
+- **Desktop migration** - Tauri 2, Rust, Vite, locally bundled pages, SQLite,
+  OS credential storage and field-aware synchronization with conflict review.
+  Run `npm run desktop:dev`; build with `npm run desktop:build`.
+- **Legacy Mac support** - the complete live Base interface in a native window, a
   SwiftUI offline fallback, a reliable `Control+Option+Space` global shortcut,
   Spotlight/Dock install flow, and Sparkle updates.
 - **Backend integrations** - Upstash Redis/KV persistence, Vercel Blob uploads,
@@ -54,7 +59,8 @@ queue edits without a connection, and merge those edits when the internet return
 - **Framework:** Next.js 16 App Router, React 19, TypeScript
 - **Styling:** Tailwind CSS v4 with custom monochrome/liquid-glass tokens
 - **Storage:** Upstash Redis/KV for app state, Vercel Blob for uploads
-- **Native:** SwiftUI and WidgetKit for iPhone, SwiftUI/WebKit hybrid for Mac,
+- **Desktop:** Tauri 2, Rust, React 19, TypeScript, Vite and SQLite
+- **Native iPhone/legacy Mac:** SwiftUI and WidgetKit for iPhone, SwiftUI/WebKit hybrid for Mac,
   Network framework reconnect detection, Sparkle for Mac updates
 - **AI/search:** Gemini, Perplexity, optional local CLI/Ollama relay (`scripts/base-cli.mjs`)
 - **Deployment:** Vercel with daily cron snapshots
@@ -70,6 +76,9 @@ app/
   (app)/                 Authenticated dashboard routes
   api/                   Route handlers, integrations, MCP, cron, widgets
   login/                 Password login
+apps/desktop/            Tauri/Rust application and Vite frontend
+packages/core/           Shared integration response types
+packages/sync/           JSON-preserving sync contracts, merge and upload logic
 components/              Page components, navigation, command palette, UI
 lib/                     Store, contexts, sessions, AI context, utilities
 public/                  Brand assets and PWA manifest
@@ -79,6 +88,11 @@ macos/                   macOS WebKit host, offline fallback, and Sparkle config
 scripts/                 Native install/release helpers, base-cli.mjs local relay
 docs/                    iOS/macOS app notes
 ```
+
+The migration retains the web application at the root to preserve Vercel setup.
+Read [migration decisions](docs/native-migration.md) and
+[build/runtime checks](docs/desktop-verification.md) before replacing an existing
+native installation. Production builds require no local Node server.
 
 ## Getting Started
 
