@@ -1,9 +1,10 @@
 # Phase 1 desktop verification
 
-Phase 1 remains **incomplete** until actual macOS build/runtime results and the
-remaining integration checks below have been supplied. The user has reported
-passing Mac checks; their scope is being clarified below. Phase 2 and phase 3
-have not started.
+Phase 1's desktop implementation is committed. The user confirms actual Mac
+build, launch and offline persistence checks and explicitly authorizes Phase 2
+before hosted-backend reconnection verification. That cloud check is **pending**,
+not passed; it will run after the UI upgrade and Vercel backend setup. Phase 3
+has not started. The remaining release/integration checks below stay open.
 
 ## Build and run
 
@@ -143,14 +144,16 @@ Close the fixture after testing and sign out of its account in the app.
 - Hardware: MacBook Air M3, 16 GB RAM.
 - OS: macOS Tahoe 26.5.2, as reported by the user.
 - Result: “8 checks passed, no errors or failures.”
-- Verification scope: awaiting clarification of whether this means the eight
-  Rust unit tests or also the bundled app build/runtime, offline restart and
-  reconnection checks. The sync destination (local fixture or hosted staging)
-  has not yet been reported.
+- Verification scope: the user subsequently confirmed building and launching
+  the bundled app and verifying offline edits survive restart.
+- Reconnection synchronization was difficult to verify and is not reported as
+  passed. At the user's explicit instruction, the proper check is deferred until
+  the updated backend runs on Vercel, after the UI upgrade. No hosted staging
+  synchronization result has been supplied.
 - Intel runtime and Mac performance measurements have not been reported.
 
-This records the user's evidence without inferring unreported checks. Do not
-mark Phase 1 complete or start Phase 2 until the required gate is established.
+This records the user's evidence without inferring unreported checks. The user
+has revised the original phase gate to allow Phase 2 with the cloud check open.
 
 ## macOS checklist for the user
 
@@ -268,6 +271,8 @@ remains confined to the unchanged iOS source until its phase.
 ## Gate status
 
 Linux implementation, builds and the functional checks recorded above are
-verified. macOS runtime, real staging cloud/integration verification, signed
-updates and the remaining native service checks remain pending. Phase 1 is **not complete**, and the redesign
-and native iPhone modernization have not begun.
+verified. Mac build/launch/offline checks are confirmed by the user. Hosted
+reconnection and integration verification, signed updates and remaining native
+service checks remain pending. The original full Phase 1 verification criteria
+are not yet met; the user explicitly authorizes the UI upgrade first. Phase 2
+can proceed with that documented exception. Phase 3 has not begun.

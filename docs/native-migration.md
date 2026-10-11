@@ -4,9 +4,12 @@
 
 There are three phases: (1) locally bundled desktop and offline sync, (2) visual
 redesign and measured optimization, (3) native iPhone modernization. A phase must
-be implemented, tested, documented and committed before the next begins. macOS
-and iPhone hardware verification cannot be performed on this Linux workstation;
-those checks remain pending and prevent claiming the relevant phase complete.
+be implemented, tested, documented and committed before the next begins. The
+user has subsequently authorized the UI upgrade before hosted-backend
+reconnection verification, which will follow Vercel backend setup. Record that
+exception without claiming the deferred checks passed. macOS and iPhone hardware
+cannot be tested directly on this Linux workstation; user-run checks are credited
+only to their reported scope.
 
 ## Repository audit (11 October 2026)
 
@@ -99,9 +102,12 @@ the old deployment; v2 receipts and desktop sessions are additive Redis keys.
 Phase 1: desktop/sync implementation and documented Linux functional checks are
 implemented. The user reports eight passing checks on a MacBook Air M3 with
 16 GB RAM, running macOS Tahoe 26.5.2. The scope of those checks is being
-clarified; real staging integrations and signed-update validation remain pending.
-Phase 1 is not yet
-complete. Phase 2 and phase 3 have not started.
+confirmed: actual bundled build/launch and offline restart checks passed.
+Hosted reconnection, real integrations and signed-update validation remain
+pending. The user explicitly authorizes Phase 2 first and will verify proper
+sync after the updated backend runs on Vercel. The original full verification
+criteria remain unmet and tracked; Phase 2 proceeds under that revised gate.
+Phase 3 has not started.
 Actual results, hardware verification and remaining limitations will be recorded
 here before any phase advances.
 
