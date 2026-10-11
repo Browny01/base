@@ -13,5 +13,17 @@ export function moveDashboardWidget(widgets: DashboardWidget[], id: DashboardWid
 }
 export function reorderDashboardWidget(widgets:DashboardWidget[], source:DashboardWidget, target:DashboardWidget):DashboardWidget[] {
   if(source===target || !widgets.includes(source) || !widgets.includes(target))return [...widgets];
-  const next=widgets.filter(id=>id!==source);next.splice(next.indexOf(target),0,source);return next;
+  const next=widgets.filter(id=>id!==source);next.splice(widgets.indexOf(target),0,source);return next;
+}
+
+export type WidgetSize = { columns: number; height: number };
+export type WidgetSizes = Partial<Record<DashboardWidget, WidgetSize>>;
+export function clampWidgetSize(id: DashboardWidget, columns: number, height: number): WidgetSize {
+  return { columns: Math.max(1, Math.min(4, Math.round(Number.isFinite(columns)?columns:2))), height: Math.max(id.endsWith("metric")?176:240, Math.min(1200, Math.round((Number.isFinite(height)?height:320)/16)*16)) };
+}
+export function readWidgetSizes(raw: string): WidgetSizes {
+  try {
+    const value: unknown=JSON.parse(raw);if(!value||typeof value!=="object"||Array.isArray(value))return {};
+    return Object.fromEntries(DASHBOARD_WIDGETS.flatMap(id=>{const size=(value as Record<string,WidgetSize>)[id];return size&&typeof size.columns==="number"&&typeof size.height==="number"?[[id,clampWidgetSize(id,size.columns,size.height)]]:[];}));
+  } catch { return {}; }
 }

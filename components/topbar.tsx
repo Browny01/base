@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "@/lib/link";
 import { Keyboard, Plus, ChevronDown } from "lucide-react";
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
@@ -12,7 +13,7 @@ import { usePathname } from "@/lib/navigation";
 import { PAGE_BY_HREF, SETTINGS_PAGE } from "@/lib/nav-config";
 import { useQuickActions } from "@/lib/quick-actions";
 
-export function TopBar() {
+export function TopBar({ syncControl }: { syncControl?: ReactNode }) {
   const { data } = useBase();
   const path = usePathname();
   const quick = useQuickActions();
@@ -41,7 +42,7 @@ export function TopBar() {
               <Dropdown.Item className="base-menu-item" onSelect={quick.newProject}>New project <kbd>⇧ O</kbd></Dropdown.Item>
             </Dropdown.Content></Dropdown.Portal>
           </Dropdown.Root>
-          <BrowserSyncStatus />
+          {syncControl ?? <BrowserSyncStatus />}
           <button
             onClick={openShortcutSheet}
             title="Keyboard shortcuts (?)"

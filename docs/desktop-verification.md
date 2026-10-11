@@ -139,6 +139,24 @@ curl -X POST http://127.0.0.1:3456/test/control -H 'Content-Type: application/js
 curl -X POST http://127.0.0.1:3456/test/control -H 'Content-Type: application/json' -d '{"offline":false}'
 ```
 
+The fixture is ephemeral: restarting it clears its data and sessions. A new
+account identity remains isolated from the old cached workspace. To exercise
+revision rollback while retaining the fixture account/session, use:
+
+```sh
+# Fixture only. Connect and sync first, then make an offline edit.
+curl -X POST http://127.0.0.1:3456/test/control -H 'Content-Type: application/json' -d '{"offline":false,"reset":true}'
+```
+
+Click the top-bar sync icon. The updated backend returns an explicit recovery
+snapshot; Base archives the previous document, baseline and original queued
+operations in one transaction. Differences require review in Settings → Account
+& sync. Choosing “Keep my edit” submits a fresh operation against the new server
+state. “Export workspace & pending edits” includes the recovery archives. Do not
+delete SQLite or reset a cursor manually to recover. Older clients retain local
+data and reject the backward revision until upgraded. This simulates service
+data loss; it is never a production recovery procedure.
+
 Retries are bounded (five exponential-backoff attempts). Reconnect, foreground
 activation, new edits and “Sync now” restart synchronization; no idle poller runs.
 Close the fixture after testing and sign out of its account in the app.
@@ -147,7 +165,9 @@ Close the fixture after testing and sign out of its account in the app.
 
 - Hardware: MacBook Air M3, 16 GB RAM.
 - OS: macOS Tahoe 26.5.2, as reported by the user.
-- Result: “8 checks passed, no errors or failures.”
+- Initial result: “8 checks passed, no errors or failures.” Later, the user
+  explicitly reported all 99 JavaScript tests and eight Rust tests passing on the
+  Phase 2 source. See [feedback fixes and updated checks](desktop-feedback.md).
 - Verification scope: the user subsequently confirmed building and launching
   the bundled app and verifying offline edits survive restart.
 - Reconnection synchronization was difficult to verify and is not reported as
@@ -163,13 +183,13 @@ has revised the original phase gate to allow Phase 2 with the cloud check open.
 
 Requirements: macOS 13.3 or newer, Xcode command-line tools, Node 24+ and Rust
 1.90+. The old Swift/Sparkle app stays installed for rollback; Tauri initially
-uses `app.base.personal.desktop` and the name **Base Desktop**.
+uses `app.base.personal.desktop` and the name **Base**. The identifier is unchanged, so existing local data and Keychain sessions remain available.
 
 Run the common checks above, then build your host architecture:
 
 ```sh
 npm run desktop:build -- --bundles app,dmg
-open 'apps/desktop/src-tauri/target/release/bundle/macos/Base Desktop.app'
+open 'apps/desktop/src-tauri/target/release/bundle/macos/Base.app'
 ```
 
 For a universal Intel/Apple Silicon package:
@@ -177,7 +197,7 @@ For a universal Intel/Apple Silicon package:
 ```sh
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
 npm run desktop:build -- --target universal-apple-darwin --bundles app,dmg
-open 'apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos/Base Desktop.app'
+open 'apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos/Base.app'
 ```
 
 Unsigned/ad-hoc local development builds are suitable for these checks. Public

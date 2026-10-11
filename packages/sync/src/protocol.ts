@@ -19,7 +19,7 @@ export type Conflict = {
   /** Captured locally when a remote deletion removed the containing record. */
   localRecord?: Slot;
   revision: number;
-  reason: "concurrent-edit" | "deleted-parent" | "protected-field" | "tombstone";
+  reason: "concurrent-edit" | "deleted-parent" | "protected-field" | "tombstone" | "server-reset";
 };
 export type SyncRequest = { protocol: 2; workspaceId: string; cursor: number; full?: boolean; operations: Operation[] };
 export type SyncResponse = {
@@ -29,6 +29,8 @@ export type SyncResponse = {
   data?: Document;
   applied: string[];
   conflicts: Conflict[];
+  /** A rollback/reset cannot acknowledge edits. Clients archive their prior state. */
+  recovery?: { reason: "server-reset"; previousRevision: number };
 };
 export type BrowserSyncStatus = {
   pending: number; conflicts: Conflict[]; error: string; syncing: boolean;

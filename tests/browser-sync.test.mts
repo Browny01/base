@@ -58,4 +58,25 @@ test("browser writes persist a document/outbox atomically and rebase edits made 
   assert.equal(resolved.resolvedConflicts[0].remote.value,"Remote conflict");
   assert.equal(resolved.resolvedConflicts[0].operation.after.value,"Local conflict");
   assert.equal((remote.tasks as Document[]).find(task=>task.id==="one")!.title,"Local conflict");
+  await browser.commitBrowserEdit(data=>({...data,tasks:data.tasks.map(task=>task.id==="one"?{...task,title:"Edit before reset"}:task)}));
+  const previous=JSON.parse(storage.get("base_sync_v2")!);
+  remote={tasks:[{id:"new-server",title:"Created after rollback"}],future:{server:true}};revision=0;
+  globalThis.fetch=async(_input,init)=>{
+    const body=JSON.parse(String(init!.body)) as SyncRequest;
+    if(body.cursor>revision)return Response.json({protocol:2,workspaceId:body.workspaceId,revision,data:remote,applied:[],conflicts:[],recovery:{reason:"server-reset",previousRevision:body.cursor}});
+    const result=mergeOperations(remote,body.operations,revision);remote=result.data;revision++;
+    return Response.json({protocol:2,workspaceId:body.workspaceId,revision,...result});
+  };
+  await browser.sync();
+  const recovered=JSON.parse(storage.get("base_sync_v2")!);
+  assert.equal(recovered.revision,0);assert.equal(recovered.pending.length,0);
+  assert.ok(recovered.conflicts.some((item:{reason:string})=>item.reason==="server-reset"));
+  assert.deepEqual(recovered.recoveryArchives[0].pending,previous.pending);
+  assert.deepEqual(recovered.recoveryArchives[0].document,previous.document);
+  assert.ok(recovered.document.tasks.some((task:{id:string})=>task.id==="new-server"));
+  assert.equal(recovered.document.tasks.find((task:{id:string})=>task.id==="one").title,"Edit before reset");
+  const restore=browser.browserSyncStatus().conflicts.find(conflict=>typeof conflict.operation.path[1]==="object"&&conflict.operation.path[1].id==="one")!;
+  await browser.browserSyncStatus().resolveConflict(restore.id,"local");await browser.sync();
+  assert.equal((remote.tasks as Document[]).find(task=>task.id==="one")?.title,"Edit before reset");
+  assert.ok((remote.tasks as Document[]).some(task=>task.id==="new-server"));
 });

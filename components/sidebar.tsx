@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useTheme } from "@/lib/theme-context";
 import { useBase } from "@/lib/hooks";
-import { visiblePages, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
+import { visiblePages, orderedKeys, DEFAULT_SIDEBAR_ORDER, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
 import { ChevronsLeft, Sun, Moon, ChevronsRight } from "lucide-react";
 import { firstName, initialOf } from "@/lib/profile";
 
@@ -26,17 +26,17 @@ function NavLink({ item, pathname, collapsed }: { item: NavPage; pathname: strin
       aria-label={collapsed ? item.label : undefined}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "base-nav-link relative flex items-center rounded-md text-[13px] transition-colors min-h-[32px]",
-        collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
+        "base-nav-link relative flex items-center rounded-lg text-[13px] transition-colors min-h-[36px]",
+        collapsed ? "justify-center px-0" : "gap-3 px-3",
         active
           ? "base-nav-active text-[var(--text)] font-medium"
-          : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] font-normal"
+          : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] font-medium"
       )}
     >
       <Icon
         className="shrink-0"
-        style={{ width: 17, height: 17 }}
-        strokeWidth={active ? 2.1 : 1.8}
+        style={{ width: 18, height: 18 }}
+        strokeWidth={1.65}
       />
       {!collapsed && <span className="truncate">{item.label}</span>}
     </Link>
@@ -51,8 +51,9 @@ export function Sidebar() {
   const isDark = theme === "dark";
 
   const pages = visiblePages(data.navPrefs);
-  const sections: string[] = [];
-  for (const p of pages) if (!sections.includes(p.section)) sections.push(p.section);
+  const customOrder=orderedKeys(data.navPrefs).join()!==DEFAULT_SIDEBAR_ORDER.join();
+  const sections: string[] = customOrder?["Workspace"]:[];
+  if(!customOrder)for (const p of pages) if (!sections.includes(p.section)) sections.push(p.section);
 
   return (
     <aside
@@ -91,13 +92,13 @@ export function Sidebar() {
         {sections.map((section) => (
           <div key={section} className="flex flex-col gap-0.5">
             {!collapsed ? (
-              <p className="px-2.5 pt-1 pb-1.5 text-[10.5px] font-semibold text-[var(--faint)] tracking-[0.14em] uppercase">
+              <p className="px-2.5 pt-1 pb-1.5 text-[11px] font-medium text-[var(--faint)] tracking-normal">
                 {section}
               </p>
             ) : (
               <div className="mx-auto my-1 h-px w-7 bg-[var(--border)]" aria-hidden="true" />
             )}
-            {pages.filter((p) => p.section === section).map((item) => (
+            {pages.filter((p) => customOrder || p.section === section).map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} collapsed={collapsed} />
             ))}
           </div>
@@ -130,8 +131,8 @@ export function Sidebar() {
             className="shrink-0 flex items-center justify-center rounded-[7px] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors w-9 h-9"
           >
             {isDark
-              ? <Sun className="shrink-0" style={{ width: 17, height: 17 }} strokeWidth={1.8} />
-              : <Moon className="shrink-0" style={{ width: 17, height: 17 }} strokeWidth={1.8} />}
+              ? <Sun className="shrink-0" style={{ width: 18, height: 18 }} strokeWidth={1.8} />
+              : <Moon className="shrink-0" style={{ width: 18, height: 18 }} strokeWidth={1.8} />}
           </button>
         </div>
         {!collapsed && <Link href="/settings" className="flex items-center gap-2.5 rounded-md px-2 py-2 hover:bg-[var(--surface-2)]">

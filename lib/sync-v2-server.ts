@@ -50,7 +50,11 @@ function protectedOperation(data: Document, op: Operation): boolean {
 export async function syncV2(redis: Redis, request: SyncRequest): Promise<SyncResponse> {
   for (let attempt = 0; attempt < 6; attempt++) {
     const snapshot = await readVersionedBaseData(redis);
-    if (request.cursor > snapshot.revision) throw new Error("Sync cursor is ahead of the server; recovery is required.");
+    if (request.cursor > snapshot.revision) return {
+      protocol: 2, workspaceId: request.workspaceId, revision: snapshot.revision,
+      data: snapshot.data as Document, applied: [], conflicts: [],
+      recovery: { reason: "server-reset", previousRevision: request.cursor },
+    };
     const ids = request.operations.map(op => op.id);
     const stored = ids.length ? await redis.hmget<Record<string, unknown>>(RECEIPTS, ...ids) : {};
     const receipts = request.operations.map(op => unwrap<Receipt>(stored?.[op.id]));

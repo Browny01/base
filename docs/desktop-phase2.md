@@ -11,6 +11,11 @@ with 16 GB RAM, running their reported Tahoe 26.5.2. They explicitly deferred
 hosted reconnection synchronization until after the UI upgrade and Vercel backend
 setup. That check remains pending; fixture synchronization does not close it.
 
+The user subsequently reported **99 JavaScript and eight Rust tests passing on
+their Mac**, and supplied UI/runtime feedback. The fixes and updated verification
+are recorded in [Mac feedback fixes](desktop-feedback.md). The updated source now
+has 106 JavaScript and ten Rust tests; the new Mac build still needs verification.
+
 ## Design decisions
 
 The actual [GR8R reference](https://gr8r-studio.vercel.app/) was inspected in the
@@ -217,7 +222,7 @@ Run the Phase 1 common checks again on the redesigned source, then:
 
 ```sh
 npm run desktop:build -- --bundles app,dmg
-BASE_DESKTOP_PROFILE=1 'apps/desktop/src-tauri/target/release/bundle/macos/Base Desktop.app/Contents/MacOS/base-desktop'
+BASE_DESKTOP_PROFILE=1 'apps/desktop/src-tauri/target/release/bundle/macos/Base.app/Contents/MacOS/base-desktop'
 ```
 
 Record three launches with no build/dev server running: the first launch of a

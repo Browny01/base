@@ -12,14 +12,14 @@ import { ThemeProvider } from "@/lib/theme-context";
 import { AccentProvider } from "@/lib/accent-context";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { usePathname } from "./navigation";
-import { DesktopControls } from "./desktop-controls";
+import { DesktopAccountSettings, DesktopSyncButton, DesktopFeedback } from "./desktop-controls";
 import { useUnsaved, useWorkspaceScope } from "./store";
 import { PageSkeleton } from "@/components/ui/page-heading";
 
 class PageRecovery extends Component<{children:ReactNode},{error:Error|null}> {
   state:{error:Error|null}={error:null};
   static getDerivedStateFromError(error:Error){return {error};}
-  render(){return this.state.error?<div role="alert" className="p-6"><h1 className="text-lg font-semibold">This page could not open</h1><p className="mt-2">Your stored workspace is retained. Use Account & sync to export a recovery copy, or open another page.</p><p className="mt-2 text-sm text-[var(--muted)]">{this.state.error.message}</p><button className="mt-3 underline" onClick={()=>this.setState({error:null})}>Retry page</button></div>:this.props.children;}
+  render(){return this.state.error?<div role="alert" className="p-6"><h1 className="text-lg font-semibold">This page could not open</h1><p className="mt-2">Your stored workspace is retained. Use Settings → Account & sync to export a recovery copy, or open another page.</p><p className="mt-2 text-sm text-[var(--muted)]">{this.state.error.message}</p><button className="mt-3 underline" onClick={()=>this.setState({error:null})}>Retry page</button></div>:this.props.children;}
 }
 
 const Dashboard = lazy(() => import("@/components/dashboard").then(m => ({ default: m.Dashboard })));
@@ -53,7 +53,7 @@ function Route() {
     case "/shopping-list": return <Shopping />;
     case "/reading-list": return <Reading />;
     case "/watch-list": return <Watch />;
-    case "/settings": return <Settings />;
+    case "/settings": return <Settings accountSection={<DesktopAccountSettings />} />;
     default: return path.startsWith("/projects/") ? <Project id={decodeURIComponent(path.slice(10))} /> : <div className="p-6">Page not found. Use the sidebar to return to your workspace.</div>;
   }
 }
@@ -74,7 +74,7 @@ export function App() {
     <div className="flex h-dvh overflow-hidden bg-[var(--bg)]">
       <div className="nx-desktop-sidebar hidden md:flex shrink-0"><Sidebar /></div>
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <TopBar /><DesktopControls />
+        <TopBar syncControl={<DesktopSyncButton />} /><DesktopFeedback />
         <main id="base-main" tabIndex={-1} inert={unsaved} className="nx-main flex-1 min-h-0 overflow-y-auto overscroll-contain"><ContentContainer>
           <PageRecovery key={`${scope}:${path}`}><Suspense fallback={<PageSkeleton />}><Route /><ReportReady /></Suspense></PageRecovery>
         </ContentContainer></main>

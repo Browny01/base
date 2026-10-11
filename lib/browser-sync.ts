@@ -1,10 +1,11 @@
 "use client";
 import { DEFAULT, getData, migrateAll, installLocalSnapshot, type BaseData } from "./store.ts";
 import { diff, equal, overlay, readSlot, validOperation, type Document, type Operation, type Conflict, type SyncResponse, type BrowserSyncStatus } from "../packages/sync/src/protocol.ts";
+import { isRecovery, recoverSnapshot } from "../packages/sync/src/recovery.ts";
 import { prepareBatch } from "../packages/sync/src/upload.ts";
 
 const KEY = "base_sync_v2";
-type State = { version: 2; document: BaseData; baseline: Document | null; pending: Operation[]; conflicts: Conflict[]; resolvedConflicts?: (Conflict & { choice: "local" | "server"; resolvedAt: number })[]; revision: number; workspaceId: string | null; legacy?: BaseData };
+type State = { version: 2; document: BaseData; baseline: Document | null; pending: Operation[]; conflicts: Conflict[]; resolvedConflicts?: (Conflict & { choice: "local" | "server"; resolvedAt: number })[]; revision: number; workspaceId: string | null; legacy?: BaseData; recoveryArchives?: { document: BaseData; baseline: Document | null; pending: Operation[]; conflicts: Conflict[]; revision: number; recoveredAt: number }[] };
 const json = (data: BaseData) => JSON.parse(JSON.stringify(data)) as Document;
 let state: State | null = null;
 let unsaved: { next: State; previous: string | null } | null = null;
@@ -124,11 +125,21 @@ export async function sync():Promise<void> {
     const response=await fetch("/api/native/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({protocol:2,workspaceId:sent.workspaceId,cursor:sent.revision,operations}),signal:AbortSignal.timeout(30_000)});
     if(!response.ok)throw new Error((await response.json()).error??`Sync failed (${response.status}).`);
     const result=await response.json() as SyncResponse;
-    if(result.protocol!==2||result.workspaceId!==sent.workspaceId||!Number.isSafeInteger(result.revision)||result.revision<sent.revision)throw new Error("Invalid sync response; edits were retained.");
+    if(result.protocol!==2||result.workspaceId!==sent.workspaceId||!Number.isSafeInteger(result.revision)||(result.revision<sent.revision&&!isRecovery(result,sent.revision)))throw new Error("Invalid sync response; edits were retained.");
+    if(result.recovery&&!isRecovery(result,sent.revision))throw new Error("Invalid recovery response; edits were retained.");
     const ids=new Set(operations.map(op=>op.id));
     if(!Array.isArray(result.applied)||!Array.isArray(result.conflicts)||[...result.applied,...result.conflicts.map(c=>c.id)].some(id=>!ids.has(id))||result.conflicts.some(c=>!validOperation(c.operation)||!equal(c.operation,sent.pending.find(op=>op.id===c.id))))throw new Error("Unknown sync acknowledgement; no edits were removed.");
     await locked(()=>{
     if(state!.workspaceId!==sent.workspaceId)throw new Error("Workspace changed during sync; your edits are retained.");
+    if(isRecovery(result,sent.revision)) {
+      const previous=state!;
+      const recovered=recoverSnapshot(json(previous.document),[...previous.pending,...previous.conflicts.map(c=>c.operation)],result.data!,result.revision,undefined,previous.baseline??{});
+      const conflicts=[...previous.conflicts,...recovered.conflicts];
+      const document=migrateAll({...DEFAULT,...overlay(recovered.document,previous.conflicts.map(c=>c.operation))} as unknown as BaseData);
+      const archive={document:previous.document,baseline:previous.baseline,pending:previous.pending,conflicts:previous.conflicts,revision:previous.revision,recoveredAt:Date.now()};
+      save({...previous,document,baseline:result.data!,revision:result.revision,pending:[],conflicts,recoveryArchives:[...(previous.recoveryArchives??[]),archive]});
+      failures=0;return;
+    }
     const acknowledged=new Set([...result.applied,...result.conflicts.map(c=>c.id)]);
     const pending=state!.pending.filter(op=>!acknowledged.has(op.id));
     const baseline=result.revision>=state!.revision?(result.data??state!.baseline!):state!.baseline!;

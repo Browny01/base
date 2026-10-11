@@ -59,7 +59,7 @@ let vaultSecret: string | null = null;
 installSecretCache({ get: () => vaultSecret, set: secret => { vaultSecret = secret; }, clear: () => { vaultSecret = null; } });
 root.render(<div role="status" className="p-6">Opening local workspace…</div>);
 if (!isTauri()) {
-  root.render(<div className="p-6"><h1 className="text-xl font-semibold">Base Desktop</h1><p className="mt-2">Run the Tauri application to use the local SQLite workspace.</p></div>);
+  root.render(<div className="p-6"><h1 className="text-xl font-semibold">Base</h1><p className="mt-2">Run the Tauri application to use the local SQLite workspace.</p></div>);
 } else {
   void (async()=>{
     await getCurrentWindow().onCloseRequested(async event=>{
@@ -82,7 +82,10 @@ if (!isTauri()) {
     await listen<string>("base:menu", ({ payload }) => {
       if (payload.startsWith("/")) window.location.hash = payload;
       else if (payload === "new-task") { requestHandoff(HANDOFF_OPEN_NEW_TASK,[LEGACY_HANDOFF_OPEN_NEW_TASK]); window.location.hash = "/tasks"; }
-      else if (payload === "command") window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+      else if (payload === "command") {
+        const event=new KeyboardEvent("keydown",{key:"k",ctrlKey:true,bubbles:true,cancelable:true});
+        (document.activeElement instanceof HTMLElement?document.activeElement:window).dispatchEvent(event);
+      }
     });
     window.addEventListener("base:focus-complete", () => {
       void isPermissionGranted().then(granted => { if (granted) sendNotification({ title: "Base", body: "Your focus session is complete." }); });

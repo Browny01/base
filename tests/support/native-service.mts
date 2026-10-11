@@ -47,6 +47,7 @@ const service=createServer(async(req,res)=>{
   if(pathname==="/test/control"){
     if(req.method==="POST") {
       const control=JSON.parse(body);if(typeof control.offline==="boolean")offline=control.offline;
+      if(control.reset===true){redis.values.set("base:data",{tasks:[{id:"reset-server-task",title:"Created on reset server",done:false,priority:"P2",tag:"work",dueDate:null,recurring:null,createdAt:"2026-10-11T00:00:00Z"}]});redis.values.set("base:data:revision","0");redis.hashes.delete("base:sync:v2:receipts");redis.hashes.delete("base:sync:v2:tombstones");}
       if(control.patch){const data=typeof redis.values.get("base:data")==="string"?JSON.parse(String(redis.values.get("base:data"))):redis.values.get("base:data");redis.values.set("base:data",{...(data as object),...control.patch});redis.values.set("base:data:revision",String(Number(redis.values.get("base:data:revision")??0)+1));}
     }
     res.setHeader("content-type","application/json");res.end(JSON.stringify({offline,data:redis.values.get("base:data"),revision:redis.values.get("base:data:revision")}));return;

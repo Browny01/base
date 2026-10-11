@@ -17,9 +17,10 @@ import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
 import { ProjectLogo } from "@/components/project-logo";
 import { useQuickActions } from "@/lib/quick-actions";
+import { DashboardTile } from "./ui/dashboard-tile";
 import { PageHeading } from "./ui/page-heading";
 import { useStoredPref, writeStored } from "@/lib/prefs";
-import { readDashboardWidgets, moveDashboardWidget, reorderDashboardWidget, DEFAULT_DASHBOARD_WIDGETS, type DashboardWidget } from "@/lib/dashboard-widgets";
+import { readWidgetSizes, readDashboardWidgets, moveDashboardWidget, reorderDashboardWidget, DEFAULT_DASHBOARD_WIDGETS, type DashboardWidget } from "@/lib/dashboard-widgets";
 
 
 const PRIORITIES = PRIORITY_META;
@@ -121,8 +122,8 @@ export function Dashboard() {
   const [showQuickForm, setShowQuickForm] = useState(false);
   const [revenuePeriod, setRevenuePeriod] = useState<"day" | "week" | "month">("day");
   const [customizing, setCustomizing] = useState(false);
-  const [dragWidget,setDragWidget]=useState<WidgetId|null>(null);
-  const [overWidget,setOverWidget]=useState<WidgetId|null>(null);
+  const rawSizes=useStoredPref("base_dashboard_sizes_v1","{}");
+  const widgetSizes=useMemo(()=>readWidgetSizes(rawSizes),[rawSizes]);
   const storedWidgets = useStoredPref("base_dashboard_widgets_v1", JSON.stringify(DEFAULT_DASHBOARD_WIDGETS));
   const widgetIds = useMemo(()=>readDashboardWidgets(storedWidgets),[storedWidgets]);
   const saveWidgets = (widgets: WidgetId[]) => writeStored("base_dashboard_widgets_v1",JSON.stringify(widgets));
@@ -327,15 +328,15 @@ export function Dashboard() {
         <button onClick={quick.newTask} className="base-button base-button-primary"><Plus className="h-3.5 w-3.5"/> New task</button>
       </PageHeading>
       {customizing && <section className="base-dashboard-settings" aria-label="Dashboard widgets">
-        <div className="flex items-center justify-between mb-3"><h2 className="text-sm font-semibold">Make this space yours</h2><button className="text-xs underline" onClick={()=>saveWidgets([...DEFAULT_DASHBOARD_WIDGETS])}>Reset layout</button></div>
-        <p className="mb-4 text-xs text-[var(--muted)]">Choose your widgets and their order. Drag the panels or use the arrow buttons. This layout is saved on this device.</p>
+        <div className="flex items-center justify-between mb-3"><h2 className="text-sm font-semibold">Make this space yours</h2><button className="text-xs underline" onClick={()=>{saveWidgets([...DEFAULT_DASHBOARD_WIDGETS]);writeStored("base_dashboard_sizes_v1","{}");}}>Reset layout</button></div>
+        <p className="mb-4 text-xs text-[var(--muted)]">Drag a widget’s top handle to move it and its bottom-right corner to resize. You can also focus either handle and use the arrow keys. Layout changes are saved on this device.</p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{WIDGETS.map(widget=><div key={widget.id} className="flex items-center gap-2 rounded-md border border-[var(--border)] p-2">
           <label className="flex flex-1 items-center gap-2 text-xs"><input type="checkbox" checked={widgetIds.includes(widget.id)} onChange={event=>saveWidgets(event.target.checked?[...widgetIds,widget.id]:widgetIds.filter(id=>id!==widget.id))}/>{widget.label}</label>
           <button aria-label={`Move ${widget.label} earlier`} disabled={widgetIds.indexOf(widget.id)<=0} onClick={()=>saveWidgets(moveDashboardWidget(widgetIds,widget.id,-1))} className="base-widget-nudge"><ChevronLeft className="h-3.5 w-3.5"/></button>
           <button aria-label={`Move ${widget.label} later`} disabled={!widgetIds.includes(widget.id)||widgetIds.indexOf(widget.id)===widgetIds.length-1} onClick={()=>saveWidgets(moveDashboardWidget(widgetIds,widget.id,1))} className="base-widget-nudge"><ChevronRight className="h-3.5 w-3.5"/></button>
         </div>)}</div>
       </section>}
-      <div className="base-dashboard-grid">{widgetIds.map(id=><section key={id} draggable={customizing} onDragStart={event=>{setDragWidget(id);event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",id);}} onDragOver={event=>{if(!dragWidget)return;event.preventDefault();setOverWidget(id);}} onDrop={event=>{event.preventDefault();if(dragWidget)saveWidgets(reorderDashboardWidget(widgetIds,dragWidget,id));setDragWidget(null);setOverWidget(null);}} onDragEnd={()=>{setDragWidget(null);setOverWidget(null);}} className={`base-dashboard-widget ${id.endsWith("metric")?"base-dashboard-metric":""} ${customizing?"base-widget-arranging":""} ${overWidget===id?"base-widget-drop":""}`} aria-label={WIDGETS.find(widget=>widget.id===id)?.label}>{renderWidget(id)}</section>)}</div>
+      <div className="base-dashboard-grid">{widgetIds.map(id=><DashboardTile key={id} id={id} label={WIDGETS.find(widget=>widget.id===id)!.label} customizing={customizing} size={widgetSizes[id]} onMove={(source,target)=>saveWidgets(reorderDashboardWidget(widgetIds,source,target))} onResize={size=>writeStored("base_dashboard_sizes_v1",JSON.stringify({...widgetSizes,[id]:size}))}>{renderWidget(id)}</DashboardTile>)}</div>
       {!widgetIds.length && <div className="base-empty"><h2>Your dashboard, your call</h2><p>Use Customize to add the widgets you want to see.</p></div>}
     </div>
   );

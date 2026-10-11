@@ -438,12 +438,16 @@ pub async fn export_workspace(
     let imports = {
         let connection = db.0.lock().map_err(|e| e.to_string())?;
         let mut statement = connection
-            .prepare("SELECT value FROM metadata WHERE key LIKE ?1")
+            .prepare("SELECT value FROM metadata WHERE key LIKE ?1 OR key LIKE ?2")
             .map_err(|e| e.to_string())?;
         let rows = statement
-            .query_map([format!("import:{}:%", snapshot.scope)], |r| {
-                r.get::<_, String>(0)
-            })
+            .query_map(
+                [
+                    format!("import:{}:%", snapshot.scope),
+                    format!("recovery:{}:%", snapshot.scope),
+                ],
+                |r| r.get::<_, String>(0),
+            )
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;

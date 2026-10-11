@@ -4,6 +4,7 @@ import { diff, overlay, readSlot, writeSlot, equal, validOperation, type Documen
 import { native, request, documentOf, type Workspace } from "./native";
 import { prepareBatch } from "@/packages/sync/src/upload";
 import { clearSessionSecret } from "@/lib/vault";
+import { isRecovery, recoverSnapshot } from "@/packages/sync/src/recovery";
 import { importOperations } from "@/packages/sync/src/import";
 
 const normalize = (document: Document) => migrateAll({ ...DEFAULT, ...document } as unknown as BaseData, { preserveArchived: true });
@@ -91,12 +92,21 @@ export async function sync(): Promise<void> {
     if (!res.ok) throw new Error((await res.json()).error ?? `Sync failed (${res.status}).`);
     const response = await res.json() as SyncResponse;
     if (response.protocol !== 2 || response.workspaceId !== sent.workspaceId || !Array.isArray(response.applied) || !Array.isArray(response.conflicts)) throw new Error("The server does not support this sync protocol. Deploy the desktop API first.");
-    if (!Number.isSafeInteger(response.revision) || response.revision < sent.revision || (response.data !== undefined && (!response.data || typeof response.data !== "object" || Array.isArray(response.data)))) throw new Error("Invalid server snapshot; no local changes were acknowledged.");
+    if (response.recovery && !isRecovery(response, sent.revision)) throw new Error("Invalid recovery response; your local workspace is retained.");
+    if (!Number.isSafeInteger(response.revision) || response.revision < 0 || (response.revision < sent.revision && !isRecovery(response, sent.revision)) || (response.data !== undefined && (!response.data || typeof response.data !== "object" || Array.isArray(response.data)))) throw new Error("Invalid server snapshot; no local changes were acknowledged.");
     const sentIds = new Set(operations.map(op => op.id));
     if ([...response.applied, ...response.conflicts.map(c => c.id)].some(id => !sentIds.has(id))) throw new Error("Server acknowledged unknown operations; no local data was changed.");
     if (response.conflicts.some(c => !validOperation(c.operation) || !equal(c.operation, sent.pending.find(op => op.id === c.id)))) throw new Error("The server returned a changed operation; your original edit is still queued.");
     await serialized(async () => {
       if (!workspace || workspace.scope !== sent.scope) return;
+      if (isRecovery(response, sent.revision)) {
+        const recovered = recoverSnapshot(workspace.document, [...workspace.pending,...workspace.conflicts.map(c=>c.operation)], response.data!, response.revision, undefined, workspace.baseline);
+        const document = overlay(recovered.document, workspace.conflicts.map(c => c.operation));
+        accept(await native<Workspace>("apply_sync", { scope: workspace.scope, expectedRevision: workspace.localRevision, response, document, recoveryConflicts: recovered.conflicts }));
+        failures = 0;
+        setStatus({ lastSync: Date.now(), error: recovered.conflicts.length ? "The service restarted. Your local records are preserved. Review recovery conflicts in Settings → Account & sync." : "" });
+        return;
+      }
       const acknowledged = new Set([...response.applied, ...response.conflicts.map(c => c.id)]);
       const pending = workspace.pending.filter(op => !acknowledged.has(op.id));
       const remote = response.data ?? workspace.baseline;
@@ -132,14 +142,18 @@ export async function sync(): Promise<void> {
   return syncing;
 }
 export async function connect(origin: string, password: string) {
+  window.dispatchEvent(new Event("base:flush-editors"));
   return serialized(async () => {
+    flushLocalWritesBeforeSwitch();
     const next = await native<Workspace>("connect_account", { origin, password, defaults: documentOf(normalize(documentOf(DEFAULT))) });
     clearSessionSecret();
     accept(next); failures = 0; setStatus({ error: "" }); schedule(0);
   });
 }
 export async function disconnect() {
+  window.dispatchEvent(new Event("base:flush-editors"));
   return serialized(async () => {
+    flushLocalWritesBeforeSwitch();
     accept(await native<Workspace>("disconnect_account", { defaults: documentOf(normalize(documentOf(DEFAULT))) }));
     clearSessionSecret();
     setStatus({ error: "" });
@@ -175,7 +189,7 @@ export function useDesktopStatus() { return useSyncExternalStore(subscribe, () =
 export function useWorkspaceScope() { return useSyncExternalStore(subscribe, () => workspace?.scope ?? ""); }
 export function useUnsaved() { return useSyncExternalStore(subscribe, () => status.hasUnsaved); }
 export function unsavedCopy() { return failedEdit; }
-export async function flushLocalWrites() { await tail;if(failedEdit)throw new Error("An edit is still unsaved. Retry saving or export its full copy before closing Base."); }
+export async function flushLocalWrites() { window.dispatchEvent(new Event("base:flush-editors"));await tail;if(failedEdit)throw new Error("An edit is still unsaved. Retry saving or export its full copy before closing Base."); }
 export async function retrySave() {
   return serialized(async()=>{
     if(!failedEdit)return;
@@ -184,6 +198,7 @@ export async function retrySave() {
   });
 }
 export async function importBackup() {
+  window.dispatchEvent(new Event("base:flush-editors"));
   return serialized(async()=>{
     await flushLocalWritesBeforeSwitch();
     const next=await native<Workspace|null>("import_workspace");
@@ -192,6 +207,7 @@ export async function importBackup() {
 }
 function flushLocalWritesBeforeSwitch() { if(failedEdit)throw new Error("Save or export your unsaved edit before switching workspaces."); }
 export async function selectOffline(scope:string) {
+  window.dispatchEvent(new Event("base:flush-editors"));
   return serialized(async()=>{
     flushLocalWritesBeforeSwitch();
     // Switching away from a cloud account keeps its scoped queue and session;

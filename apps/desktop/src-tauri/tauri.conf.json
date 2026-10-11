@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Base Desktop",
+  "productName": "Base",
   "version": "0.1.0",
   "identifier": "app.base.personal.desktop",
   "build": {

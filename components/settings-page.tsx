@@ -1,9 +1,11 @@
 "use client";
 
+import { readStored, writeStored } from "@/lib/prefs";
+import { ReorderList } from "./ui/reorder-list";
 import { PageHeading } from "./ui/page-heading";
 
-import { useState } from "react";
-import { ArrowDown, ArrowUp, Check, Eye, EyeOff, KeyRound, Layers, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Check, Eye, EyeOff, KeyRound, Layers, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNavMode } from "@/lib/nav-mode-context";
@@ -369,16 +371,6 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
   );
 }
 
-function moveKey(arr: string[], key: string, dir: -1 | 1): string[] {
-  const idx = arr.indexOf(key);
-  const target = idx + dir;
-  if (idx < 0 || target < 0 || target >= arr.length) return arr;
-  const next = [...arr];
-  const [moved] = next.splice(idx, 1);
-  next.splice(target, 0, moved);
-  return next;
-}
-
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button
@@ -412,19 +404,11 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
     setPrefs({ ...prefs, hiddenPages: [...next] });
   }
 
-  function moveKeyIn(key: string, dir: -1 | 1) {
-    setPrefs({ ...prefs, sidebarOrder: moveKey(order, key, dir) });
-  }
-
   function toggleTab(key: string) {
     setPrefs({
       ...prefs,
       bottomTabs: tabs.includes(key) ? tabs.filter((k) => k !== key) : [...tabs, key],
     });
-  }
-
-  function moveTab(key: string, dir: -1 | 1) {
-    setPrefs({ ...prefs, bottomTabs: moveKey(tabs, key, dir) });
   }
 
   const pageFor = (key: string) => ALL_PAGES.find((p) => p.key === key);
@@ -465,52 +449,16 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
           {/* Sidebar order */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
             <p className="text-sm font-bold text-[var(--text)]">Sidebar order</p>
-            <p className="mb-3 text-[11px] text-[var(--faint)]">Reorders the sidebar on desktop and the &quot;All pages&quot; sheets.</p>
-            <div className="space-y-1">
-              {order.map((key, i) => {
-                const page = pageFor(key);
-                if (!page) return null;
-                return (
-                  <div key={key} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-[var(--chip)] transition-colors">
-                    <page.icon className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
-                    <span className="flex-1 min-w-0 truncate text-[13px] text-[var(--text)]">{page.label}</span>
-                    <button onClick={() => moveKeyIn(key, -1)} disabled={i === 0} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move up">
-                      <ArrowUp className="w-4 h-4" strokeWidth={1.9} />
-                    </button>
-                    <button onClick={() => moveKeyIn(key, 1)} disabled={i === order.length - 1} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move down">
-                      <ArrowDown className="w-4 h-4" strokeWidth={1.9} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">Drag a handle up or down to reorder. Keyboard: focus a handle and use ↑ / ↓.</p>
+            <ReorderList label="Sidebar order" items={order.flatMap(key=>{const page=pageFor(key);return page?[{id:key,label:page.label,icon:<page.icon className="h-4 w-4 text-[var(--muted)]"/>}]:[];})} onChange={sidebarOrder=>setPrefs({...prefs,sidebarOrder})}/>
+
           </div>
 
           {/* Mobile dock tabs */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
             <p className="text-sm font-bold text-[var(--text)]">Mobile dock tabs</p>
-            <p className="mb-3 text-[11px] text-[var(--faint)]">These fixed tabs always sit in the bottom bar. Everything else is reachable through &quot;More&quot;.</p>
-            <div className="space-y-1">
-              {tabs.map((key, i) => {
-                const page = pageFor(key);
-                if (!page) return null;
-                return (
-                  <div key={key} className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-[var(--chip)] transition-colors">
-                    <page.icon className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
-                    <span className="flex-1 min-w-0 truncate text-[13px] text-[var(--text)]">{page.label}</span>
-                    <button onClick={() => moveTab(key, -1)} disabled={i === 0} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move left">
-                      <ArrowUp className="w-4 h-4" strokeWidth={1.9} />
-                    </button>
-                    <button onClick={() => moveTab(key, 1)} disabled={i === tabs.length - 1} className="text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:text-[var(--faint)] transition-colors" title="Move right">
-                      <ArrowDown className="w-4 h-4" strokeWidth={1.9} />
-                    </button>
-                    <button onClick={() => toggleTab(key)} className="text-[var(--faint)] hover:text-[var(--c-red)] transition-colors" title={`Remove ${page.label}`}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">Drag to arrange the fixed tabs in the mobile bottom bar. Other pages remain in “More”.</p>
+            <ReorderList label="Mobile dock tabs" items={tabs.flatMap(key=>{const page=pageFor(key);return page?[{id:key,label:page.label,icon:<page.icon className="h-4 w-4 text-[var(--muted)]"/>,action:<button type="button" onClick={()=>toggleTab(key)} className="base-icon-button" aria-label={`Remove ${page.label}`}><Trash2 className="h-3.5 w-3.5"/></button>}]:[];})} onChange={bottomTabs=>setPrefs({...prefs,bottomTabs})}/>
             <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Add a tab</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {ALL_PAGES.filter((p) => !tabs.includes(p.key)).map((page) => (
@@ -532,7 +480,12 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
   );
 }
 
-export function SettingsPage() {
+export function SettingsPage({ accountSection }: { accountSection?: ReactNode }) {
+  const [section,setSection]=useState(() => typeof window!=="undefined"&&accountSection&&window.location.hash.includes("section=account")?"account":readStored("base_settings_section_v1")==="account"&&!accountSection?"appearance":readStored("base_settings_section_v1")||"appearance");
+  useEffect(()=>{
+    const select=(event:Event)=>{const value=(event as CustomEvent<string>).detail;if(["appearance","navigation","news","account"].includes(value)){writeStored("base_settings_section_v1",value);setSection(value);}};
+    window.addEventListener("base:settings-section",select);return()=>window.removeEventListener("base:settings-section",select);
+  },[]);
   const { preference, setTheme } = useTheme();
   const { accent, setAccent } = useAccent();
   const { collapsed, toggle } = useSidebar();
@@ -549,7 +502,14 @@ export function SettingsPage() {
     <div className="base-page settings-page">
       <PageHeading title="Settings" description="Preferences for your Base workspace." />
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="base-settings-layout">
+        <nav aria-label="Settings categories" className="base-settings-nav">
+          {[{id:"appearance",label:"Appearance",icon:MonitorCog},{id:"navigation",label:"Navigation",icon:Layers},{id:"news",label:"News & integrations",icon:Rss},...(accountSection?[{id:"account",label:"Account & sync",icon:KeyRound}]:[])].map(item=><button key={item.id} type="button" aria-current={section===item.id?"page":undefined} onClick={()=>{writeStored("base_settings_section_v1",item.id);setSection(item.id);}}><item.icon className="h-4 w-4"/>{item.label}</button>)}
+        </nav>
+        <div className="base-settings-content" key={section}>
+        {section==="account"&&accountSection}
+        {section==="appearance"&&<section className="base-settings-intro"><p className="base-eyebrow">Make it yours</p><h2>A comfortable place to work.</h2><p>Choose an appearance that follows your day and your desktop.</p></section>}
+        {section==="appearance"&&<>
         <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
           <div className="flex items-center gap-2 mb-5">
             <MonitorCog className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
@@ -609,6 +569,8 @@ export function SettingsPage() {
           </div>
         </section>
 
+        </>}
+        {section==="navigation"&&<>
         <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
           <div className="flex items-center gap-2 mb-5">
             {collapsed ? (
@@ -662,9 +624,10 @@ export function SettingsPage() {
           )}
         </section>
 
-        <SourceManager prefs={newsPrefs} setPrefs={setNewsPrefs} />
-        <BriefingManager settings={aiSettings} setSettings={setAiSettings} />
         <NavigationManager prefs={navPrefs} setPrefs={setNavPrefs} />
+        </>}
+        {section==="news"&&<><SourceManager prefs={newsPrefs} setPrefs={setNewsPrefs} /><BriefingManager settings={aiSettings} setSettings={setAiSettings} /></>}
+        </div>
       </div>
     </div>
   );

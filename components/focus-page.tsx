@@ -7,7 +7,7 @@ import { remainingFocusSeconds, elapsedFocusMinutes } from "@/lib/focus-clock";
 import { useBase } from "@/lib/hooks";
 import { uid, getToday, formatTime } from "@/lib/utils";
 import { TASK_TAGS, taskTagLabel, type TaskTag } from "@/lib/store";
-import { Play, Pause, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Maximize2, Minimize2, Timer, Clock3, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MODES = [
@@ -115,150 +115,24 @@ export function FocusPage() {
   const todaySessions = data.focusSessions.filter((s) => s.date === getToday(data.profile?.timezone));
   const todayMins = todaySessions.reduce((s, f) => s + f.durationMins, 0);
 
-  return (
-    <div className={cn("focus-page min-h-full transition-colors", immersive ? "bg-[var(--bg)]" : "bg-[var(--bg)]")}>
-      <div className={cn("p-6 max-w-xl mx-auto", immersive && "flex flex-col items-center justify-center min-h-screen")}>
-        {!immersive && (
-          <PageHeading title="Focus" description={`${todayMins} minutes of focused time today.`}>
-            <button aria-label="Enter distraction-free focus" onClick={() => setImmersive(true)} className="base-button base-button-secondary">
-              <Maximize2 className="w-5 h-5" />
-            </button>
-          </PageHeading>
-        )}
-
-        {immersive && (
-          <button
-            onClick={() => setImmersive(false)}
-            aria-label="Leave distraction-free focus"
-            className="absolute top-4 right-4 text-[var(--faint)] hover:text-[var(--text)] transition-colors"
-          >
-            <Minimize2 className="w-5 h-5" />
-          </button>
-        )}
-
-        {/* Mode Selector */}
-        {!immersive && (
-          <div className="flex gap-2 mb-8 bg-[var(--surface)] p-1 rounded-lg">
-            {MODES.map((m, i) => (
-              <button
-                key={m.label}
-                onClick={() => selectMode(i)}
-                className={cn(
-                  "flex-1 py-2 text-sm font-medium rounded-md transition-colors",
-                  modeIdx === i ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]"
-                )}
-              >
-                {m.label}
-                <span className="block text-xs opacity-60">{m.mins}m</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Circle Timer */}
-        <div className="flex justify-center mb-8">
-          <div className="relative w-64 h-64 flex items-center justify-center">
-            <svg className="absolute inset-0 -rotate-90" width="256" height="256" viewBox="0 0 256 256">
-              <circle cx="128" cy="128" r="110" fill="none" style={{ stroke: "var(--border)" }} strokeWidth="6" />
-              <circle
-                cx="128"
-                cy="128"
-                r="110"
-                fill="none"
-                style={{ stroke: running ? "var(--text)" : "var(--border-2)" }}
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={dash}
-                className="transition-[stroke-dashoffset] duration-300"
-              />
-            </svg>
-            <div className="text-center">
-              <p className="text-5xl font-mono font-bold text-[var(--text)]">{formatTime(seconds)}</p>
-              <p className="text-sm text-[var(--muted)] mt-1">{MODES[modeIdx].label}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <button
-            onClick={reset}
-            aria-label="Reset timer"
-            className="p-3 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] transition-colors"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </button>
-          <button
-            onClick={running ? pause : start}
-            disabled={!running && seconds === 0}
-            className="px-10 py-3 rounded-full bg-[var(--action)] hover:opacity-90 text-[var(--on-action)] font-semibold flex items-center gap-2 transition-colors"
-          >
-            {running ? <><Pause className="w-5 h-5" /> Pause</> : <><Play className="w-5 h-5" /> Start</>}
-          </button>
-          {sessionStarted && !running && (
-            <button
-              onClick={logManual}
-              className="p-3 rounded-full bg-[var(--chip)] border border-[var(--border-2)] text-[var(--text)] hover:bg-[var(--chip-2)] transition-colors text-xs px-4"
-            >
-              Log
-            </button>
-          )}
-        </div>
-
-        {/* Session Context */}
-        {!immersive && (
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 space-y-3">
-            <div>
-              <label className="text-xs text-[var(--muted)] mb-1 block">Context Tag</label>
-              <div className="flex gap-1 flex-wrap">
-                {TAGS.map((t) => (
-                  <button
-                    key={t.value}
-                    onClick={() => setTag(t.value)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors",
-                      tag === t.value
-                        ? "bg-[var(--chip)] border-[var(--border-2)] text-[var(--text)]"
-                        : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--border)]"
-                    )}
-                  >
-                    <span aria-hidden="true">{t.emoji}</span>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-[var(--muted)] mb-1 block">Session Notes</label>
-              <input
-                className="w-full bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none focus:border-[var(--border-2)]"
-                placeholder="What are you working on?"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Today's Sessions */}
-        {!immersive && todaySessions.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-xs text-[var(--muted)] uppercase tracking-wider mb-3">Today&apos;s Sessions</h2>
-            <div className="space-y-2">
-              {todaySessions.map((s) => (
-                <div key={s.id} className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-sm">
-                  <span className="text-[var(--text)]">{s.notes || "—"}</span>
-                  <div className="flex items-center gap-3 text-[var(--muted)]">
-                    <span>{taskTagLabel(s.tag)}</span>
-                    <span className="font-mono text-[var(--text)]">{s.durationMins}m</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+  const recentSessions=[...data.focusSessions].reverse().slice(0,20);
+  return <div className={cn("base-page focus-page",immersive&&"base-focus-immersive")}>
+    {!immersive&&<PageHeading title="Focus" description="Give one thing your full attention."><button aria-label="Enter distraction-free focus" onClick={()=>setImmersive(true)} className="base-button base-button-secondary"><Maximize2 className="h-4 w-4"/> Full screen</button></PageHeading>}
+    {immersive&&<button onClick={()=>setImmersive(false)} aria-label="Leave distraction-free focus" className="base-focus-exit base-icon-button"><Minimize2 className="h-5 w-5"/></button>}
+    {!immersive&&<div className="base-focus-stats">
+      <div><span><Clock3 className="h-4 w-4"/> Focused today</span><strong>{todayMins}<small> min</small></strong></div>
+      <div><span><CheckCircle2 className="h-4 w-4"/> Sessions completed</span><strong>{todaySessions.length}</strong></div>
+      <div><span><Timer className="h-4 w-4"/> Next session</span><strong>{MODES[modeIdx].mins}<small> min · {MODES[modeIdx].label}</small></strong></div>
+    </div>}
+    <div className="base-focus-workspace">
+      <section className="base-focus-timer">
+        {!immersive&&<div className="base-focus-modes" role="group" aria-label="Focus duration">{MODES.map((mode,index)=><button key={mode.label} aria-pressed={modeIdx===index} onClick={()=>selectMode(index)}><span>{mode.label}</span><small>{mode.mins} min</small></button>)}</div>}
+        <div className="base-focus-clock"><svg aria-hidden="true" className="-rotate-90" viewBox="0 0 256 256"><circle cx="128" cy="128" r="110" fill="none" stroke="var(--border)" strokeWidth="3"/><circle cx="128" cy="128" r="110" fill="none" stroke="var(--action)" strokeWidth="3" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dash}/></svg><div><p className="base-eyebrow">{running?"In progress":sessionStarted?"Paused":"Ready when you are"}</p><p className="base-focus-time" role="timer" aria-label="Time remaining">{formatTime(seconds)}</p><p className="text-sm text-[var(--muted)]">{MODES[modeIdx].label} session</p></div></div>
+        <div className="base-focus-controls"><button onClick={reset} aria-label="Reset timer" className="base-icon-button"><RotateCcw className="h-4 w-4"/></button><button onClick={running?pause:start} disabled={!running&&seconds===0} className="base-button base-button-primary">{running?<><Pause className="h-4 w-4"/> Pause session</>:<><Play className="h-4 w-4"/> {sessionStarted?"Resume session":"Start session"}</>}</button>{sessionStarted&&!running&&<button onClick={logManual} className="base-button base-button-secondary">Log session</button>}</div>
+        {!immersive&&<p className="base-focus-caption">A little space between you and the noise.</p>}
+      </section>
+      {!immersive&&<aside className="base-focus-context"><p className="base-eyebrow">Your intention</p><h2>What matters right now?</h2><p className="text-sm text-[var(--muted)]">Set a direction for this session. Everything else can wait.</p><label htmlFor="focus-intention">Session notes</label><textarea id="focus-intention" rows={4} value={notes} onChange={event=>setNotes(event.target.value)} placeholder="One thing I want to move forward…"/><p className="mt-5 mb-2 text-xs font-medium">Context</p><div className="flex flex-wrap gap-2">{TAGS.map(item=><button key={item.value} aria-pressed={tag===item.value} onClick={()=>setTag(item.value)} className={cn("base-focus-tag",tag===item.value&&"base-focus-tag-active")}>{item.label}</button>)}</div><div className="base-focus-tip"><p className="text-xs font-medium">Make room for deep work</p><p className="mt-1 text-xs text-[var(--muted)]">Close what you don’t need. Pick a small finish line. Take a break when the timer ends.</p></div></aside>}
     </div>
-  );
+    {!immersive&&<section className="base-focus-history"><div className="flex items-center justify-between gap-3 mb-4"><h2 className="text-sm font-semibold">Recent sessions</h2><span className="text-xs text-[var(--muted)]">{data.focusSessions.length} total</span></div>{!recentSessions.length?<div className="base-empty"><Timer className="mx-auto mb-3 h-6 w-6"/><h2>Your first session starts here.</h2><p>Completed sessions will appear in your history.</p></div>:<div>{recentSessions.map(session=><div key={session.id} className="base-focus-history-row"><span className="base-focus-history-icon"><CheckCircle2 className="h-4 w-4"/></span><span className="min-w-0 flex-1"><strong className="block truncate text-[13px] font-medium">{session.notes||`${taskTagLabel(session.tag)} session`}</strong><small className="text-[var(--muted)]">{session.date} · {taskTagLabel(session.tag)}</small></span><span className="text-sm tabular-nums">{session.durationMins}<small className="text-[var(--muted)]"> min</small></span></div>)}</div>}</section>}
+  </div>;
 }

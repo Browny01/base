@@ -32,7 +32,7 @@ test("keyboard widget reordering keeps every enabled widget",()=>{
 test("dragging widgets preserves enabled records and rejects missing targets",()=>{
   const widgets=["tasks","news","calendar"] as const;
   assert.deepEqual(reorderDashboardWidget([...widgets],"calendar","tasks"),["calendar","tasks","news"]);
-  assert.deepEqual(reorderDashboardWidget([...widgets],"tasks","news"),widgets);
+  assert.deepEqual(reorderDashboardWidget([...widgets],"tasks","news"),["news","tasks","calendar"]);
   assert.deepEqual(reorderDashboardWidget([...widgets],"focus","tasks"),widgets);
 });
 test("canvas culling keeps rotated edges, editing candidates and audio while excluding distant items",()=>{
@@ -43,4 +43,24 @@ test("canvas culling keeps rotated edges, editing candidates and audio while exc
   assert.equal(canvasItemVisible({...item,x:2400,y:1700},viewport),false);
   assert.ok(canvasItemVisible({...item,type:"music",x:2400,y:1700},viewport));
   assert.ok(canvasItemVisible({...item,type:"photo",x:2400,y:1700,caption:"long".repeat(60)},viewport));
+});
+
+test("widget sizes survive reload and are bounded for narrow and malformed layouts",async()=>{
+  const {readWidgetSizes,clampWidgetSize}=await import("../lib/dashboard-widgets.ts");
+  assert.deepEqual(readWidgetSizes("invalid"),{});
+  assert.deepEqual(readWidgetSizes('{"tasks":{"columns":20,"height":-100},"unknown":{"columns":1,"height":300}}'),{tasks:{columns:4,height:240}});
+  assert.deepEqual(clampWidgetSize("tasks",2.7,377),{columns:3,height:384});
+  assert.deepEqual(readWidgetSizes(JSON.stringify({news:{columns:1,height:384}})),{news:{columns:1,height:384}});
+});
+test("format shortcuts work on Mac and Linux without claiming ordinary typing or unrelated modifiers",async()=>{
+  const {editorFormatCommand}=await import("../lib/editor-shortcuts.ts");
+  const event={key:"b",metaKey:true,ctrlKey:false,shiftKey:false,altKey:false};
+  assert.equal(editorFormatCommand(event),"bold");
+  assert.equal(editorFormatCommand({...event,metaKey:false,ctrlKey:true,key:"u"}),"underline");
+  assert.equal(editorFormatCommand({...event,key:"i"}),"italic");
+  assert.equal(editorFormatCommand({...event,key:"k"}),"createLink");
+  assert.equal(editorFormatCommand({...event,key:"X",shiftKey:true}),"strikeThrough");
+  assert.equal(editorFormatCommand({...event,key:"\\",shiftKey:true}),"removeFormat");
+  assert.equal(editorFormatCommand({...event,metaKey:false}),null);
+  assert.equal(editorFormatCommand({...event,altKey:true}),null);
 });

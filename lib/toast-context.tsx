@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useRef, useSyncExternalStore } from "react";
+import { createContext, useContext, useState, useCallback, useRef, useSyncExternalStore, useEffect } from "react";
 import { createPortal } from "react-dom";
 
 interface ToastAction { label: string; onClick: () => void }
@@ -19,6 +19,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     if (tm) { clearTimeout(tm); delete timers.current[id]; }
   }, []);
 
+  useEffect(()=>{const activeTimers=timers.current;return()=>{for(const timer of Object.values(activeTimers))clearTimeout(timer);};},[]);
+
   const toast = useCallback((message: string, opts?: { action?: ToastAction; duration?: number }) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((t) => [...t.slice(-3), { id, message, action: opts?.action }]);
@@ -29,9 +31,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ toast }}>
       {children}
       {canPortal && createPortal(
-        <div className="fixed inset-x-0 z-[120] flex flex-col items-center gap-2 px-4 pointer-events-none bottom-24 md:bottom-6">
+        <div className="fixed right-0 left-0 md:left-auto md:right-6 z-[120] flex flex-col items-end gap-2 px-4 md:px-0 pointer-events-none bottom-24 md:bottom-6 md:w-[min(420px,calc(100vw-48px))]">
           {toasts.map((t) => (
-            <div key={t.id} className="pointer-events-auto flex items-center gap-3 max-w-[92vw] rounded-xl border border-[var(--border)] bg-[var(--surface)] elevated px-3.5 py-2.5 nx-slide-up">
+            <div key={t.id} role="status" aria-live="polite" className="pointer-events-auto flex items-center gap-3 w-full max-w-[92vw] rounded-xl border border-[var(--border)] bg-[var(--surface)] elevated px-3.5 py-2.5 nx-slide-up">
               <span className="text-[13px] text-[var(--text)] font-medium">{t.message}</span>
               {t.action && (
                 <button
@@ -41,7 +43,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   {t.action.label}
                 </button>
               )}
-              <button onClick={() => dismiss(t.id)} className="text-[var(--faint)] hover:text-[var(--text)] shrink-0 text-[16px] leading-none">×</button>
+              <button aria-label="Dismiss notification" onClick={() => dismiss(t.id)} className="text-[var(--faint)] hover:text-[var(--text)] shrink-0 text-[16px] leading-none">×</button>
             </div>
           ))}
         </div>,

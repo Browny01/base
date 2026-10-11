@@ -1,15 +1,16 @@
-import { useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
+import { useEffect, useRef, useState } from "react";
+import { RefreshCw, CloudOff, Check, ShieldCheck, Download, Upload, Bell, ArrowRight, Laptop } from "lucide-react";
+import { useToast } from "@/lib/toast-context";
+import { useRouter } from "./navigation";
 import { useDesktopStatus, currentWorkspace, connect, disconnect, sync, resolve, unsavedCopy, retrySave, importBackup, selectOffline, transferOffline } from "./store";
 import { native } from "./native";
-import { useTheme } from "@/lib/theme-context";
+
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 
-export function DesktopControls() {
+export function DesktopAccountSettings() {
   const status = useDesktopStatus();
   const workspace = currentWorkspace();
-  const [open, setOpen] = useState(false);
-  const [origin, setOrigin] = useState("https://base.lucasbrown.xyz");
+  const [origin, setOrigin] = useState(workspace?.origin || "https://base.lucasbrown.xyz");
   const [password, setPassword] = useState("");
   const [notePassword, setNotePassword] = useState("");
   const [error, setError] = useState("");
@@ -17,24 +18,12 @@ export function DesktopControls() {
   const [update, setUpdate] = useState<string | null>(null);
   const [updateMessage, setUpdateMessage] = useState("");
   const [offlineWorkspaces,setOfflineWorkspaces]=useState<{scope:string;label:string}[]>([]);
-  const { setTheme } = useTheme();
   const text = status.saving ? "Saving on this device…" : status.syncing ? "Synchronizing…" : status.local ? "Local workspace" : status.pending ? `${status.pending} changes saved locally` : "Saved on this device";
   const action = async (fn: () => Promise<unknown>) => { setBusy(true); setError(""); try { await fn(); } catch (e) { setError(String(e)); } finally { setBusy(false); } };
-  return <>
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-5 py-1.5 text-[11px]">
-      <span role="status" aria-live="polite" className="text-[var(--muted)]">{text}{status.conflicts ? ` · ${status.conflicts} conflicts to review` : ""}</span>
-      <div className="flex items-center gap-3">
-        {!status.local && <button onClick={() => void sync()} disabled={status.syncing}>Sync now</button>}
-        <button onClick={() => setOpen(true)} className="font-medium">{status.conflicts ? "Review conflicts" : status.local ? "Connect account" : "Account & sync"}</button>
-      </div>
-    </div>
-    {status.error && <div role="alert" className="border-b border-[var(--border)] px-4 py-2 text-xs text-[var(--muted)]">{status.error}</div>}
-    <Dialog.Root open={open} onOpenChange={setOpen}><Dialog.Portal>
-      <Dialog.Overlay className="fixed inset-0 z-[140] bg-black/40" />
-      <Dialog.Content className="fixed left-1/2 top-1/2 z-[141] max-h-[85vh] w-[min(640px,92vw)] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl">
-        <Dialog.Title className="text-lg font-semibold">Desktop account & sync</Dialog.Title>
-        <Dialog.Description className="mt-2 text-sm text-[var(--muted)]">Your workspace and pending changes stay on this device. Connect to the same Base service on each device.</Dialog.Description>
-        <p className="my-3 break-all text-xs text-[var(--muted)]">{workspace?.origin || "Local workspace — available offline"}</p>
+  return <section className="base-account-settings base-settings-card">
+    <div className="base-settings-card-heading"><ShieldCheck className="h-5 w-5"/><div><h2>Account & sync</h2><p>Your workspace is saved on this device. Connect your Base account to sync across devices.</p></div></div>
+    <div className="base-account-summary"><Laptop className="h-5 w-5 text-[var(--muted)]"/><div className="min-w-0"><p className="text-sm font-medium break-all">{workspace?.origin || "Local workspace"}</p><p role="status" className="mt-1 text-xs text-[var(--muted)]">{text}{status.conflicts ? ` · ${status.conflicts} conflicts to review` : ""}</p></div>{!status.local&&<button className="base-button base-button-secondary ml-auto" disabled={status.syncing} onClick={()=>void sync()}><RefreshCw className="h-4 w-4"/> Sync</button>}</div>
+    <div className="base-account-form">
         <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void action(async () => { await connect(origin, password); setPassword(""); }); }}>
           <label className="grid gap-1 text-sm">Service URL<input type="url" required value={origin} onChange={e => setOrigin(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
           <label className="grid gap-1 text-sm">Base password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
@@ -45,13 +34,12 @@ export function DesktopControls() {
           <button disabled={busy} className="text-left text-xs underline">Set local note password</button>
         </form>}
         {error && <p role="alert" className="my-3 text-sm text-red-500">{error}</p>}
-        <div className="my-4 flex flex-wrap gap-3 text-xs">
-          <button onClick={() => setTheme("system")}>Follow system appearance</button>
-          <button onClick={() => void action(async () => { const permission = await isPermissionGranted() ? "granted" : await requestPermission(); if (permission !== "granted") throw new Error("Notifications are disabled in system settings."); })}>Enable notifications</button>
-          <button onClick={() => void action(() => native("export_workspace",{ unsaved: unsavedCopy() }))}>Export workspace & pending edits</button>
-          <button disabled={busy||status.hasUnsaved} onClick={()=>void action(importBackup)}>Import workspace backup</button>
-          <button onClick={()=>void action(async()=>setOfflineWorkspaces(await native("list_offline_workspaces")))}>Choose offline workspace</button>
-          {!status.local&&<button disabled={busy||status.hasUnsaved} onClick={()=>void action(transferOffline)}>Add selected offline workspace to account</button>}
+        </div><div className="base-account-actions">
+          <button onClick={() => void action(async () => { const permission = await isPermissionGranted() ? "granted" : await requestPermission(); if (permission !== "granted") throw new Error("Notifications are disabled in system settings."); })}><Bell className="h-4 w-4"/> Enable notifications</button>
+          <button onClick={() => void action(() => native("export_workspace",{ unsaved: unsavedCopy() }))}><Download className="h-4 w-4"/> Export workspace & pending edits</button>
+          <button disabled={busy||status.hasUnsaved} onClick={()=>void action(importBackup)}><Upload className="h-4 w-4"/> Import workspace backup</button>
+          <button onClick={()=>void action(async()=>setOfflineWorkspaces(await native("list_offline_workspaces")))}><Laptop className="h-4 w-4"/> Choose offline workspace</button>
+          {!status.local&&<button disabled={busy||status.hasUnsaved} onClick={()=>void action(transferOffline)}><ArrowRight className="h-4 w-4"/> Add selected offline workspace to account</button>}
           <button onClick={() => void action(async () => { const version = await native<string | null>("check_update"); setUpdate(version); setUpdateMessage(version ? `Version ${version} is available.` : "This build is up to date."); })}>Check for updates</button>
           {!status.local && <button disabled={busy || status.hasUnsaved} onClick={() => void action(disconnect)}>Sign out to local workspace</button>}
         </div>
@@ -71,8 +59,37 @@ export function DesktopControls() {
           </div>
           <div className="mt-3 flex gap-4 text-xs"><button disabled={busy} onClick={() => void action(() => resolve(conflict.id, "local"))}>Keep my edit</button><button disabled={busy} onClick={() => void action(() => resolve(conflict.id, "server"))}>Use server value</button></div>
         </div>)}
-        <Dialog.Close className="mt-5 rounded-lg border border-[var(--border)] px-4 py-2 text-sm">Close</Dialog.Close>
-      </Dialog.Content>
-    </Dialog.Portal></Dialog.Root>
-  </>;
+  </section>;
+}
+
+function openAccount(router: ReturnType<typeof useRouter>) {
+  router.push("/settings?section=account");
+  window.dispatchEvent(new CustomEvent("base:settings-section", { detail: "account" }));
+}
+export function DesktopSyncButton() {
+  const status = useDesktopStatus();
+  const router = useRouter();
+  const label = status.hasUnsaved ? "An edit needs saving" : status.saving ? "Saving…" : status.conflicts ? `${status.conflicts} conflicts to review` : status.pending ? `${status.pending} changes saved locally` : status.local ? "Local workspace" : status.error ? "Offline changes retained" : "All changes synced";
+  return <div className="flex items-center gap-1.5">
+    <button onClick={()=>openAccount(router)} title={label} aria-label={label} className="base-sync-summary hidden lg:flex" data-attention={status.conflicts>0||status.hasUnsaved}>
+      {status.pending||status.conflicts||status.hasUnsaved ? <span className="base-sync-dot"/> : <Check className="h-3 w-3"/>}<span>{label}</span>
+    </button>
+    <button onClick={()=>status.local||status.hasUnsaved?openAccount(router):void sync()} disabled={status.syncing} aria-label={status.local?"Connect account in Settings":"Sync now"} title={`${label} · ${status.local?"Connect account":"Sync now"}`} className="base-icon-button" data-attention={!!status.error||status.conflicts>0}>
+      {status.error&&!status.syncing?<CloudOff className="h-[18px] w-[18px]"/>:<RefreshCw className={`h-[18px] w-[18px] ${status.syncing?"animate-spin":""}`}/>}
+    </button>
+  </div>;
+}
+export function DesktopFeedback() {
+  const status = useDesktopStatus();
+  const { toast } = useToast();
+  const router = useRouter();
+  const shown = useRef({ message: "", time: 0 });
+  useEffect(()=>{
+    if(!status.error)return;
+    // Repeated bounded retries do not produce a stack of identical warnings.
+    if(shown.current.message===status.error&&Date.now()-shown.current.time<60_000)return;
+    shown.current={message:status.error,time:Date.now()};
+    toast(status.error.replace(/^Error: /,""),{duration:9000,action:{label:"Settings",onClick:()=>openAccount(router)}});
+  },[status.error,toast,router]);
+  return null;
 }

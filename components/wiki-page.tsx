@@ -4,6 +4,8 @@ import { verifyNotePassword } from "@/lib/note-lock";
 
 import { printDocument } from "@/lib/print-document";
 
+import * as Dropdown from "@radix-ui/react-dropdown-menu";
+import { EditorDialog } from "./ui/editor-dialog";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
@@ -190,6 +192,7 @@ export function WikiPage() {
     if (typeof window === "undefined") return new Set();
     try { const v = localStorage.getItem("base_wiki_collapsed"); return v ? new Set<string>(JSON.parse(v)) : new Set(); } catch { return new Set(); }
   });
+  const [folderEditor,setFolderEditor]=useState<{id:string|null;name:string}|null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState<boolean>(() => typeof window !== "undefined" && localStorage.getItem("base_wiki_trash") === "1");
@@ -278,17 +281,13 @@ export function WikiPage() {
   useEffect(() => { try { localStorage.setItem("base_wiki_trash", trashOpen ? "1" : "0"); } catch {} }, [trashOpen]);
 
   // ── Folders ────────────────────────────────────────────────────────────────
-  function createFolder() {
-    const name = (typeof window !== "undefined" ? window.prompt("Folder name", "New folder") : "New folder")?.trim();
-    if (!name) return;
-    const folder: WikiFolder = { id: uid(), name, createdAt: new Date().toISOString() };
-    mutate((d) => ({ ...d, wikiFolders: [...(d.wikiFolders ?? []), folder] }));
-  }
-  function renameFolder(id: string) {
-    const cur = folders.find((f) => f.id === id);
-    const name = (typeof window !== "undefined" ? window.prompt("Rename folder", cur?.name ?? "") : null)?.trim();
-    if (!name) return;
-    mutate((d) => ({ ...d, wikiFolders: (d.wikiFolders ?? []).map((f) => (f.id === id ? { ...f, name } : f)) }));
+  function createFolder() { setFolderEditor({id:null,name:""}); }
+  function renameFolder(id: string) { const folder=folders.find(f=>f.id===id);if(folder)setFolderEditor({id,name:folder.name}); }
+  function saveFolder() {
+    const name=folderEditor?.name.trim();if(!name||!folderEditor)return;
+    if(folderEditor.id)mutate(d=>({...d,wikiFolders:(d.wikiFolders??[]).map(f=>f.id===folderEditor.id?{...f,name}:f)}));
+    else { const folder:WikiFolder={id:uid(),name,createdAt:new Date().toISOString()};mutate(d=>({...d,wikiFolders:[...(d.wikiFolders??[]),folder]})); }
+    setFolderEditor(null);
   }
   async function deleteFolder(id: string) {
     const ok = await confirm({ message: "Delete this folder? Its pages move out to the top level (pages are kept)." });
@@ -414,6 +413,7 @@ export function WikiPage() {
 
   return (
     <div className="notes-page flex flex-1 min-h-0 bg-[var(--surface)] relative">
+      {folderEditor&&<EditorDialog title={folderEditor.id?"Rename folder":"New folder"} onClose={()=>setFolderEditor(null)}><form onSubmit={event=>{event.preventDefault();saveFolder();}}><h2 className="text-lg font-semibold">{folderEditor.id?"Rename folder":"New folder"}</h2><p className="mt-1 text-sm text-[var(--muted)]">Keep related notes together.</p><label className="mt-5 block text-xs font-medium">Folder name<input autoFocus required maxLength={200} value={folderEditor.name} onChange={event=>setFolderEditor({...folderEditor,name:event.target.value})} className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 text-sm"/></label><div className="mt-5 flex justify-end gap-2"><button type="button" className="base-button base-button-secondary" onClick={()=>setFolderEditor(null)}>Cancel</button><button className="base-button base-button-primary" disabled={!folderEditor.name.trim()}>{folderEditor.id?"Save name":"Create folder"}</button></div></form></EditorDialog>}
       {/* mobile drawer backdrop */}
       {sidebarOpen && <div className="md:hidden fixed inset-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] bg-black/40 backdrop-blur-[2px] nx-fade" onClick={() => setSidebarOpen(false)} />}
 
@@ -431,36 +431,18 @@ export function WikiPage() {
             <button
               onClick={createFolder}
               title="New folder"
+              aria-label="New folder"
               className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
             >
               <FolderPlus className="w-4 h-4" />
             </button>
-            <div className="relative">
-            <button
-              onClick={() => setNewMenuOpen((v) => !v)}
-              title="New page"
-              className="p-1.5 rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--chip)] transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            {newMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setNewMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-56 max-w-[calc(100vw-2.5rem)] bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl p-1.5 nx-pop">
-                  <p className="px-2 py-1 text-[10px] font-semibold text-[var(--faint)] uppercase tracking-widest flex items-center gap-1.5"><LayoutTemplate className="w-3 h-3" /> Templates</p>
-                  {TEMPLATES.map((t) => (
-                    <button key={t.id} onClick={() => createFromTemplate(t)} className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left hover:bg-[var(--surface-2)] transition-colors">
-                      <span className="w-7 h-7 rounded-md border border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-center shrink-0 text-[15px]">{t.icon}</span>
-                      <span className="min-w-0">
-                        <span className="block text-[13px] text-[var(--text)] font-medium leading-tight">{t.name}</span>
-                        <span className="block text-[11px] text-[var(--faint)] leading-tight truncate">{t.desc}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-            </div>
+            <Dropdown.Root open={newMenuOpen} onOpenChange={setNewMenuOpen}>
+              <Dropdown.Trigger aria-label="New page from template" title="New page from template" className="base-icon-button"><Plus className="h-4 w-4"/></Dropdown.Trigger>
+              <Dropdown.Portal><Dropdown.Content side="right" align="start" sideOffset={10} collisionPadding={12} className="base-menu base-template-menu">
+                <Dropdown.Label className="base-menu-label"><LayoutTemplate className="h-3.5 w-3.5"/> Page templates</Dropdown.Label>
+                {TEMPLATES.map(template=><Dropdown.Item key={template.id} onSelect={()=>createFromTemplate(template)} className="base-menu-item base-template-item"><span className="base-template-icon" aria-hidden="true">{template.icon}</span><span><strong>{template.name}</strong><small>{template.desc}</small></span></Dropdown.Item>)}
+              </Dropdown.Content></Dropdown.Portal>
+            </Dropdown.Root>
           </div>
         </div>
 

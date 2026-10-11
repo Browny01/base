@@ -1,10 +1,12 @@
 "use client";
 
+import { EditorDialog } from "./ui/editor-dialog";
+import { editorFormatCommand } from "@/lib/editor-shortcuts";
 import { BaseImage } from "@/lib/image";
 
 import { apiFetch } from "@/lib/api-client";
 
-import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { uid, cn } from "@/lib/utils";
 import { insertIndexAt as insertIndexFor, dropTargetIndex, moveBlockTo } from "@/lib/block-order";
@@ -230,6 +232,8 @@ export function WikiEditor({
   const [description, setDescription] = useState(page.description ?? "");
   const [blocks, setBlocks] = useState<WikiBlock[]>(page.blocks.length ? page.blocks : [newBlock()]);
   const [slash, setSlash] = useState<{ blockId: string; query: string; index: number; viaPlus: boolean } | null>(null);
+  const [linkEditor,setLinkEditor]=useState<string|null>(null);
+  const linkRange=useRef<Range|null>(null);
   const [toolbar, setToolbar] = useState<{ top: number; left: number } | null>(null);
   // ⌘A-twice selects every block at once for a single bulk format action.
   const [selectedAll, setSelectedAll] = useState(false);
@@ -237,7 +241,7 @@ export function WikiEditor({
   useEffect(() => { selectedAllRef.current = selectedAll; }, [selectedAll]);
 
   const latest = useRef({ title, icon, description, blocks });
-  useEffect(() => { latest.current = { title, icon, description, blocks }; });
+  useLayoutEffect(() => { latest.current = { title, icon, description, blocks }; });
 
   const refs = useRef(new Map<string, HTMLDivElement>());
   const [focusReq, setFocusReq] = useState<FocusReq>(null);
@@ -254,13 +258,19 @@ export function WikiEditor({
   // Keep a stable ref to the latest persist so effects don't depend on its
   // (per-render) identity — depending on it caused an infinite update loop.
   const persistRef = useRef(persist);
-  useEffect(() => { persistRef.current = persist; });
+  useLayoutEffect(() => { persistRef.current = persist; });
   const scheduleSave = useCallback(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => persistRef.current(), 400);
+    saveTimer.current = setTimeout(() => { saveTimer.current=null;persistRef.current(); }, 400);
   }, []);
-  // Flush pending edits only on unmount (switching pages).
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); persistRef.current(); }, []);
+  // A native quit/workspace switch must commit the editor's buffered text before
+  // awaiting SQLite. Opening and leaving an unchanged note queues no edit.
+  useEffect(() => {
+    const flush=()=>{if(saveTimer.current===null)return;clearTimeout(saveTimer.current);saveTimer.current=null;persistRef.current();};
+    const visibility=()=>{if(document.hidden)flush();};
+    window.addEventListener("base:flush-editors",flush);window.addEventListener("pagehide",flush);document.addEventListener("visibilitychange",visibility);
+    return()=>{flush();window.removeEventListener("base:flush-editors",flush);window.removeEventListener("pagehide",flush);document.removeEventListener("visibilitychange",visibility);};
+  }, []);
 
   // ── Undo / redo ──────────────────────────────────────────────────────────
   // Every block edit is immutable, so a snapshot only has to hold a reference to
@@ -703,10 +713,32 @@ export function WikiEditor({
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, text: html } : b)));
     scheduleSave();
   };
+  function editLink() {
+    const selection=window.getSelection();if(!selection?.rangeCount||selectedAllRef.current)return;
+    linkRange.current=selection.getRangeAt(0).cloneRange();
+    const anchor=(selection.anchorNode?.nodeType===3?selection.anchorNode.parentElement:selection.anchorNode as HTMLElement)?.closest("a");
+    setLinkEditor(anchor?.getAttribute("href")??"");
+  }
+  function saveLink() {
+    const value=linkEditor?.trim()??"";
+    if(value&&!/^(https?:\/\/|mailto:|#wiki:)/i.test(value)&&/^[a-z][a-z0-9+.-]*:/i.test(value))return;
+    const range=linkRange.current;setLinkEditor(null);
+    requestAnimationFrame(()=>{
+      if(!range)return;
+      const node=range.startContainer.nodeType===3?range.startContainer.parentElement:range.startContainer as HTMLElement;
+      node?.closest<HTMLElement>("[contenteditable]")?.focus();
+      const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);
+      markEdit("format");runFormat(value?"createLink":"unlink",value?/^(https?:\/\/|mailto:|#wiki:)/i.test(value)?value:`https://${value}`:undefined);
+    });
+  }
   const exec = (cmd: string, value?: string) => {
     if (cmd === "foreColor" || cmd === "hiliteColor" || cmd === "fontSize") document.execCommand("styleWithCSS", false, "true");
     document.execCommand(cmd, false, value);
-    syncActiveFromSelection();
+    const selection=window.getSelection();const node=selection?.anchorNode;
+    const editable=(node?.nodeType===3?node.parentElement:node as HTMLElement|null)?.closest<HTMLElement>("[contenteditable]");
+    // Nested table/tab fields own their HTML; notify their onInput callback too.
+    if(editable&&!editable.hasAttribute("data-block-id"))editable.dispatchEvent(new Event("input",{bubbles:true}));
+    else syncActiveFromSelection();
   };
 
   // Apply a formatting action to every formattable block at once (bulk ⌘A mode).
@@ -782,7 +814,14 @@ export function WikiEditor({
   }, [title, description, blocks]);
 
   return (
-    <div ref={rootRef} className={cn("relative mx-auto px-6 sm:px-12 py-10", fullWidth ? "max-w-none" : "max-w-[760px]", selectedAll && "nx-allsel")}>
+    <div ref={rootRef} onKeyDownCapture={event=>{
+      const target=event.target as HTMLElement;
+      if(!target.isContentEditable||target.closest('[data-block-id]')?.classList.contains("font-mono"))return;
+      const command=editorFormatCommand(event);if(!command)return;
+      event.preventDefault();event.stopPropagation();
+      if(command==="createLink")editLink();else {markEdit("format");runFormat(command);}
+    }} className={cn("relative mx-auto px-6 sm:px-12 py-10", fullWidth ? "max-w-none" : "max-w-[760px]", selectedAll && "nx-allsel")}>
+      {linkEditor!==null&&<EditorDialog title="Edit link" onClose={()=>setLinkEditor(null)}><form onSubmit={event=>{event.preventDefault();saveLink();}}><h2 className="text-lg font-semibold">Link</h2><label className="mt-4 block text-sm">URL<input autoFocus value={linkEditor} onChange={event=>setLinkEditor(event.target.value)} placeholder="https://example.com" className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3"/></label><p className="mt-2 text-xs text-[var(--muted)]">Leave empty to remove the link. Web, email and Base note links are supported.</p><div className="mt-5 flex justify-end gap-2"><button type="button" className="base-button base-button-secondary" onClick={()=>setLinkEditor(null)}>Cancel</button><button className="base-button base-button-primary">Save link</button></div></form></EditorDialog>}
       {/* Icon + title */}
       <div className="mb-5">
         <EmojiButton value={icon} onChange={(e) => { markEdit("icon"); setIcon(e); scheduleSave(); }} />
@@ -902,7 +941,8 @@ export function WikiEditor({
       {(toolbar || selectedAll) && (
         <FormatToolbar
           pos={selectedAll ? { top: 70, left: (typeof window !== "undefined" ? window.innerWidth / 2 : 400) } : toolbar!}
-          exec={runFormat}
+          exec={(command,value)=>{markEdit("format");runFormat(command,value);}}
+          onLink={editLink}
           bulk={selectedAll}
         />
       )}
@@ -911,7 +951,7 @@ export function WikiEditor({
 }
 
 // ── Floating selection toolbar ──────────────────────────────────────────────────
-function FormatToolbar({ pos, exec, bulk }: { pos: { top: number; left: number }; exec: (cmd: string, value?: string) => void; bulk?: boolean }) {
+function FormatToolbar({ pos, exec, bulk, onLink }: { pos: { top: number; left: number }; exec: (cmd: string, value?: string) => void; bulk?: boolean; onLink: () => void }) {
   const [popover, setPopover] = useState<"color" | "highlight" | "size" | null>(null);
   const stop = (e: React.MouseEvent) => e.preventDefault(); // keep the text selection alive
   // Don't let clicks bubble to the document handler that cancels the bulk selection.
@@ -931,13 +971,7 @@ function FormatToolbar({ pos, exec, bulk }: { pos: { top: number; left: number }
       {!bulk && (
         <button
           onMouseDown={stop}
-          onClick={() => {
-            const sel = window.getSelection();
-            const a = (sel?.anchorNode?.nodeType === 3 ? sel?.anchorNode?.parentElement : sel?.anchorNode as HTMLElement)?.closest?.("a") as HTMLAnchorElement | null;
-            if (a) { exec("unlink"); return; }
-            const url = window.prompt("Link URL (https://…)");
-            if (url) exec("createLink", /^(https?:|mailto:|#)/.test(url) ? url : `https://${url}`);
-          }}
+          onClick={onLink}
           title="Add / remove link"
           className={btnCls}
         ><Link2 className="w-4 h-4" /></button>
