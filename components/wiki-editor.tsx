@@ -1,5 +1,9 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
+import { apiFetch } from "@/lib/api-client";
+
 import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { uid, cn } from "@/lib/utils";
@@ -203,7 +207,7 @@ async function processImage(file: File): Promise<string | null> {
   if (!read) return null;
   if (read.blob) {
     try {
-      const res = await fetch(`/api/blob/upload?filename=note-${Date.now()}.jpg`, { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: read.blob });
+      const res = await apiFetch(`/api/blob/upload?filename=note-${Date.now()}.jpg`, { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: read.blob });
       if (res.ok) { const { url } = await res.json(); if (typeof url === "string") return url; }
     } catch { /* fall through */ }
   }
@@ -1019,8 +1023,7 @@ function FloatingImage({ block, onPatch, onUnpin, onDelete }: {
       style={{ left: x, top: y, width: w, touchAction: "none" }}
       onPointerDown={startDrag}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={block.src} alt={block.caption || ""} draggable={false}
+      <BaseImage src={block.src} alt={block.caption || ""} draggable={false}
         className="w-full h-auto rounded-lg border border-[var(--border)] shadow-lg cursor-grab active:cursor-grabbing" />
       {block.caption && <p className="mt-1 text-[11px] text-[var(--muted)] truncate">{block.caption}</p>}
 
@@ -1221,8 +1224,7 @@ function BlockRow({
               </button>
             ) : block.src ? (
               <figure className="group/img relative inline-block max-w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={block.src} alt={block.caption || ""} className="max-w-full rounded-lg border border-[var(--border)]" />
+                <BaseImage src={block.src} alt={block.caption || ""} className="max-w-full rounded-lg border border-[var(--border)]" />
                 <button
                   onClick={() => onPatch({ floating: true, x: block.x ?? 40, y: block.y ?? 40, w: block.w ?? 280 })}
                   title="Pin / move anywhere on the page"

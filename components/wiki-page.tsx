@@ -1,5 +1,9 @@
 "use client";
 
+import { verifyNotePassword } from "@/lib/note-lock";
+
+import { printDocument } from "@/lib/print-document";
+
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
@@ -15,7 +19,6 @@ import {
   Search, X,
 } from "lucide-react";
 
-const LOCK_PASSWORD = "REDACTED";
 
 // ── Page templates (offered when creating a new page) ───────────────────────────
 type TemplateDef = { id: string; name: string; icon: string; desc: string; build: () => { icon: string; title: string; blocks: WikiBlock[] } };
@@ -378,12 +381,7 @@ export function WikiPage() {
   }
 
   function downloadPdf(page: WikiPageT) {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(pageToPrintDoc(page));
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 350); // let images/layout settle
+    void printDocument(pageToPrintDoc(page));
   }
 
   // Breadcrumb trail from root → active.
@@ -712,8 +710,8 @@ export function WikiPage() {
           ) : gated && activePage ? (
             <LockScreen
               key={activePage.id}
-              onUnlock={(pw) => {
-                if (pw === LOCK_PASSWORD) { setUnlocked((s) => new Set(s).add(activePage.id)); return true; }
+              onUnlock={async (pw) => {
+                if (await verifyNotePassword(pw)) { setUnlocked((s) => new Set(s).add(activePage.id)); return true; }
                 return false;
               }}
             />
@@ -748,10 +746,17 @@ export function WikiPage() {
   );
 }
 
-function LockScreen({ onUnlock }: { onUnlock: (pw: string) => boolean }) {
+function LockScreen({ onUnlock }: { onUnlock: (pw: string) => Promise<boolean> }) {
   const [pw, setPw] = useState("");
-  const [err, setErr] = useState(false);
-  const submit = () => { if (!onUnlock(pw)) { setErr(true); setPw(""); } };
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (busy) return;
+    setBusy(true); setErr("");
+    try { if (!await onUnlock(pw)) setErr("Incorrect password"); }
+    catch (error) { setErr(String(error)); }
+    finally { setPw(""); setBusy(false); }
+  };
   return (
     <div className="h-full flex items-center justify-center px-6">
       <div className="w-full max-w-[320px] text-center">
@@ -759,25 +764,26 @@ function LockScreen({ onUnlock }: { onUnlock: (pw: string) => boolean }) {
           <Lock className="w-6 h-6 text-[var(--muted)]" />
         </div>
         <h2 className="text-lg font-semibold text-[var(--text)] mb-1 tracking-tight">Page locked</h2>
-        <p className="text-sm text-[var(--muted)] mb-5">Enter the password to view this page.</p>
+        <p className="text-sm text-[var(--muted)] mb-5">Enter your Base account password, or the note password for this offline workspace.</p>
         <input
           autoFocus
           type="password"
           value={pw}
-          onChange={(e) => { setPw(e.target.value); setErr(false); }}
-          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+          onChange={(e) => { setPw(e.target.value); setErr(""); }}
+          onKeyDown={(e) => { if (e.key === "Enter") void submit(); }}
           placeholder="Password"
           className={cn(
             "w-full text-center bg-[var(--surface-2)] border rounded-xl px-3 py-2.5 text-sm text-[var(--text)] placeholder-[var(--faint)] focus:outline-none transition-colors tracking-[0.3em]",
             err ? "border-red-500" : "border-[var(--border)] focus:border-[var(--border-2)]",
           )}
         />
-        {err && <p className="text-xs text-red-500 mt-2">Incorrect password</p>}
+        {err && <p className="text-xs text-red-500 mt-2">{err}</p>}
         <button
-          onClick={submit}
+          onClick={() => void submit()}
+          disabled={busy}
           className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--text)] hover:bg-[var(--text-hover)] text-[var(--bg)] text-sm font-medium rounded-xl transition-colors"
         >
-          <LockOpen className="w-3.5 h-3.5" /> Unlock
+          <LockOpen className="w-3.5 h-3.5" /> {busy ? "Verifying…" : "Unlock"}
         </button>
       </div>
     </div>

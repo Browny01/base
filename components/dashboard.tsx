@@ -1,5 +1,9 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
+import { apiFetch } from "@/lib/api-client";
+
 import { useId, useRef, useState, useEffect } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, formatCurrency, formatDate, getToday } from "@/lib/utils";
@@ -8,7 +12,7 @@ import { TASK_TAGS, type Priority, type Task, type TaskTag, type BaseData, type 
 import { PRIORITY_META, priorityLabel } from "@/lib/task-sort";
 import { useConfirm } from "@/lib/confirm-context";
 import { Plus, Circle, CheckSquare, Wallet, Newspaper, Loader2, RefreshCw, FolderKanban, ArrowRight, ArrowUpRight, ArrowDownRight, X, Timer, NotebookText, CreditCard, Pencil, Trash2, Globe, ImagePlus } from "lucide-react";
-import Link from "next/link";
+import Link from "@/lib/link";
 import { cn } from "@/lib/utils";
 import { mdToHtml } from "@/lib/markdown";
 import { ProjectLogo } from "@/components/project-logo";
@@ -502,7 +506,7 @@ function DashNewsBriefing() {
   const [state, setState] = useState<{ loading: boolean; summary?: string; error?: string }>({ loading: true });
   const load = () => {
     setState((s) => ({ ...s, loading: true }));
-    fetch("/api/news/summary")
+    apiFetch("/api/news/summary")
       .then((r) => r.json())
       .then((j) => setState(j.ok ? { loading: false, summary: j.summary } : { loading: false, error: j.error || "Couldn't load the briefing." }))
       .catch((e) => setState({ loading: false, error: String(e) }));
@@ -542,7 +546,7 @@ function BookmarkFavicon({ bookmark, size = 40 }: { bookmark: Bookmark; size?: n
     return <div style={box} className={cn(base, "text-lg leading-none")}>{bookmark.icon}</div>;
   }
   const src = bookmark.icon && isImageIcon(bookmark.icon) ? bookmark.icon : bookmark.icon ? undefined : bookmark.favicon;
-  if (src) return <img src={src} alt="" style={box} className={cn(base, "object-cover")} />;
+  if (src) return <BaseImage src={src} alt="" style={box} className={cn(base, "object-cover")} />;
   return <div style={box} className={base}><Globe className="w-4 h-4 text-[var(--faint)]" /></div>;
 }
 
@@ -635,7 +639,7 @@ function BookmarksWidget({ data, mutate }: { data: BaseData; mutate: (updater: (
 
   async function fetchFavicon(url: string): Promise<string | undefined> {
     try {
-      const r = await fetch(`/api/favicon?url=${encodeURIComponent(url)}`);
+      const r = await apiFetch(`/api/favicon?url=${encodeURIComponent(url)}`);
       const j = await r.json();
       return j?.ok ? (j.dataUrl as string) : undefined;
     } catch {

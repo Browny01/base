@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import {
   HANDOFF_OPEN_NEW_PROJECT,
   HANDOFF_OPEN_NEW_TASK,

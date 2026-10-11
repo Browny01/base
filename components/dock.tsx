@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from "@/lib/link";
+import { usePathname } from "@/lib/navigation";
 import {
   MoreHorizontal, X, Sun, Moon,
 } from "lucide-react";

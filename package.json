@@ -12,7 +12,13 @@
     "mac:gen": "cd macos && xcodegen generate",
     "mac": "cd macos && xcodegen generate && open Base.xcodeproj",
     "mac:install": "./scripts/install_mac.sh",
-    "mac:release": "./scripts/release_mac.sh"
+    "mac:release": "./scripts/release_mac.sh",
+    "desktop:dev": "npm run tauri -w @base/desktop -- dev",
+    "desktop:build": "npm run tauri -w @base/desktop -- build",
+    "desktop:frontend": "npm run build -w @base/desktop",
+    "desktop:typecheck": "npm run typecheck -w @base/desktop",
+    "desktop:check": "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -27,7 +33,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",
-    "next": "16.2.7",
+    "next": "16.4.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-grid-layout": "^2.2.3",
@@ -41,8 +47,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.7",
+    "eslint-config-next": "16.4.0",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "workspaces": [
+    "apps/desktop",
+    "packages/*"
+  ]
 }

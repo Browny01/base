@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cache-media"
+description = "Enables the cache_media command without any pre-configured scope."
+commands.allow = ["cache_media"]
+
+[[permission]]
+identifier = "deny-cache-media"
+description = "Denies the cache_media command without any pre-configured scope."
+commands.deny = ["cache_media"]

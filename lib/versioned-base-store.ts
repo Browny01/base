@@ -1,5 +1,5 @@
 import type { Redis } from "@upstash/redis";
-import { DATA_KEY, DATA_REVISION_KEY, readCurrentData } from "./base-data.ts";
+import { DATA_KEY, DATA_REVISION_KEY, readCurrentData, readCurrentRevision } from "./base-data.ts";
 
 export type BaseDataRecord = Record<string, unknown>;
 
@@ -44,6 +44,7 @@ export async function readVersionedBaseData(redis: Redis): Promise<VersionedBase
     await readCurrentData(redis);
     [data, revision] = await redis.mget<[unknown, unknown]>(DATA_KEY, DATA_REVISION_KEY);
   }
+  if (revision == null) revision = await readCurrentRevision(redis);
   return { data: asRecord(data), revision: asRevision(revision) };
 }
 

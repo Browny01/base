@@ -1,5 +1,7 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
 import { useRef, useState } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
@@ -106,7 +108,7 @@ function AddBook({ close, append }: { close: () => void; append: (item: ReadingL
         <div className="shrink-0">
           <div className="w-28 h-40 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] overflow-hidden grid place-items-center relative">
             {cover ? (
-              <img src={cover} alt="Book cover" className="absolute inset-0 w-full h-full object-cover" />
+              <BaseImage src={cover} alt="Book cover" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
               <span className="text-4xl opacity-30">{emojiFor(category)}</span>
             )}

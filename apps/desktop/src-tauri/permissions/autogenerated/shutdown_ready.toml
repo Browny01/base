@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-shutdown-ready"
+description = "Enables the shutdown_ready command without any pre-configured scope."
+commands.allow = ["shutdown_ready"]
+
+[[permission]]
+identifier = "deny-shutdown-ready"
+description = "Denies the shutdown_ready command without any pre-configured scope."
+commands.deny = ["shutdown_ready"]

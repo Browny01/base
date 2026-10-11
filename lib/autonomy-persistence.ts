@@ -8,7 +8,7 @@ import {
 } from "./autonomy.ts";
 import { mutateBaseDataAtomically, updateBaseDataAtomically, type BaseDataRecord } from "./versioned-base-store.ts";
 
-const PROTECTED_AUTONOMY_FIELDS = [
+export const PROTECTED_AUTONOMY_FIELDS = [
   "done",
   "completedAt",
   "executionState",
@@ -72,6 +72,7 @@ export function mergeBaseWrite(
   }
 
   const next: BaseDataRecord = {
+    ...current,
     ...incoming,
     tasks: mergedTasks,
     dataRevision: Number(current.dataRevision ?? 0) + 1,
@@ -80,8 +81,14 @@ export function mergeBaseWrite(
   return next;
 }
 
-export async function safeWriteBaseData(redis: Redis, data: BaseData, preserveAutonomySettings: boolean): Promise<void> {
-  await updateBaseDataAtomically(redis, (current) => mergeBaseWrite(current, data as unknown as BaseDataRecord, preserveAutonomySettings));
+export async function safeWriteBaseData(redis: Redis, data: BaseData, preserveAutonomySettings: boolean, options: { allowStale?: boolean } = {}): Promise<void> {
+  await updateBaseDataAtomically(redis, (current) => {
+    if (!options.allowStale && Number(data.dataRevision ?? 0) !== Number(current.dataRevision ?? 0)) throw new StaleBaseWriteError();
+    return mergeBaseWrite(current, data as unknown as BaseDataRecord, preserveAutonomySettings);
+  });
+}
+export class StaleBaseWriteError extends Error {
+  constructor() { super("Base changed since this snapshot was read. Reload the current data and retry; no data was overwritten."); }
 }
 
 type OwnerDecision = "approve" | AutonomyReviewDecision;

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-offline-source"
+description = "Enables the read_offline_source command without any pre-configured scope."
+commands.allow = ["read_offline_source"]
+
+[[permission]]
+identifier = "deny-read-offline-source"
+description = "Denies the read_offline_source command without any pre-configured scope."
+commands.deny = ["read_offline_source"]

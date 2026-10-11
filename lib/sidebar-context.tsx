@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { useStoredPref, writeStored } from "./prefs";
+import { createContext, useContext } from "react";
 
 interface SidebarCtx {
   collapsed: boolean;
@@ -10,22 +11,8 @@ interface SidebarCtx {
 const SidebarContext = createContext<SidebarCtx>({ collapsed: false, toggle: () => {} });
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("base_sidebar_collapsed");
-      if (stored !== null) setCollapsed(JSON.parse(stored));
-    } catch {}
-  }, []);
-
-  function toggle() {
-    setCollapsed((c) => {
-      const next = !c;
-      try { localStorage.setItem("base_sidebar_collapsed", JSON.stringify(next)); } catch {}
-      return next;
-    });
-  }
+  const collapsed = useStoredPref("base_sidebar_collapsed","false") === "true";
+  function toggle() { writeStored("base_sidebar_collapsed",JSON.stringify(!collapsed)); }
 
   return (
     <SidebarContext.Provider value={{ collapsed, toggle }}>

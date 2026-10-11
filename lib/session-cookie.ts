@@ -1,5 +1,7 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "@/lib/session";
+import { readDesktopSession } from "@/lib/desktop-session";
+import { DESKTOP_API_PATHS } from "@/lib/desktop-api-paths";
 
 const THIRTY_DAYS = 60 * 60 * 24 * 30;
 
@@ -21,7 +23,8 @@ export function readSessionCookie(req: NextRequest): string | undefined {
 }
 
 export async function hasValidSession(req: NextRequest): Promise<boolean> {
-  return verifySession(readSessionCookie(req));
+  if (await verifySession(readSessionCookie(req))) return true;
+  return DESKTOP_API_PATHS.has(new URL(req.url).pathname) && Boolean(await readDesktopSession(req));
 }
 
 export function setSessionCookie(res: NextResponse, token: string): void {

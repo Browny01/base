@@ -1,7 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { BaseImage } from "@/lib/image";
+
+import Link from "@/lib/link";
+import { usePathname } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useTheme } from "@/lib/theme-context";
@@ -62,8 +64,7 @@ export function Sidebar() {
         "flex items-center h-14 shrink-0 gap-1",
         collapsed ? "justify-center" : "px-3"
       )}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <BaseImage
           src="/base-icon-transparent.png"
           alt="Base"
           className="w-9 h-9 object-contain shrink-0"

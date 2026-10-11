@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-client";
+
 import type { WalletNetwork } from "./store";
 
 export interface WalletBalance {
@@ -19,8 +21,8 @@ export interface CryptoPrices {
 
 export async function fetchCryptoPrices(): Promise<CryptoPrices> {
   try {
-    const res = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,hyperliquid&vs_currencies=usd",
+    const res = await apiFetch(
+      "/api/market/prices",
       { cache: "no-store" }
     );
     if (!res.ok) return { bitcoin: null, ethereum: null, solana: null, hyperliquid: null };
@@ -41,7 +43,7 @@ export async function fetchWalletBalance(
   network: WalletNetwork,
   address: string
 ): Promise<number> {
-  const res = await fetch(
+  const res = await apiFetch(
     `/api/wallet/balance?network=${encodeURIComponent(network)}&address=${encodeURIComponent(address)}`
   );
   const data = await res.json();

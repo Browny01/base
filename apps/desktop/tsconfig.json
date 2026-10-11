@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "plugins": [], "types": ["vite/client"], "paths": {
+    "@/lib/navigation": ["./src/navigation.tsx"],
+    "@/lib/link": ["./src/link.tsx"],
+    "@/lib/hooks": ["./src/store.ts"],
+    "@/lib/image": ["./src/media.tsx"],
+    "@/*": ["../../*"]
+  } },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

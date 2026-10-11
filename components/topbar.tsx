@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/link";
 import { Keyboard } from "lucide-react";
 import { CommandBar } from "@/components/command-bar";
 import { openShortcutSheet } from "@/lib/shortcuts";
 import { useBase } from "@/lib/hooks";
 import { initialOf } from "@/lib/profile";
+import { BrowserSyncStatus } from "./browser-sync-status";
 
 export function TopBar() {
   const { data } = useBase();
@@ -23,6 +24,7 @@ export function TopBar() {
 
         {/* Right: shortcuts + account */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <BrowserSyncStatus />
           <button
             onClick={openShortcutSheet}
             title="Keyboard shortcuts (?)"

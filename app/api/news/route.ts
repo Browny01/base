@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
 
-export interface NewsArticle {
-  title: string;
-  link: string;
-  description: string;
-  pubDate: string;
-  source: string;
-  category: "crypto" | "markets" | "general";
-}
+import type { NewsArticle } from "@/packages/core/src/integrations";
+export type { NewsArticle } from "@/packages/core/src/integrations";
 
 const FEEDS = [
   {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname } from "@/lib/navigation";
 import { createPortal } from "react-dom";
 import { useBase } from "@/lib/hooks";
 import { useTheme } from "@/lib/theme-context";

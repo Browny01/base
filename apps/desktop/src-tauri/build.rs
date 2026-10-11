@@ -1,0 +1,29 @@
+fn main() {
+    tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
+        tauri_build::AppManifest::new().commands(&[
+            "load_workspace",
+            "commit_local",
+            "apply_sync",
+            "resolve_conflict",
+            "connect_account",
+            "disconnect_account",
+            "api_request",
+            "open_external",
+            "export_workspace",
+            "check_update",
+            "install_update",
+            "print_document",
+            "cache_media",
+            "shutdown_ready",
+            "finish_exit",
+            "close_window",
+            "import_workspace",
+            "list_offline_workspaces",
+            "activate_offline_workspace",
+            "read_offline_source",
+            "verify_note_password",
+            "set_local_note_password",
+        ]),
+    ))
+    .expect("Tauri build setup failed");
+}

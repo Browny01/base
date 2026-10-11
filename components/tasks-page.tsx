@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useHandoffForm } from "@/lib/handoff-form";
 import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
 import { uid, getToday } from "@/lib/utils";
@@ -9,7 +10,7 @@ import { DEFAULT_TASK_SORT, PRIORITY_META, TASK_SORTS, isTaskSort, priorityLabel
 import { useStoredPref, writeStored } from "@/lib/prefs";
 import { Plus, Trash2, RotateCcw, LayoutList, Columns3, Pencil, Check, X, ChevronDown, ChevronRight, ChevronUp, GripVertical, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HANDOFF_OPEN_NEW_TASK, LEGACY_HANDOFF_OPEN_NEW_TASK, consumeHandoff } from "@/lib/base-storage";
+import { HANDOFF_OPEN_NEW_TASK, LEGACY_HANDOFF_OPEN_NEW_TASK } from "@/lib/base-storage";
 
 const PRIORITIES = PRIORITY_META;
 const TAGS = TASK_TAGS;
@@ -34,7 +35,7 @@ export function TasksPage() {
   const { toast } = useToast();
   const [filter, setFilter] = useState<"all" | "today" | TaskTag>("all");
   const [view, setView] = useState<"list" | "kanban">("list");
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useHandoffForm(HANDOFF_OPEN_NEW_TASK, [LEGACY_HANDOFF_OPEN_NEW_TASK]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const storedSort = useStoredPref(SORT_KEY, DEFAULT_TASK_SORT);
@@ -45,10 +46,6 @@ export function TasksPage() {
 
   const today = getToday(data.profile?.timezone);
 
-  // ⌘K → "New task" opens the form on arrival
-  useEffect(() => {
-    if (consumeHandoff(HANDOFF_OPEN_NEW_TASK, [LEGACY_HANDOFF_OPEN_NEW_TASK])) setShowForm(true);
-  }, []);
 
   const filtered = data.tasks.filter((t) => {
     if (filter === "today") return t.dueDate === today && !t.done;

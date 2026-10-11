@@ -36,8 +36,10 @@ export async function readMigrating(
   for (const key of previous) {
     const value = await redis.get<string>(key);
     if (value !== null && value !== undefined) {
-      await redis.set(current, value);
-      return value;
+      // Another client can write while the legacy read is in flight. Never
+      // overwrite that new value with an old snapshot.
+      await redis.set(current, value, { nx: true });
+      return await redis.get<string>(current);
     }
   }
   return null;

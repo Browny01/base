@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { useStoredPref, writeStored } from "./prefs";
+import { createContext, useContext, useEffect } from "react";
 
 export type NavMode = "sidebar" | "dock";
 
@@ -10,24 +11,10 @@ export type NavMode = "sidebar" | "dock";
 const Ctx = createContext<{ mode: NavMode; setMode: (m: NavMode) => void }>({ mode: "sidebar", setMode: () => {} });
 
 export function NavModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<NavMode>("sidebar");
-
-  // Read from localStorage and RE-APPLY data-nav on <html> — React hydration drops
-  // the attribute the pre-paint script set, so we must put it back after mount.
-  useEffect(() => {
-    let m: NavMode = "sidebar";
-    try { m = localStorage.getItem("base_nav_mode") === "dock" ? "dock" : "sidebar"; } catch {}
-    setModeState(m);
-    document.documentElement.dataset.nav = m;
-  }, []);
-
-  const setMode = (m: NavMode) => {
-    setModeState(m);
-    try {
-      localStorage.setItem("base_nav_mode", m);
-      document.documentElement.dataset.nav = m;
-    } catch {}
-  };
+  const stored = useStoredPref("base_nav_mode","sidebar");
+  const mode: NavMode = stored === "dock" ? "dock" : "sidebar";
+  useEffect(() => { document.documentElement.dataset.nav = mode; },[mode]);
+  const setMode = (m: NavMode) => { writeStored("base_nav_mode",m); document.documentElement.dataset.nav = m; };
 
   return <Ctx.Provider value={{ mode, setMode }}>{children}</Ctx.Provider>;
 }

@@ -21,6 +21,19 @@ let storageListener: ((e: { key: string | null }) => void) | null = null;
 
 const { getData, updateData, migrateAll, DEFAULT } = await import("../lib/store.ts");
 
+test("desktop migrations retain archived notes, legacy chat and unknown native fields", () => {
+  const data = {
+    ...structuredClone(DEFAULT),
+    chatThreads: [{ id: "legacy", retained: true }],
+    wikiPages: [{ id: "archived", title: "Keep", blocks: [], deletedAt: "2000-01-01T00:00:00Z" }],
+    habits: [{ id: "h", name: "H", nativeExtension: "kept" }],
+  };
+  const migrated = migrateAll(data as unknown as BaseData, { preserveArchived: true });
+  assert.equal(migrated.wikiPages.length, 1);
+  assert.equal((migrated as unknown as typeof data).chatThreads[0].retained, true);
+  assert.equal((migrated.habits[0] as unknown as { nativeExtension: string }).nativeExtension, "kept");
+});
+
 const seed = () => ({
   ...structuredClone(DEFAULT),
   updatedAt: 1000,

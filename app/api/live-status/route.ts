@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { CreatorPlatform } from "@/lib/news-prefs";
 
-export interface LiveStatusItem {
-  id: string;
-  name: string;
-  handle: string;
-  platform: CreatorPlatform;
-  status: "live" | "offline" | "unknown";
-  avatarUrl: string;
-  url: string;
-  title?: string;
-}
+import type { LiveStatusItem } from "@/packages/core/src/integrations";
+export type { LiveStatusItem } from "@/packages/core/src/integrations";
 
 function creatorUrl(platform: CreatorPlatform, handle: string) {
   return platform === "twitch"

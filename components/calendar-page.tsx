@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { apiFetch } from "@/lib/api-client";
+
+import Link from "@/lib/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, CalendarDays, CheckSquare, ChevronLeft, ChevronRight, Clock,
@@ -167,7 +169,7 @@ export function CalendarPage() {
     const end = parseDateKey(rangeEnd);
     end.setHours(23, 59, 59, 999);
     const params = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
-    fetch(`/api/calcom/bookings?${params}`, { signal: controller.signal })
+    apiFetch(`/api/calcom/bookings?${params}`, { signal: controller.signal })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok || body.error) throw new Error(body.error || "Could not load Cal.com");

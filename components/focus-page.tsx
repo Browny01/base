@@ -37,6 +37,7 @@ export function FocusPage() {
             clearInterval(intervalRef.current!);
             setRunning(false);
             logSession(MODES[modeIdx].mins);
+            window.dispatchEvent(new Event("base:focus-complete"));
             try { new Audio("/chime.mp3").play(); } catch {}
             return 0;
           }

@@ -4,13 +4,8 @@ export const runtime = "nodejs";
 
 const TMDB_KEY = process.env.TMDB_API_KEY;
 
-export interface TmdbResult {
-  id: number;
-  media_type: "movie" | "tv";
-  title: string;
-  year: string | null;
-  poster: string | null;
-}
+import type { TmdbResult } from "@/packages/core/src/integrations";
+export type { TmdbResult } from "@/packages/core/src/integrations";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

@@ -1,5 +1,9 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
+import { apiFetch } from "@/lib/api-client";
+
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
@@ -15,13 +19,13 @@ import {
 import { mdToHtml } from "@/lib/markdown";
 import { DEFAULT_AI_SETTINGS, hasSavedKey, normalizeAiSettings } from "@/lib/ai-settings";
 import { decryptSecret, sessionSecret } from "@/lib/vault";
-import Link from "next/link";
+import Link from "@/lib/link";
 import { cn } from "@/lib/utils";
 import { useBase } from "@/lib/hooks";
-import type { AssetData } from "@/app/api/market/charts/route";
-import type { LiveStatusItem } from "@/app/api/live-status/route";
-import type { NewsArticle } from "@/app/api/news/route";
-import type { SocialFeedItem } from "@/app/api/social-feed/route";
+import type { AssetData } from "@/packages/core/src/integrations";
+import type { LiveStatusItem } from "@/packages/core/src/integrations";
+import type { NewsArticle } from "@/packages/core/src/integrations";
+import type { SocialFeedItem } from "@/packages/core/src/integrations";
 import {
   CATEGORY_LABEL,
   DEFAULT_NEWS_PREFS,
@@ -154,7 +158,7 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
 
   function refresh() {
     setLoading(true);
-    fetch(`/api/social-feed?${feedQuery}`)
+    apiFetch(`/api/social-feed?${feedQuery}`)
       .then((res) => res.json())
       .then((data) => setItems(data.items ?? []))
       .catch(() => setItems([]))
@@ -169,7 +173,7 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
     }
 
     Promise.resolve().then(() => { if (!cancelled) setLoading(true); });
-    fetch(`/api/social-feed?${feedQuery}`)
+    apiFetch(`/api/social-feed?${feedQuery}`)
       .then((res) => res.json())
       .then((data) => { if (!cancelled) setItems(data.items ?? []); })
       .catch(() => { if (!cancelled) setItems([]); })
@@ -260,8 +264,7 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
                 <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer" className="group w-[260px] shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 transition-colors hover:bg-[var(--surface-2)]">
                   <div className="aspect-video overflow-hidden rounded-md bg-[var(--chip)]">
                     {item.thumbnail ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" loading="lazy" />
+                      <BaseImage src={item.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" loading="lazy" />
                     ) : (
                       <div className="flex h-full items-center justify-center text-[11px] text-[var(--faint)]">No thumbnail</div>
                     )}
@@ -361,7 +364,7 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
   function refresh() {
     if (!query) return;
     setLoading(true);
-    fetch(`/api/live-status?${query}`)
+    apiFetch(`/api/live-status?${query}`)
       .then((res) => res.json())
       .then((data) => setItems(data.items ?? []))
       .catch(() => setItems([]))
@@ -376,7 +379,7 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
     }
 
     Promise.resolve().then(() => { if (!cancelled) setLoading(true); });
-    fetch(`/api/live-status?${query}`)
+    apiFetch(`/api/live-status?${query}`)
       .then((res) => res.json())
       .then((data) => { if (!cancelled) setItems(data.items ?? []); })
       .catch(() => { if (!cancelled) setItems([]); })
@@ -400,8 +403,7 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
         {items.map((creator) => (
           <div key={creator.id} className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
             <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--chip)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={creator.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <BaseImage src={creator.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -431,36 +433,28 @@ function NewsBriefing() {
   const settings = normalizeAiSettings(data.aiSettings ?? DEFAULT_AI_SETTINGS);
   const [state, setState] = useState<{ loading: boolean; summary?: string; generatedAt?: string; error?: string }>({ loading: true });
 
-  const load = async () => {
-    setState((s) => ({ ...s, loading: true }));
+  async function fetchBriefing(signal?: AbortSignal): Promise<typeof state> {
     try {
-      // The saved key is AES-GCM ciphertext, so it can only be unlocked here in
-      // the browser. No key in this session means we call the provider the
-      // server has credentials for (or ask for the password).
       let apiKey: string | undefined;
       if (hasSavedKey(settings)) {
         const password = sessionSecret();
-        if (!password) {
-          setState({ loading: false, error: "Your briefing key is locked. Unlock it in Settings → News briefing." });
-          return;
-        }
+        if (!password) return { loading: false, error: "Your briefing key is locked. Unlock it in Settings → News briefing." };
         apiKey = (await decryptSecret(settings.keyCipher!, settings.keySalt!, password)) ?? undefined;
       }
-      const res = await fetch("/api/news/summary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await apiFetch("/api/news/summary", {
+        method: "POST", headers: { "Content-Type": "application/json" }, signal,
         body: JSON.stringify({ model: settings.model, apiKey }),
       });
-      const j = await res.json();
-      setState(j.ok ? { loading: false, summary: j.summary, generatedAt: j.generatedAt } : { loading: false, error: j.error || "Couldn't load the briefing." });
-    } catch (e) {
-      setState({ loading: false, error: String((e as Error)?.message || e) });
-    }
-  };
-
+      const result = await res.json();
+      return result.ok ? { loading: false, summary: result.summary, generatedAt: result.generatedAt } : { loading: false, error: result.error || "Couldn't load the briefing." };
+    } catch (error) { return { loading: false, error: String((error as Error)?.message || error) }; }
+  }
+  const load = async () => { setState(previous => ({ ...previous,loading: true }));setState(await fetchBriefing()); };
   useEffect(() => {
-    if (settings.briefingEnabled) load();
-    else setState({ loading: false });
+    if (!settings.briefingEnabled) return;
+    const controller = new AbortController();
+    void fetchBriefing(controller.signal).then(result => { if (!controller.signal.aborted) setState(result); });
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.briefingEnabled, settings.model]);
 
@@ -518,7 +512,7 @@ export function NewsPage() {
   function loadAll() {
     setChartsLoading(true);
     setNewsLoading(true);
-    fetch("/api/market/charts")
+    apiFetch("/api/market/charts")
       .then((res) => res.json())
       .then((data) => {
         const nextAssets = data.assets ?? [];
@@ -528,7 +522,7 @@ export function NewsPage() {
       .catch(() => setAssets([]))
       .finally(() => setChartsLoading(false));
 
-    fetch("/api/news")
+    apiFetch("/api/news")
       .then((res) => res.json())
       .then((data) => setNews(data.articles ?? []))
       .catch(() => setNews([]))
@@ -540,7 +534,7 @@ export function NewsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/market/charts")
+    apiFetch("/api/market/charts")
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -551,7 +545,7 @@ export function NewsPage() {
       .catch(() => { if (!cancelled) setAssets([]); })
       .finally(() => { if (!cancelled) setChartsLoading(false); });
 
-    fetch("/api/news")
+    apiFetch("/api/news")
       .then((res) => res.json())
       .then((data) => { if (!cancelled) setNews(data.articles ?? []); })
       .catch(() => { if (!cancelled) setNews([]); })

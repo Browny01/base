@@ -36,10 +36,11 @@ export function ProjectLogo({
       style={src ? undefined : { background: `${hex}22` }}
     >
       {src ? (
-        <img src={src} alt={`${name} logo`} className="w-full h-full object-cover" />
+        <BaseImage src={src} alt={`${name} logo`} className="w-full h-full object-cover" />
       ) : (
         <FolderKanban className={iconClass} style={{ color: hex }} />
       )}
     </div>
   );
 }
+import { BaseImage } from "@/lib/image";

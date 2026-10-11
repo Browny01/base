@@ -1,5 +1,7 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
 import { useState, type ReactNode } from "react";
 import { useBase } from "@/lib/hooks";
 import type { BaseData } from "@/lib/store";
@@ -166,7 +168,7 @@ export function CardListPage<T extends MediaCardLike>({
               >
                 <div className={cn("relative w-full", config.aspect(item))}>
                   {cover ? (
-                    <img src={cover} alt={title} draggable={false} className="absolute inset-0 w-full h-full object-cover" />
+                    <BaseImage src={cover} alt={title} draggable={false} className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <div className="absolute inset-0 bg-[var(--chip)] grid place-items-center">
                       <span className="text-3xl opacity-40">{config.fallbackEmoji(item)}</span>
@@ -231,7 +233,7 @@ export function CardListPage<T extends MediaCardLike>({
                 return (
                   <div key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden flex flex-col">
                     {config.cover(item) ? (
-                      <img src={config.cover(item)} alt={title} className={cn("w-full object-cover", config.aspect(item))} />
+                      <BaseImage src={config.cover(item)} alt={title} className={cn("w-full object-cover", config.aspect(item))} />
                     ) : (
                       <div className={cn("w-full bg-[var(--chip)] grid place-items-center", config.aspect(item))}>
                         <span className="text-3xl opacity-40">{config.fallbackEmoji(item)}</span>

@@ -64,7 +64,13 @@ export async function verifyStoredPassword(password: string, verifier: StoredVer
     // A wrong password fails the AES-GCM auth tag and throws, which is exactly
     // the check we want.
     const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(verifier.iv, "base64"));
-    const plain = Buffer.concat([decipher.update(Buffer.from(verifier.hash, "base64")), decipher.final()]);
+    // Web Crypto appends the 16-byte GCM tag to its ciphertext. Node's
+    // decipher requires that tag separately; otherwise even the correct
+    // onboarding password always fails verification.
+    const encrypted = Buffer.from(verifier.hash, "base64");
+    if (encrypted.length < 16) return false;
+    decipher.setAuthTag(encrypted.subarray(-16));
+    const plain = Buffer.concat([decipher.update(encrypted.subarray(0, -16)), decipher.final()]);
     return plain.length === 0;
   } catch {
     return false;

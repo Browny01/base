@@ -1,17 +1,7 @@
 import { NextResponse } from "next/server";
 
-export interface AssetData {
-  id: string;
-  name: string;
-  symbol: string;
-  price: number | null;       // in AUD
-  priceUsd: number | null;    // kept for reference
-  change24h: number | null;
-  history: { t: number; v: number }[];  // values in AUD
-  currency: string;
-  note?: string;   // shown instead of a price for assets that don't trade (e.g. private companies)
-  error?: string;
-}
+import type { AssetData } from "@/packages/core/src/integrations";
+export type { AssetData } from "@/packages/core/src/integrations";
 
 const YAHOO_ASSETS = [
   { id: "gold",  name: "Gold",      symbol: "GC=F",   currency: "AUD/oz" },

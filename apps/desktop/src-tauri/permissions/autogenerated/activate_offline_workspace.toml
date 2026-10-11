@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-activate-offline-workspace"
+description = "Enables the activate_offline_workspace command without any pre-configured scope."
+commands.allow = ["activate_offline_workspace"]
+
+[[permission]]
+identifier = "deny-activate-offline-workspace"
+description = "Denies the activate_offline_workspace command without any pre-configured scope."
+commands.deny = ["activate_offline_workspace"]

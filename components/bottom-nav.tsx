@@ -2,8 +2,8 @@
 
 import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from "@/lib/link";
+import { usePathname } from "@/lib/navigation";
 import {
   X, MoreHorizontal, Sun, Moon,
 } from "lucide-react";

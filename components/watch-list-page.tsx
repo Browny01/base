@@ -1,13 +1,17 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
+import { apiFetch } from "@/lib/api-client";
+
 import { useEffect, useState } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
 import { Play, Film, Tv, Video, Search, Plus, Loader2, Check } from "lucide-react";
 import { CardListPage, type CardConfig } from "@/components/card-list-page";
 import type { WatchListItem, WatchKind } from "@/lib/store";
-import type { TmdbResult } from "@/app/api/tmdb/search/route";
-import type { YoutubeMeta } from "@/app/api/youtube/oembed/route";
+import type { TmdbResult } from "@/packages/core/src/integrations";
+import type { YoutubeMeta } from "@/packages/core/src/integrations";
 
 const KIND_BADGE: Record<WatchKind, { label: string; icon: typeof Film; emoji: string }> = {
   movie:  { label: "Movie",   icon: Film,    emoji: "🎬" },
@@ -56,22 +60,20 @@ function AddWatch({ items, close, append }: {
 
   useEffect(() => {
     const q = query.trim();
-    if (!q) { setResults(null); setYt(null); setError(null); setNotConfigured(false); setLoading(false); return; }
     const ac = new AbortController();
-    setLoading(true);
-    setError(null);
-    setNotConfigured(false);
-    setResults(null);
-    setYt(null);
     const t = setTimeout(async () => {
+      setResults(null); setYt(null); setError(null); setNotConfigured(false);
+      if (!q) { setLoading(false); return; }
+      setLoading(true);
+
       try {
         if (YT_RE.test(q)) {
-          const res = await fetch(`/api/youtube/oembed?url=${encodeURIComponent(q)}`, { signal: ac.signal });
+          const res = await apiFetch(`/api/youtube/oembed?url=${encodeURIComponent(q)}`, { signal: ac.signal });
           const j = await res.json();
           if (j.ok) setYt(j as YoutubeMeta);
           else setError(j.error ?? "Couldn't fetch that video.");
         } else {
-          const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`, { signal: ac.signal });
+          const res = await apiFetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`, { signal: ac.signal });
           const j = await res.json();
           if (j.ok) setResults(j.results ?? []);
           else if (j.configured === false) setNotConfigured(true);
@@ -159,7 +161,7 @@ function AddWatch({ items, close, append }: {
       {yt && (
         <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3">
           {yt.thumbnail ? (
-            <img src={yt.thumbnail} alt="" className="w-32 aspect-video object-cover rounded-lg shrink-0" />
+            <BaseImage src={yt.thumbnail} alt="" className="w-32 aspect-video object-cover rounded-lg shrink-0" />
           ) : (
             <div className="w-32 aspect-video rounded-lg bg-[var(--chip)] grid place-items-center shrink-0">
               <Video className="w-6 h-6 opacity-40" />
@@ -190,7 +192,7 @@ function AddWatch({ items, close, append }: {
               <div key={`${r.media_type}-${r.id}`} className="w-36 shrink-0 rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden flex flex-col">
                 <div className="aspect-[2/3] w-full relative bg-[var(--chip)] grid place-items-center">
                   {r.poster ? (
-                    <img src={r.poster} alt={r.title} className="absolute inset-0 w-full h-full object-cover" />
+                    <BaseImage src={r.poster} alt={r.title} className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <span className="text-3xl opacity-30">{emoji}</span>
                   )}

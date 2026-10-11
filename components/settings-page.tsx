@@ -463,7 +463,7 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
           {/* Sidebar order */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
             <p className="text-sm font-bold text-[var(--text)]">Sidebar order</p>
-            <p className="mb-3 text-[11px] text-[var(--faint)]">Reorders the sidebar on desktop and the "All pages" sheets.</p>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">Reorders the sidebar on desktop and the &quot;All pages&quot; sheets.</p>
             <div className="space-y-1">
               {order.map((key, i) => {
                 const page = pageFor(key);
@@ -487,7 +487,7 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
           {/* Mobile dock tabs */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
             <p className="text-sm font-bold text-[var(--text)]">Mobile dock tabs</p>
-            <p className="mb-3 text-[11px] text-[var(--faint)]">These fixed tabs always sit in the bottom bar. Everything else is reachable through "More".</p>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">These fixed tabs always sit in the bottom bar. Everything else is reachable through &quot;More&quot;.</p>
             <div className="space-y-1">
               {tabs.map((key, i) => {
                 const page = pageFor(key);

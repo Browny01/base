@@ -1,5 +1,7 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
 import { useState, useEffect } from "react";
 import { useBase } from "@/lib/hooks";
 import { useToast } from "@/lib/toast-context";
@@ -14,9 +16,9 @@ import {
   ExternalLink, Pencil, Check, X, Map, Circle, CircleDot, CheckCircle2,
   RotateCcw, Upload, Download, File as FileIcon, MoreHorizontal, Archive,
 } from "lucide-react";
-import Link from "next/link";
+import Link from "@/lib/link";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import { ProjectLogo } from "@/components/project-logo";
 
 const COLOR_TEXT: Record<ProjectColor, string> = {
@@ -54,7 +56,9 @@ function formatFileSize(bytes: number): string {
   return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
 }
 
-export function ProjectDetail({ id }: { id: string }) {
+export function ProjectDetail({ id }: { id: string }) { return <ProjectDetailView key={id} id={id} />; }
+
+function ProjectDetailView({ id }: { id: string }) {
   const { data, mutate } = useBase();
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -85,39 +89,31 @@ export function ProjectDetail({ id }: { id: string }) {
     .filter((file) => file.projectId === id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
-  const [docContent, setDocContent] = useState("");
-  const [docTitleEdit, setDocTitleEdit] = useState("");
+  const [requestedDocId, setRequestedDocId] = useState<string | null>(null);
+  const [docDraft,setDocDraft] = useState<{ id: string; content: string; title: string } | null>(null);
   const [renamingDocId, setRenamingDocId] = useState<string | null>(null);
   const [renameVal, setRenameVal] = useState("");
-
-  const selectedDoc = projectDocs.find((d) => d.id === selectedDocId) ?? null;
-
-  // Reset when switching projects
-  useEffect(() => {
-    setSelectedDocId(null);
-    setDocContent("");
-    setDocTitleEdit("");
-  }, [id]);
-
-  // Load content when selected doc changes (but not on content updates to avoid textarea reset)
-  useEffect(() => {
-    if (selectedDoc) {
-      setDocContent(selectedDoc.content);
-      setDocTitleEdit(selectedDoc.title);
-    } else {
-      setDocContent("");
-      setDocTitleEdit("");
+  const selectedDoc = projectDocs.find(doc => doc.id === requestedDocId) ?? projectDocs[0] ?? null;
+  const selectedDocId = selectedDoc?.id ?? null;
+  const docContent = docDraft?.id === selectedDocId ? docDraft!.content : selectedDoc?.content ?? "";
+  const docTitleEdit = docDraft?.id === selectedDocId ? docDraft!.title : selectedDoc?.title ?? "";
+  function setDocContent(content: string) {
+    if (!selectedDocId) return;
+    mutate(data => ({ ...data, projectDocuments: data.projectDocuments.map(doc => doc.id === selectedDocId ? { ...doc, content, updatedAt: new Date().toISOString() } : doc) }));
+    setDocDraft(previous => ({ id: selectedDocId, content, title: previous?.id === selectedDocId ? previous.title : selectedDoc?.title ?? "" }));
+  }
+  function setDocTitleEdit(title: string) {
+    if (!selectedDocId) return;
+    setDocDraft(previous => ({ id: selectedDocId, title, content: previous?.id === selectedDocId ? previous.content : selectedDoc?.content ?? "" }));
+  }
+  function setSelectedDocId(docId: string | null) {
+    // Switching documents must flush the previous draft before the debounce
+    // is canceled, including when SQLite persistence completes asynchronously.
+    if (docDraft && docDraft.id === selectedDocId && selectedDoc?.content !== docDraft.content) {
+      mutate(data => ({ ...data, projectDocuments: data.projectDocuments.map(doc => doc.id === docDraft.id ? { ...doc, content: docDraft.content, updatedAt: new Date().toISOString() } : doc) }));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDocId]);
-
-  // Auto-select first doc whenever selection is empty and docs exist
-  useEffect(() => {
-    if (!selectedDocId && projectDocs.length > 0) {
-      setSelectedDocId(projectDocs[0].id);
-    }
-  }, [projectDocs.length, selectedDocId]);
+    setRequestedDocId(docId);setDocDraft(null);
+  }
 
   // Migrate existing single-note to a document (runs once per project when docs tab first opened)
   useEffect(() => {
@@ -130,26 +126,8 @@ export function ProjectDetail({ id }: { id: string }) {
       content: oldNote.content, createdAt: oldNote.updatedAt, updatedAt: oldNote.updatedAt,
     };
     mutate((d) => ({ ...d, projectDocuments: [...(d.projectDocuments ?? []), newDoc] }));
-    setSelectedDocId(newDoc.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, id]);
-
-  // Auto-save doc content (debounced)
-  useEffect(() => {
-    if (!selectedDocId) return;
-    const timer = setTimeout(() => {
-      mutate((d) => ({
-        ...d,
-        projectDocuments: (d.projectDocuments ?? []).map((doc) =>
-          doc.id === selectedDocId
-            ? { ...doc, content: docContent, updatedAt: new Date().toISOString() }
-            : doc
-        ),
-      }));
-    }, 600);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docContent, selectedDocId]);
 
   // ── Links ────────────────────────────────────────────────────────────────────
   const [linkUrl, setLinkUrl] = useState("");
@@ -319,8 +297,6 @@ export function ProjectDetail({ id }: { id: string }) {
     };
     mutate((d) => ({ ...d, projectDocuments: [...(d.projectDocuments ?? []), newDoc] }));
     setSelectedDocId(newDoc.id);
-    setDocContent("");
-    setDocTitleEdit("Untitled");
   }
   function deleteDoc(docId: string) {
     mutate((d) => ({ ...d, projectDocuments: (d.projectDocuments ?? []).filter((doc) => doc.id !== docId) }));
@@ -849,7 +825,7 @@ function ProjectFileCard({ file, onDelete }: { file: ProjectFile; onDelete: (id:
     <div className="group bg-[var(--surface-2)] border border-[var(--border)] rounded-xl overflow-hidden hover:border-[var(--border-2)] transition-colors">
       <a href={file.dataUrl} target="_blank" rel="noopener noreferrer" className="block aspect-[4/3] bg-[var(--chip)]">
         {isImage ? (
-          <img src={file.dataUrl} alt={file.name} className="w-full h-full object-cover" />
+          <BaseImage src={file.dataUrl} alt={file.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             {isPdf ? <FileText className="w-10 h-10 text-[var(--faint)]" /> : <FileIcon className="w-10 h-10 text-[var(--faint)]" />}

@@ -53,10 +53,12 @@ export function consumeHandoff(
       hit = true;
     }
   }
+  if (hit && typeof window !== "undefined") window.dispatchEvent(new Event("base:handoff"));
   return hit;
 }
 
 /** Requests a handoff to `path`; native clients watch both names. */
 export function requestHandoff(name: string, legacy: readonly string[] = []): void {
   for (const key of [name, ...legacy]) writeBaseKey(key, "1");
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("base:handoff"));
 }

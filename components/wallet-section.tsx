@@ -1,11 +1,15 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
+import { apiFetch } from "@/lib/api-client";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, formatAUD, getToday } from "@/lib/utils";
 import type { WalletNetwork } from "@/lib/store";
 import { fetchWalletBalance, fetchCryptoPrices, NETWORK_INFO } from "@/lib/crypto";
-import type { TokenBalance } from "@/app/api/wallet/tokens/route";
+import type { TokenBalance } from "@/packages/core/src/integrations";
 import {
   Plus, Trash2, RefreshCw, Wallet, AlertCircle,
 } from "lucide-react";
@@ -39,8 +43,7 @@ function ChainIcon({ network }: { network: WalletNetwork }) {
       )}
     >
       {!failed ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <BaseImage
           src={info.imageUrl}
           alt={info.symbol}
           className="w-9 h-9 rounded-full object-cover"
@@ -61,8 +64,7 @@ function TokenIcon({ logoUri, symbol }: { logoUri?: string; symbol: string }) {
 
   if (!failed && logoUri) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <BaseImage
         src={logoUri}
         alt={symbol}
         className="w-7 h-7 rounded-full object-cover shrink-0"
@@ -109,7 +111,7 @@ export function WalletSection({ onTotalUpdate }: Props) {
     });
 
     const [fxData, priceData] = await Promise.all([
-      fetch("/api/fx/rate").then((r) => r.json()).catch(() => ({ usdToAud: 1.55 })),
+      apiFetch("/api/fx/rate").then((r) => r.json()).catch(() => ({ usdToAud: 1.55 })),
       fetchCryptoPrices(),
     ]);
     const rate: number = fxData.usdToAud ?? 1.55;
@@ -135,7 +137,7 @@ export function WalletSection({ onTotalUpdate }: Props) {
 
           // Auto-fetch tokens for SOL and ETH wallets immediately
           if (wallet.network === "solana" || wallet.network === "ethereum") {
-            fetch(
+            apiFetch(
               `/api/wallet/tokens?network=${encodeURIComponent(wallet.network)}&address=${encodeURIComponent(wallet.address)}`
             )
               .then((r) => r.json())

@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-client";
+
 // First run: the wizard that turns a fresh install into someone's Base.
 //
 // It's a client component because the sensitive parts happen in the browser with
@@ -8,7 +10,7 @@
 // that same password).
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useBase } from "@/lib/hooks";
 import { DEFAULT_AI_SETTINGS, PROVIDER_INFO, modelsForProvider, type AiProvider, type AiSettings } from "@/lib/ai-settings";
@@ -64,7 +66,7 @@ export default function OnboardingPage() {
   // password. Everything else comes from the store or the browser's own settings.
   useEffect(() => {
     let live = true;
-    fetch("/api/setup")
+    apiFetch("/api/setup")
       .then((r) => r.json())
       .then((j: SetupStatus) => { if (live) setStatus(j); })
       .catch(() => { if (live) setStatus({ passwordMode: "none", canSetPassword: false }); });
@@ -135,7 +137,7 @@ export default function OnboardingPage() {
 
       if (password) {
         const verifier = await makePasswordVerifier(password);
-        const res = await fetch("/api/setup", {
+        const res = await apiFetch("/api/setup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password: serializeVerifier(verifier) }),

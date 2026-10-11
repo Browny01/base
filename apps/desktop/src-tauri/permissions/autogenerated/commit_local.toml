@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-commit-local"
+description = "Enables the commit_local command without any pre-configured scope."
+commands.allow = ["commit_local"]
+
+[[permission]]
+identifier = "deny-commit-local"
+description = "Denies the commit_local command without any pre-configured scope."
+commands.deny = ["commit_local"]

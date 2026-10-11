@@ -11,6 +11,7 @@ const listeners = new Set<() => void>();
 function emit() {
   for (const listener of listeners) listener();
 }
+if (typeof window !== "undefined") window.addEventListener("storage", emit);
 
 function subscribe(cb: () => void) {
   listeners.add(cb);

@@ -2,17 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { apiAccessAllowed } from "@/lib/access";
 
-export interface TokenBalance {
-  mint: string;
-  symbol: string;
-  name: string;
-  balance: number;
-  decimals: number;
-  priceUsd: number | null;
-  priceAud: number | null;
-  valueAud: number | null;
-  logoUri?: string;
-}
+import type { TokenBalance } from "@/packages/core/src/integrations";
+export type { TokenBalance } from "@/packages/core/src/integrations";
 
 // ─── Base58 helpers ────────────────────────────────────────────────────────
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";

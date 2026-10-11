@@ -4,11 +4,7 @@ export const runtime = "nodejs";
 
 const YT_HOST_RE = /(^|\.)(youtube\.com|youtu\.be)$/i;
 
-export interface YoutubeMeta {
-  title: string;
-  thumbnail: string | null;
-  channel: string | null;
-}
+export type { YoutubeMeta } from "@/packages/core/src/integrations";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

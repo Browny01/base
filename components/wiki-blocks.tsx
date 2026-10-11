@@ -1,5 +1,9 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
+import { apiFetch } from "@/lib/api-client";
+
 import { useEffect, useRef, useState } from "react";
 import { uid, cn } from "@/lib/utils";
 import type { WikiTableData, WikiBoardColumn, WikiChartData, ChartKind } from "@/lib/store";
@@ -278,7 +282,7 @@ export function RichInput({ html, onChange, placeholder, className }: {
 async function uploadFile(file: File): Promise<string | null> {
   try {
     const ext = file.name.split(".").pop() || "bin";
-    const res = await fetch(`/api/blob/upload?filename=note-${Date.now()}.${ext}`, {
+    const res = await apiFetch(`/api/blob/upload?filename=note-${Date.now()}.${ext}`, {
       method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file,
     });
     if (!res.ok) return null;
@@ -301,7 +305,7 @@ function BookmarkBlock({ block, onPatch }: { block: WikiBlock; onPatch: (p: Part
     setThumbOk(true);
     let alive = true;
     setLoading(true);
-    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+    apiFetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { ok?: boolean; title?: string; description?: string; image?: string | null } | null) => {
         if (!alive || !d?.ok) return;
@@ -348,14 +352,12 @@ function BookmarkBlock({ block, onPatch }: { block: WikiBlock; onPatch: (p: Part
           )}
         />
         <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-[var(--faint)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} alt="" className="w-3.5 h-3.5 rounded-sm" />
+          <BaseImage src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`} alt="" className="w-3.5 h-3.5 rounded-sm" />
           <span className="truncate">{host}</span><ExternalLink className="w-3 h-3" />
         </div>
       </div>
       {thumb && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={thumb} alt="" onError={() => setThumbOk(false)} className="w-[92px] shrink-0 object-cover border-l border-[var(--border)] bg-[var(--surface-2)]" />
+        <BaseImage src={thumb} alt="" onError={() => setThumbOk(false)} className="w-[92px] shrink-0 object-cover border-l border-[var(--border)] bg-[var(--surface-2)]" />
       )}
     </a>
   );
@@ -468,8 +470,7 @@ function SketchBlock({ src, onChange }: { src?: string; onChange: (src: string) 
   if (src) {
     return (
       <figure className="my-1 group/sk relative inline-block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="sketch" className="max-w-full rounded-lg border border-[var(--border)]" />
+        <BaseImage src={src} alt="sketch" className="max-w-full rounded-lg border border-[var(--border)]" />
         <button onClick={() => onChange("")} className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg)]/80 backdrop-blur border border-[var(--border)] text-[11px] text-[var(--text)] opacity-0 group-hover/sk:opacity-100"><Pencil className="w-3 h-3" /> Redraw</button>
       </figure>
     );
@@ -543,8 +544,7 @@ export function ExtraBlock({ block, onPatch, allPages, currentPageId, pageBlocks
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
           {imgs.map((src, i) => (
             <div key={i} className="group/g relative aspect-square overflow-hidden rounded-lg border border-[var(--border)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt="" className="w-full h-full object-cover" />
+              <BaseImage src={src} alt="" className="w-full h-full object-cover" />
               <button onClick={() => onPatch({ images: imgs.filter((_, j) => j !== i) })} className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-md bg-black/60 text-white opacity-0 group-hover/g:opacity-100"><X className="w-3.5 h-3.5" /></button>
             </div>
           ))}

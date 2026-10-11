@@ -767,6 +767,7 @@ function migrateHabits(data: BaseData): BaseData {
         habits: data.habits.map((r) => {
           const rh = r as unknown as Record<string, unknown>;
           return {
+            ...r,
             id: r.id,
             name: r.name,
             emoji: (rh.emoji as string) || "⭐",
@@ -854,7 +855,7 @@ function watchExternalWrites() {
   watchingStorage = true;
   window.addEventListener("storage", (e) => {
     // key === null means localStorage.clear() fired.
-    if (e.key === null || e.key === DATA_KEY || PREVIOUS_KEYS.includes(e.key)) cache = null;
+    if (e.key === null || e.key === DATA_KEY || e.key === "base_sync_v2" || PREVIOUS_KEYS.includes(e.key)) cache = null;
   });
 }
 
@@ -914,14 +915,20 @@ function migrateExistingInstall(data: BaseData): BaseData {
 // shape. Callers that inject data from outside localStorage must use this
 // explicitly: load() only re-parses on a cache miss, so previously-pulled
 // server data would otherwise sit unmigrated in the cache until a reload.
-export function migrateAll(data: BaseData): BaseData {
-  return migrateExistingInstall(migrateAwayChat(purgeOldTrash(migrateTaskTags(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data))))))));
+export function migrateAll(data: BaseData, options: { preserveArchived?: boolean } = {}): BaseData {
+  const normalized = migrateTaskTags(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data)))));
+  return migrateExistingInstall(options.preserveArchived ? normalized : migrateAwayChat(purgeOldTrash(normalized)));
 }
+
+/** Desktop keeps its synchronous read mirror here for existing canvas/search
+ * consumers. SQLite and the desktop store own persistence and notifications. */
+export function installLocalSnapshot(data: BaseData) { cache = data; }
 
 function loadFromStorage(): BaseData {
   if (typeof window === "undefined") return DEFAULT;
   try {
-    let raw = localStorage.getItem(DATA_KEY);
+    const syncState = localStorage.getItem("base_sync_v2");
+    let raw = syncState ? JSON.stringify(JSON.parse(syncState).document) : localStorage.getItem(DATA_KEY);
     if (!raw) {
       for (const key of PREVIOUS_KEYS) {
         const previous = localStorage.getItem(key);
@@ -947,9 +954,10 @@ function load(): BaseData {
 }
 
 function save(data: BaseData) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(DATA_KEY, JSON.stringify(data));
+  }
   cache = data;
-  if (typeof window === "undefined") return;
-  localStorage.setItem(DATA_KEY, JSON.stringify(data));
 }
 
 export function getData(): BaseData {

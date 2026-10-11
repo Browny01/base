@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Parser from "rss-parser";
 
-export interface SocialFeedItem {
-  id: string;
-  title: string;
-  link: string;
-  source: string;
-  sourceType: "youtube" | "reddit" | "x";
-  category: "crypto" | "ai" | "irl" | "gaming" | "general";
-  publishedAt: string;
-  description: string;
-  thumbnail?: string;
-}
+import type { SocialFeedItem } from "@/packages/core/src/integrations";
+export type { SocialFeedItem } from "@/packages/core/src/integrations";
 
 const parser = new Parser({
   timeout: 8000,

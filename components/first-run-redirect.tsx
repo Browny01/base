@@ -4,7 +4,7 @@
 // name, no timezone, no password yet. Runs once per profile — `onboardedAt` in
 // the store is the switch, so it never nags an install that's already set up.
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import { useBase } from "@/lib/hooks";
 import { needsOnboarding } from "@/lib/profile";
 

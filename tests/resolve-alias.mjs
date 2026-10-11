@@ -8,6 +8,7 @@ const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 registerHooks({
   resolve(specifier, context, next) {
+    if (specifier === "next/server") return next("next/server.js", context);
     if (specifier.startsWith("@/")) {
       const rest = specifier.slice(2);
       for (const cand of [`${ROOT}${rest}.ts`, `${ROOT}${rest}.tsx`, `${ROOT}${rest}/index.ts`, `${ROOT}${rest}`]) {

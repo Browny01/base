@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { DATA_HISTORY_KEY, readCurrentData } from "@/lib/base-data";
-import { safeWriteBaseData } from "@/lib/autonomy-persistence";
+import { safeWriteBaseData, StaleBaseWriteError } from "@/lib/autonomy-persistence";
 
 // Rolling backups (newest first).
 const HISTORY = DATA_HISTORY_KEY;
@@ -70,9 +70,10 @@ export async function POST(req: NextRequest) {
       try { await redis.lpush(HISTORY, JSON.stringify(existing)); await redis.ltrim(HISTORY, 0, 24); } catch { /* ignore backup errors */ }
     }
 
-    await safeWriteBaseData(redis, body, false);
+    await safeWriteBaseData(redis, body, false, { allowStale: force });
     return NextResponse.json({ ok: true, configured: true });
   } catch (err) {
+    if (err instanceof StaleBaseWriteError) return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
     console.error("[base/data POST]", err);
     return NextResponse.json({ ok: false, configured: true, error: String(err) });
   }

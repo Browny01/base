@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/lib/navigation";
 
 // Most pages are centered in a max-width column. The Vision Board is full-bleed
 // (fills the whole main area beside the sidebar / under the top bar).

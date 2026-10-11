@@ -1,5 +1,7 @@
 "use client";
 
+import { BaseImage } from "@/lib/image";
+
 import { useRef, useState } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, cn } from "@/lib/utils";
@@ -116,7 +118,7 @@ function ItemIcon({ cfg, item, size = "sm" }: { cfg: ListPageConfig; item: LazyI
     : size === "lg" ? "w-9 h-9 text-2xl"
     : "w-5 h-5 text-sm";
   if (isImageIcon(item.icon)) {
-    return <img src={item.icon} alt="" className={cn("rounded object-cover shrink-0", dim)} />;
+    return <BaseImage src={item.icon} alt="" className={cn("rounded object-cover shrink-0", dim)} />;
   }
   const cat = getCategoryInfo(cfg, item.category);
   return (

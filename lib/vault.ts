@@ -15,6 +15,8 @@
 import type { SecretBlob } from "@/lib/ai-settings";
 
 const SESSION_SECRET_KEY = "base_vault_secret";
+let nativeSecretCache: { get: () => string | null; set: (secret: string) => void; clear: () => void } | null = null;
+export function installSecretCache(cache: NonNullable<typeof nativeSecretCache>) { nativeSecretCache = cache; }
 const ITERATIONS = 210_000;
 
 function toBase64(bytes: Uint8Array): string {
@@ -98,6 +100,7 @@ export async function decryptSecret(cipher: SecretBlob, salt: string, password: 
 // (not localStorage) means it disappears when the tab closes.
 
 export function setSessionSecret(password: string): void {
+  if (nativeSecretCache) { nativeSecretCache.set(password); return; }
   try {
     sessionStorage.setItem(SESSION_SECRET_KEY, password);
   } catch {
@@ -106,6 +109,7 @@ export function setSessionSecret(password: string): void {
 }
 
 export function sessionSecret(): string | null {
+  if (nativeSecretCache) return nativeSecretCache.get();
   try {
     return sessionStorage.getItem(SESSION_SECRET_KEY);
   } catch {
@@ -114,6 +118,7 @@ export function sessionSecret(): string | null {
 }
 
 export function clearSessionSecret(): void {
+  if (nativeSecretCache) { nativeSecretCache.clear(); return; }
   try {
     sessionStorage.removeItem(SESSION_SECRET_KEY);
   } catch {

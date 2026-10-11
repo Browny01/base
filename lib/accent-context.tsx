@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { useStoredPref, writeStored } from "./prefs";
+import { createContext, useContext, useEffect } from "react";
 
 // Accent presets. --accent-soft / --accent-border are color-mix(var(--accent)…) in
 // globals.css, so overriding just --accent cascades to every accent surface.
@@ -20,18 +21,9 @@ const DEFAULT = ACCENTS[0].value;
 const Ctx = createContext<{ accent: string; setAccent: (v: string) => void }>({ accent: DEFAULT, setAccent: () => {} });
 
 export function AccentProvider({ children }: { children: React.ReactNode }) {
-  const [accent, setAccentState] = useState(DEFAULT);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("base_accent");
-    if (saved) { setAccentState(saved); document.documentElement.style.setProperty("--accent", saved); }
-  }, []);
-
-  const setAccent = (v: string) => {
-    setAccentState(v);
-    try { localStorage.setItem("base_accent", v); } catch {}
-    document.documentElement.style.setProperty("--accent", v);
-  };
+  const accent = useStoredPref("base_accent", DEFAULT);
+  useEffect(() => { document.documentElement.style.setProperty("--accent",accent); },[accent]);
+  const setAccent = (v: string) => { writeStored("base_accent",v); document.documentElement.style.setProperty("--accent",v); };
 
   return <Ctx.Provider value={{ accent, setAccent }}>{children}</Ctx.Provider>;
 }

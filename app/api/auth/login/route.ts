@@ -5,6 +5,7 @@ import { basePassword, basePasswordHash } from "@/lib/env";
 import { readStoredVerifier, verifyStoredPassword } from "@/lib/auth-store";
 import { signSession } from "@/lib/session";
 import { setSessionCookie } from "@/lib/session-cookie";
+import { issueDesktopSession } from "@/lib/desktop-session";
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, keylen: number) => Promise<Buffer>;
 
@@ -106,9 +107,13 @@ export async function POST(req: NextRequest) {
   }
 
   let password = "";
+  let desktop = false;
+  let deviceId = "";
   try {
     const body = await req.json();
     if (typeof body?.password === "string") password = body.password;
+    desktop = body?.client === "desktop";
+    if (typeof body?.deviceId === "string") deviceId = body.deviceId;
   } catch {
     /* treat as empty */
   }
@@ -124,6 +129,13 @@ export async function POST(req: NextRequest) {
   }
 
   attempts.delete(ip);
+
+  if (desktop) {
+    if (!/^[\w-]{16,100}$/.test(deviceId)) return NextResponse.json({ error: "Invalid device ID." }, { status: 400 });
+    const session = await issueDesktopSession(deviceId);
+    if (!session) return NextResponse.json({ error: "Desktop sessions require configured persistence." }, { status: 503 });
+    return NextResponse.json({ ok: true, ...session, token: `base_desktop_${session.token}` }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   const token = await signSession(30);
   if (!token) {

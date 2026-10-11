@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useReducer, type ReactNode } from "react";
+import { BaseImage } from "@/lib/image";
+
+import { apiFetch } from "@/lib/api-client";
+
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import { useBase } from "@/lib/hooks";
 import { getData } from "@/lib/store";
 import { uid, cn } from "@/lib/utils";
@@ -76,7 +80,7 @@ function fileToImage(file: File): Promise<{ blob: Blob | null; dataUrl: string; 
 // if Blob isn't configured / the upload fails (caller keeps the data URL).
 async function uploadToBlob(blob: Blob): Promise<string | null> {
   try {
-    const res = await fetch(`/api/blob/upload?filename=photo-${Date.now()}.jpg`, {
+    const res = await apiFetch(`/api/blob/upload?filename=photo-${Date.now()}.jpg`, {
       method: "POST",
       headers: { "Content-Type": "image/jpeg" },
       body: blob,
@@ -93,7 +97,7 @@ async function uploadToBlob(blob: Blob): Promise<string | null> {
 async function uploadMediaToBlob(file: File): Promise<string | null> {
   try {
     const ext = file.name.split(".").pop() || "bin";
-    const res = await fetch(`/api/blob/upload?filename=media-${Date.now()}.${ext}`, {
+    const res = await apiFetch(`/api/blob/upload?filename=media-${Date.now()}.${ext}`, {
       method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file,
     });
     if (!res.ok) return null;
@@ -164,7 +168,8 @@ export function VisionBoardPage() {
   // ── Undo / redo history ──────────────────────────────────────────────────────
   const past = useRef<BoardSnap[]>([]);
   const future = useRef<BoardSnap[]>([]);
-  const [, forceHist] = useReducer((n: number) => n + 1, 0); // re-render for button enabled state
+  const [historyAvailability,setHistoryAvailability] = useState({ undo: false, redo: false });
+  const forceHist = () => setHistoryAvailability({ undo: past.current.length > 0, redo: future.current.length > 0 });
 
   const snapshot = useCallback((): BoardSnap => {
     const d = getData();
@@ -196,8 +201,8 @@ export function VisionBoardPage() {
     mutate((d) => ({ ...d, ...next }));
   }, [mutate, snapshot]);
 
-  const canUndo = past.current.length > 0;
-  const canRedo = future.current.length > 0;
+  const canUndo = historyAvailability.undo;
+  const canRedo = historyAvailability.redo;
 
   const items = (data.boardItems ?? []).filter((it) => it.boardId === activeId);
   const drawings = (data.boardDrawings ?? []).filter((d) => d.boardId === activeId);
@@ -484,6 +489,8 @@ export function VisionBoardPage() {
   const drawing = tool !== "select";
   const isDrawTool = tool !== "select" && tool !== "eraser";
   const selectedDrawing = drawings.find((d) => d.id === selectedDrawingId) ?? null;
+  const selectedDrawingBounds = selectedDrawing ? drawingBBox(selectedDrawing) : null;
+  const selectedOffset = drawOffset?.id === selectedDrawingId ? drawOffset : { dx: 0, dy: 0 };
 
   return (
     <div className="relative w-full flex-1 min-h-0 overflow-hidden bg-[var(--surface-2)]">
@@ -586,22 +593,17 @@ export function VisionBoardPage() {
           </svg>
 
           {/* Delete button for the selected drawing */}
-          {tool === "select" && selectedDrawing && (() => {
-            const bb = drawingBBox(selectedDrawing);
-            const ox = drawOffset?.id === selectedDrawing.id ? drawOffset.dx : 0;
-            const oy = drawOffset?.id === selectedDrawing.id ? drawOffset.dy : 0;
-            return (
+          {tool === "select" && selectedDrawing && selectedDrawingBounds && (
               <button
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => eraseDrawing(selectedDrawing.id)}
                 title="Delete drawing"
                 className="absolute flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-md text-[var(--muted)] hover:text-red-500 hover:border-[var(--border-2)] transition-colors"
-                style={{ left: bb.x + bb.w + 8 + ox, top: Math.max(0, bb.y - 4 + oy), zIndex: 99999 }}
+                style={{ left: selectedDrawingBounds.x + selectedDrawingBounds.w + 8 + selectedOffset.dx, top: Math.max(0, selectedDrawingBounds.y - 4 + selectedOffset.dy), zIndex: 99999 }}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-            );
-          })()}
+          )}
         </div>
       </div>
 
@@ -907,8 +909,7 @@ function PhotoCard({
   return (
     <div className="relative w-full h-full">
       <div className="bg-white rounded-[6px] shadow-[0_6px_20px_rgba(0,0,0,0.18)] p-2 pb-1 w-full">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <BaseImage
           src={item.src}
           alt={item.caption || "photo"}
           draggable={false}
@@ -970,8 +971,7 @@ function MusicCard({
           title={editing ? "Change cover" : undefined}
         >
           {item.src
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={item.src} alt="" draggable={false} className="w-full h-full object-cover" />
+            ? <BaseImage src={item.src} alt="" draggable={false} className="w-full h-full object-cover" />
             : <Music className="w-5 h-5 text-[var(--faint)]" />}
           {editing && <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-[9px] font-medium">Cover</span>}
         </button>

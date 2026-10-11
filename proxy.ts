@@ -79,6 +79,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!(await hasValidSession(request))) {
+    if (pathname.startsWith("/api/")) return harden(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
     return harden(NextResponse.redirect(new URL("/login", request.url)));
   }
 
