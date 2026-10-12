@@ -166,7 +166,9 @@ export function diff(before: Document, after: Document, id: () => string = () =>
   const operations: Operation[] = [];
   function walk(a: Slot, b: Slot, path: Segment[]) {
     if (equal(a, b)) return;
-    if (a.exists && b.exists && object(a.value) && object(b.value)) {
+    // A password verifier is indivisible: never combine a concurrent salt/hash.
+    const password = path.length === 2 && path[0] === "profile" && path[1] === "notePassword";
+    if (!password && a.exists && b.exists && object(a.value) && object(b.value)) {
       for (const key of new Set([...Object.keys(a.value), ...Object.keys(b.value)])) {
         if (UNSAFE.has(key) || key === "id") continue;
         walk(own(a.value, key) ? present(a.value[key]) : absent, own(b.value, key) ? present(b.value[key]) : absent, [...path, key]);

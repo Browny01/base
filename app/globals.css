@@ -552,3 +552,6 @@ html[data-inactive="true"] *, html[data-inactive="true"] *::before, html[data-in
 .base-cloud-plans strong { font-size:14px; font-weight:550; }.base-cloud-plans small { display:block; font-size:11px; color:var(--muted); margin-top:4px; }.base-cloud-plans span { font-size:12px; color:var(--muted); }
 .base-storage-progress { width:100%; height:5px; margin-top:16px; appearance:none; border:0; border-radius:5px; overflow:hidden; background:var(--surface-2); }.base-storage-progress::-webkit-progress-bar { background:var(--surface-2); }.base-storage-progress::-webkit-progress-value { background:var(--action); }
 @media(max-width:600px) { .base-workspace-modes,.base-cloud-plans { grid-template-columns:1fr; }.base-workspace-panel { padding:16px; }.base-workspace-tabs { width:100%; } }
+
+/* Shared profile avatar, including the legacy web shell. */
+.base-profile-avatar{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:32px;height:32px;border-radius:50%;overflow:hidden;background:var(--accent-soft);color:var(--text);font-size:12px;font-weight:600}.base-profile-avatar img{width:100%;height:100%;object-fit:cover}.base-profile-avatar-large{width:72px;height:72px;font-size:24px}

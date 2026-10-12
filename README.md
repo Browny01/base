@@ -14,7 +14,9 @@ verification is pending; see [desktop verification](docs/desktop-verification.md
 Preview the [website](https://base-cloud-staging.kingbrownyplayz.workers.dev/) or
 [open Base in your browser](https://base-cloud-staging.kingbrownyplayz.workers.dev/app/).
 Cloud uses Clerk Development and Stripe sandbox; the production domain has not
-been cut over. See [latest fixes and verification](docs/phase-2.5-improvements.md).
+been cut over. Browser access requires Cloud login. See
+[latest onboarding and account checks](docs/phase-2.5-onboarding.md) and
+[earlier integration fixes](docs/phase-2.5-improvements.md).
 
 ## Highlights
 

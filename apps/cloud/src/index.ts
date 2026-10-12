@@ -272,7 +272,7 @@ async function route(request: Request, env: Env) {
   )
     await requireSyncDevice(env, principal);
   if (path === "/api/auth/browser" && method === "GET")
-    return response({ workspaceId: workspace, deviceId: principal.deviceId });
+    return response({ workspaceId: workspace, deviceId: principal.deviceId, expiresAt: (principal.sessionExpires ?? 0) * 1000 });
   if (path === "/api/auth/browser" && method === "DELETE") {
     await revokeDevice(env, principal, principal.deviceId);
     return new Response(JSON.stringify({ ok: true }), {

@@ -2,16 +2,25 @@ import {
   newBrowserState,
   newBrowserWorkspace,
   changeBrowserWorkspace,
+  canUseBrowserOffline,
   type BrowserState,
 } from "@/packages/sync/src/browser-state";
 import { PUBLIC_INTEGRATION_PATHS } from "@/packages/core/src/providers";
 import type { Document } from "@/packages/sync/src/protocol";
+import { clerkAppearance } from "@/packages/core/src/clerk-appearance";
+import { checkWorkspaceNotePassword } from "@/packages/core/src/workspace-password";
 type ClerkClient = {
   user: unknown;
   session?: { getToken: () => Promise<string | null> };
-  load: () => Promise<void>;
+  load: (options?: Record<string, unknown>) => Promise<void>;
+  addListener: (callback: (state: { user: unknown }) => void) => () => void;
+  unmountSignIn: (element: HTMLElement) => void;
+  mountSignUp: (element: HTMLElement, options: object) => void;
+  unmountSignUp: (element: HTMLElement) => void;
+  mountUserProfile: (element: HTMLElement, options?: Record<string, unknown>) => void;
+  unmountUserProfile: (element: HTMLElement) => void;
   mountSignIn: (element: HTMLElement, options: object) => void;
-  signOut: () => Promise<void>;
+  signOut: (options?: { redirectUrl?: string }) => Promise<void>;
 };
 let clerk: ClerkClient | null = null,
   clerkLoading: Promise<ClerkClient> | null = null;
@@ -86,7 +95,7 @@ function current(state: BrowserState, scope?: string) {
   if (!workspace) throw new Error("Workspace not loaded");
   return workspace;
 }
-async function loadClerk() {
+export async function loadClerk() {
   if (clerk) return clerk;
   return (clerkLoading ??= (async () => {
     const config = (await (
@@ -119,7 +128,7 @@ async function loadClerk() {
       document.head.append(script);
     });
     const value = (window as unknown as { Clerk: ClerkClient }).Clerk;
-    await value.load();
+    await value.load({ appearance: clerkAppearance(document.documentElement.classList.contains("dark")) });
     clerk = value;
     return value;
   })().catch((e) => {
@@ -150,7 +159,7 @@ export async function browserSignIn() {
   const value = await response.json();
   if (!response.ok)
     throw new Error(value.error || "Could not connect your account");
-  return value as { workspaceId: string; deviceId: string };
+  return value as { workspaceId: string; deviceId: string; expiresAt: number };
 }
 export async function mountBrowserSignIn(element: HTMLElement) {
   const client = await loadClerk();
@@ -161,6 +170,35 @@ export async function mountBrowserSignIn(element: HTMLElement) {
     });
   return !!client.user;
 }
+export async function browserAccess() {
+  const cached = await browserState(false, s => ({ workspace: structuredClone(current(s)), access: s.access }));
+  const offline = () => canUseBrowserOffline(cached.workspace, cached.access);
+  if (!navigator.onLine) return offline();
+  try {
+    const response = await fetch("/api/auth/browser", { credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(8000) });
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) await browserState(true, s => { delete s.access; });
+      return response.status >= 500 ? offline() : false;
+    }
+    const identity = await response.json() as { workspaceId: string; expiresAt: number };
+    if (identity.workspaceId !== cached.workspace.workspaceId || !cached.workspace.origin) return false;
+    await browserState(true, s => { current(s, cached.workspace.scope); s.access = identity; });
+    return true;
+  } catch { return offline(); }
+}
+export async function mountBrowserAuth(element: HTMLElement, onSignedIn: () => void) {
+  const client = await loadClerk();
+  const signup = new URLSearchParams(location.search).get("auth") === "signup";
+  const unsubscribe = client.addListener(({ user }) => { if (user) onSignedIn(); });
+  let mounted = false;
+  if (!client.user) {
+    mounted = true;
+    const options = { forceRedirectUrl: location.origin + "/app/", signUpForceRedirectUrl: location.origin + "/app/", signInForceRedirectUrl: location.origin + "/app/", signInUrl: location.origin + "/app/", signUpUrl: location.origin + "/app/?auth=signup", appearance: clerkAppearance(document.documentElement.classList.contains("dark")) };
+    if (signup) client.mountSignUp(element, options); else client.mountSignIn(element, options);
+  } else onSignedIn();
+  return () => { unsubscribe(); if (mounted) { if (signup) client.unmountSignUp(element); else client.unmountSignIn(element); } };
+}
+
 function download(value: Blob, name: string) {
   const url = URL.createObjectURL(value),
     anchor = document.createElement("a");
@@ -234,6 +272,7 @@ export async function browserCommand<T>(
         );
         s.offlineSource ??= s.activeScope;
         s.activeScope = scope;
+        s.access = { workspaceId: identity.workspaceId, expiresAt: identity.expiresAt };
         return structuredClone(current(s));
       });
       break;
@@ -247,8 +286,8 @@ export async function browserCommand<T>(
             "Could not sign out. Your workspace remains selected.",
           );
       }
-      if (clerk && navigator.onLine) await clerk.signOut();
       result = await browserState(true, (s) => {
+        delete s.access;
         s.workspaces.local ??= newBrowserWorkspace(
           "local",
           "",
@@ -258,6 +297,8 @@ export async function browserCommand<T>(
         s.activeScope = "local";
         return structuredClone(current(s));
       });
+      // Persist local revocation before Clerk can redirect or unload this page.
+      if (navigator.onLine) await (await loadClerk()).signOut({ redirectUrl: location.origin + "/app/" });
       break;
     }
     case "api_request": {
@@ -377,7 +418,7 @@ export async function browserCommand<T>(
       result = await browserState(false, (s) => {
         const w = s.workspaces[s.offlineSource ?? "local"];
         if (!w || w.origin) throw new Error("Select a local source first.");
-        return { workspace: structuredClone(w) };
+        return { workspace: structuredClone(w), source: s.archives[w.scope] };
       });
       break;
     case "set_local_note_password": {
@@ -394,6 +435,8 @@ export async function browserCommand<T>(
       break;
     }
     case "verify_note_password": {
+      const shared = await browserState(false, s => (current(s).document.profile as Record<string, unknown> | undefined)?.notePassword);
+      if (shared !== undefined) { result = await checkWorkspaceNotePassword(String(args.password), shared); break; }
       const note = await browserState(false, (s) => s.notes[current(s).scope]);
       if (!note)
         throw new Error(
@@ -460,7 +503,7 @@ export async function browserCommand<T>(
         archive.workspace ??
         archive.saved ??
         archive;
-      const importedDocument = (source.document ??
+      const importedDocument = (archive.unsaved?.document ?? source.document ??
         source.data ??
         source) as Document;
       if (
@@ -481,9 +524,9 @@ export async function browserCommand<T>(
           scope,
           importedDocument,
         );
-        s.activeScope = scope;
+        if (!args.keepActive) s.activeScope = scope;
         s.offlineSource = scope;
-        return structuredClone(current(s));
+        return structuredClone(s.workspaces[scope]);
       });
       break;
     }

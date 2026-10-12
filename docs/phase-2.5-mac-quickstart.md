@@ -25,8 +25,8 @@ npm run desktop:build
 open apps/desktop/src-tauri/target/release/bundle/macos/Base.app
 ```
 
-Expected tests for this checkpoint: 148 JavaScript, nine standalone workspace
-Rust and ten desktop Rust. macOS build/runtime results must still be recorded on
+Expected tests for this checkpoint: 153 JavaScript, nine standalone workspace
+Rust and eleven desktop Rust. macOS build/runtime results must still be recorded on
 your Mac; passing Linux tests does not substitute for them.
 
 For development with hot reload, run `npm run desktop:dev`. No `npm run dev` or
@@ -87,6 +87,24 @@ Base in macOS System Settings → Notifications. Test a short focus session whil
 Base stays open; native permission reporting cannot establish delivery by itself.
 
 The website is available at the staging URL above: `/` is the landing page and
-`/app/` is the browser workspace. Browser local data and separate Cloud data use
-IndexedDB, not your desktop SQLite database. Test an actual disconnected browser
-reload after the service worker installs; that physical network check is pending.
+`/app/` requires Cloud sign-in. Browser workspace caches use IndexedDB, separately
+from your desktop SQLite database. Test an actual disconnected browser reload
+after signing in and installing the service worker; that physical network check
+is pending. Sign-out should show login and retain cached records for next sign-in.
+
+## Check onboarding and shared profiles
+
+Use a separate new test workspace to check first-run setup. Existing onboarded
+workspaces intentionally open normally; do not delete their data to force setup.
+Check Local start/connect and Cloud approval, then name/photo, light/dark/system,
+navigation ordering and optional news/integrations. The saved name/photo should
+appear in the sidebar footer and top right. Edit them in Settings → Appearance.
+
+Under Accounts & Sync → Note privacy, set a workspace note password. Sync a
+second device and verify the same password unlocks locked notes there and offline.
+For legacy locked notes, migrate from a device where the old password works.
+Concurrent password changes should require conflict review. This is the existing
+privacy gate with a shared verifier; it does not encrypt note contents.
+
+Check the themed Clerk account manager, connected-account status, and the real
+landing screenshots. See [implementation and checks](phase-2.5-onboarding.md).

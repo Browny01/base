@@ -44,6 +44,23 @@ fn matches(password: &str, raw: &str) -> bool {
         .fold(0u8, |diff, (a, b)| diff | (a ^ b))
         == 0
 }
+fn shared_matches(password: &str, value: &serde_json::Value) -> bool {
+    if value.get("version").and_then(|v| v.as_u64()) != Some(1)
+        || value.get("iterations").and_then(|v| v.as_u64()) != Some(210_000)
+    {
+        return false;
+    }
+    let (Some(salt), Some(hash)) = (
+        value.get("salt").and_then(|v| v.as_str()),
+        value.get("hash").and_then(|v| v.as_str()),
+    ) else {
+        return false;
+    };
+    matches(
+        password,
+        &serde_json::json!({"salt":salt,"key":hash}).to_string(),
+    )
+}
 pub fn remember(scope: &str, password: &str) -> Result<(), String> {
     if password.is_empty() || password.len() > 4096 {
         return Err("Invalid note password.".into());
@@ -65,9 +82,19 @@ pub async fn verify_note_password(
     scope: String,
     password: String,
 ) -> Result<bool, String> {
-    active(&db, &scope)?;
+    let workspace = active(&db, &scope)?;
     if password.is_empty() || password.len() > 4096 {
         return Ok(false);
+    }
+    if let Some(value) = workspace
+        .document
+        .get("profile")
+        .and_then(|v| v.get("notePassword"))
+        .cloned()
+    {
+        return tauri::async_runtime::spawn_blocking(move || shared_matches(&password, &value))
+            .await
+            .map_err(|e| e.to_string());
     }
     let raw = entry(&scope)?.get_password().map_err(|_| "Connect or renew your account session to enable offline note unlocking. For a local workspace, set a note password in Account & sync.".to_owned())?;
     tauri::async_runtime::spawn_blocking(move || matches(&password, &raw))
@@ -102,6 +129,14 @@ pub async fn set_local_note_password(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn shared_verifier_matches_web_crypto_and_rejects_unknown_costs() {
+        let mut value = serde_json::json!({"version":1,"iterations":210000,"salt":"AQIDBAUGBwgJCgsMDQ4PEA==","hash":"l3J601xuSfJ5SvIiE9rovasOuR4sFiV1iD3E7SjqudI="});
+        assert!(shared_matches("workspace-fixture-password", &value));
+        assert!(!shared_matches("wrong-password", &value));
+        value["iterations"] = serde_json::json!(1_000_000_000);
+        assert!(!shared_matches("workspace-fixture-password", &value));
+    }
     #[test]
     fn salted_verifiers_reject_wrong_and_malformed_passwords() {
         let first = encode("local-test-password").unwrap();

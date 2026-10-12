@@ -1,3 +1,4 @@
+import { clerkAppearance } from "../../../packages/core/src/clerk-appearance.ts";
 import { verifyWebhook } from "@clerk/backend/webhooks";
 import { verifyToken } from "@clerk/backend";
 import { effectivePlan } from "./plans.ts";
@@ -94,10 +95,10 @@ export async function authenticate(
   }
   if (!token) throw new HttpError(401, "Unauthorized");
   const row = await env.DB.prepare(
-    "SELECT w.*,s.device_id FROM sessions s JOIN devices d ON d.workspace_id=s.workspace_id AND d.id=s.device_id JOIN workspaces w ON w.id=s.workspace_id JOIN accounts a ON a.id=w.owner_id WHERE s.hash=? AND s.expires>? AND d.enabled=1 AND a.status='active'",
+    "SELECT w.*,s.device_id,s.expires AS session_expires FROM sessions s JOIN devices d ON d.workspace_id=s.workspace_id AND d.id=s.device_id JOIN workspaces w ON w.id=s.workspace_id JOIN accounts a ON a.id=w.owner_id WHERE s.hash=? AND s.expires>? AND d.enabled=1 AND a.status='active'",
   )
     .bind(await sha(token), now())
-    .first<WorkspaceRow & { device_id: string }>();
+    .first<WorkspaceRow & { device_id: string; session_expires: number }>();
   if (!row)
     throw new HttpError(
       401,
@@ -115,7 +116,7 @@ export async function authenticate(
   )
     .bind(now(), row.id, row.device_id, now() - 86400)
     .run();
-  return { workspace: row, deviceId: row.device_id, accountId: row.owner_id };
+  return { workspace: row, deviceId: row.device_id, accountId: row.owner_id, sessionExpires: row.session_expires };
 }
 export async function beginDevice(env: Env, input: Record<string, unknown>) {
   if (
@@ -275,6 +276,7 @@ export function clerkPage(
   code: string,
   description: string,
   button = "Connect this desktop",
+  account = false,
 ) {
   const publishable = env.CLERK_PUBLISHABLE_KEY ?? "";
   if (!/^pk_(test|live)_[A-Za-z0-9]+$/.test(publishable))
@@ -288,7 +290,9 @@ export function clerkPage(
   if (!/^[\w.-]+$/.test(host) || !host.includes("."))
     throw new HttpError(503, "Cloud sign-in is not configured");
   const nonce = random();
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Base Cloud</title><style nonce="${nonce}">body{background:#f7f6f3;color:#20201e;font:15px system-ui;margin:0}main{max-width:520px;margin:10vh auto;padding:32px}h1{font-size:32px;letter-spacing:-1px}button{background:#5956dc;color:white;padding:12px 18px;border:0;border-radius:8px;font:inherit}button:disabled{opacity:.6}#status{line-height:1.7}</style></head><body><main><h1>Base Cloud</h1><p>${description}</p><div id="clerk"></div><button hidden id="approve">${button}</button><p id="status" role="status"></p></main><script nonce="${nonce}" crossorigin="anonymous" data-clerk-publishable-key="${publishable}" src="https://${host}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"></script><script nonce="${nonce}">(async()=>{${code}})().catch(()=>document.getElementById('status').textContent='Sign-in unavailable. Please retry.');</script></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${account ? "Account settings" : "Sign in"} — Base</title><link rel="icon" href="/icon-192.png"><style nonce="${nonce}">
+@font-face{font-family:'Base Geist';src:url('/fonts/geist-latin.woff2') format('woff2');font-weight:100 900;font-display:swap}*{box-sizing:border-box}:root{--bg:#f8f7f5;--card:#fff;--text:#252524;--muted:#686862;--border:#e6e4df;--accent:#514bd4}html[data-theme=dark]{--bg:#191918;--card:#20201e;--text:#eeeeec;--muted:#aaa9a3;--border:#353530;--accent:#979af5}body{background:var(--bg);color:var(--text);font:14px 'Base Geist',system-ui;margin:0;min-height:100vh}header{height:76px;border-bottom:1px solid var(--border);padding:0 36px;display:flex;align-items:center;justify-content:space-between}a{color:inherit;text-decoration:none}header>a:first-child{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:650;letter-spacing:-.04em}header>a:last-child{font-size:12px;color:var(--muted)}main{max-width:${account ? "1040" : "500"}px;margin:60px auto;padding:0 20px}h1{font-size:32px;letter-spacing:-.04em;font-weight:600;margin:0 0 10px}.description{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:28px}.identity{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--card)}#clerk:empty{min-height:180px}#clerk .cl-rootBox,#clerk .cl-cardBox{width:100%;max-width:none}.cl-cardBox{box-shadow:none!important}button{cursor:pointer;font:inherit}#approve{background:var(--accent);color:${account ? "white" : "var(--bg)"};padding:12px 18px;border:0;border-radius:9px;font-size:13px;font-weight:550;margin-top:20px}button:disabled{opacity:.5;cursor:wait}.base-change-account{border:1px solid var(--border);background:transparent;color:var(--text);padding:10px 15px;border-radius:9px;margin-top:12px}.base-connect-summary{padding:28px;line-height:1.7}#status{font-size:13px;line-height:1.7;color:var(--muted)}a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:4px}@media(max-width:600px){header{height:64px;padding:0 20px}main{margin:32px auto}h1{font-size:28px}}
+</style></head><body><header><a href="/"><img src="/base-icon-rounded.png" width="28" height="28" alt="">Base</a><a href="/app/">Back to Base ↗</a></header><main><h1>${account ? "Your account" : "Welcome to Base"}</h1><p class="description">${description}</p><section class="identity"><div id="clerk"></div></section><button hidden id="approve">${button}</button><p id="status" role="status" aria-live="polite"></p></main><script nonce="${nonce}" crossorigin="anonymous" data-clerk-publishable-key="${publishable}" src="https://${host}/npm/@clerk/clerk-js@5/dist/clerk.browser.js"></script><script nonce="${nonce}">(async()=>{${code}})().catch(()=>document.getElementById('status').textContent='Sign-in unavailable. Please retry.');</script></body></html>`;
   return new Response(html, {
     headers: {
       "Content-Type": "text/html;charset=utf-8",
@@ -297,7 +301,7 @@ export function clerkPage(
       // Clerk injects runtime styles and uses blob workers and protection hosts.
       // A style nonce would make browsers ignore unsafe-inline and break its UI.
       // Scripts retain nonce protection; only the documented provider hosts load.
-      "Content-Security-Policy": `default-src 'none';script-src 'nonce-${nonce}' https://${host} https://challenges.cloudflare.com https://*.protect.clerk.com;style-src 'unsafe-inline';worker-src 'self' blob:;connect-src 'self' https://${host} https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com;img-src https://img.clerk.com data:;font-src https://${host} data:;frame-src https://${host} https://challenges.cloudflare.com https://*.protect.clerk.com;base-uri 'none';form-action 'self';frame-ancestors 'none'`,
+      "Content-Security-Policy": `default-src 'none';script-src 'nonce-${nonce}' https://${host} https://challenges.cloudflare.com https://*.protect.clerk.com;style-src 'unsafe-inline';worker-src 'self' blob:;connect-src 'self' https://${host} https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com;img-src 'self' https://img.clerk.com data:;font-src 'self' https://${host} data:;frame-src https://${host} https://challenges.cloudflare.com https://*.protect.clerk.com;base-uri 'none';form-action 'self';frame-ancestors 'none'`,
     },
   });
 }
@@ -307,13 +311,18 @@ export function signInPage(env: Env, flow: string | null, account = false) {
     throw new HttpError(400, "Open Sign in from the Base app");
   const flowJson = JSON.stringify(flow),
     keyJson = JSON.stringify(env.CLERK_PUBLISHABLE_KEY ?? "");
-  const code = `const clerk=window.Clerk;await clerk.load({publishableKey:${keyJson}});const root=document.getElementById('clerk');const approve=document.getElementById('approve');if(${account}){if(clerk.user)clerk.mountUserProfile(root);else clerk.mountSignIn(root,{forceRedirectUrl:window.location.href,signUpForceRedirectUrl:window.location.href});return;}const update=()=>{if(clerk.user){root.replaceChildren();const label=document.createElement('p');label.textContent='Connect Base desktop as '+(clerk.user.primaryEmailAddress?.emailAddress||clerk.user.fullName||'your account');root.append(label);const change=document.createElement('button');change.textContent='Use another account';change.onclick=()=>clerk.signOut();root.append(change);approve.hidden=false;}else{clerk.mountSignIn(root,{forceRedirectUrl:window.location.href,signUpForceRedirectUrl:window.location.href});approve.hidden=true;}};clerk.addListener(update);update();approve.onclick=async()=>{approve.disabled=true;try{const token=await clerk.session.getToken();const result=await fetch('/api/auth/device/approve',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({id:${flowJson}})});const value=await result.json();if(!result.ok)throw new Error(value.error);document.getElementById('status').textContent='Connected. Return to Base and click Complete sign-in.';}catch(e){document.getElementById('status').textContent=e.message;approve.disabled=false;}};`;
+  const appearance = JSON.stringify(clerkAppearance()), darkAppearance = JSON.stringify(clerkAppearance(true));
+  const code = `const saved=localStorage.getItem('base_theme');const dark=saved==='dark'||(saved!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';const appearance=dark?${darkAppearance}:${appearance};const clerk=window.Clerk;await clerk.load({publishableKey:${keyJson},appearance});const root=document.getElementById('clerk');const approve=document.getElementById('approve');const signInUrl=new URL(window.location.href);signInUrl.searchParams.delete('auth');const signUpUrl=new URL(signInUrl);signUpUrl.searchParams.set('auth','signup');const signup=new URLSearchParams(location.search).get('auth')==='signup';let mounted='',host=document.createElement('div');root.append(host);
+const freshHost=()=>{if(mounted==='signIn')clerk.unmountSignIn(host);if(mounted==='signUp')clerk.unmountSignUp(host);if(mounted==='profile')clerk.unmountUserProfile(host);host=document.createElement('div');root.replaceChildren(host);};
+const update=()=>{if(clerk.user){if(${account}){if(mounted!=='profile'){freshHost();clerk.mountUserProfile(host,{appearance});mounted='profile';}return;}if(mounted!=='summary'){freshHost();const summary=document.createElement('div');summary.className='base-connect-summary';const label=document.createElement('p');label.textContent='Connect Base as '+(clerk.user.primaryEmailAddress?.emailAddress||clerk.user.fullName||'your account');summary.append(label);const change=document.createElement('button');change.className='base-change-account';change.textContent='Use another account';change.onclick=()=>clerk.signOut({redirectUrl:signInUrl.href});summary.append(change);host.append(summary);mounted='summary';}approve.hidden=false;}else{if(mounted==='profile')void fetch('/api/auth/browser',{method:'DELETE'}).catch(()=>{});if(mounted!=='signIn'&&mounted!=='signUp'){freshHost();const options={forceRedirectUrl:signInUrl.href,signUpForceRedirectUrl:signInUrl.href,signInForceRedirectUrl:signInUrl.href,signInUrl:signInUrl.href,signUpUrl:signUpUrl.href,appearance};if(signup){clerk.mountSignUp(host,options);mounted='signUp';}else{clerk.mountSignIn(host,options);mounted='signIn';}}approve.hidden=true;}};clerk.addListener(update);update();approve.onclick=async()=>{approve.disabled=true;try{const token=await clerk.session.getToken();const result=await fetch('/api/auth/device/approve',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({id:${flowJson}})});const value=await result.json();if(!result.ok)throw new Error(value.error);document.getElementById('status').textContent='Connected. Return to Base and click Complete sign-in.';approve.textContent='Desktop approved';}catch(e){document.getElementById('status').textContent=e.message;approve.disabled=false;}};`;
   return clerkPage(
     env,
     code,
     account
-      ? "Manage your Base account."
-      : "Sign in, then approve this desktop connection.",
+      ? "Your profile, sign-in methods and account security."
+      : "Sign in, then approve this desktop connection. Your existing workspaces stay separate.",
+    "Connect this desktop",
+    account,
   );
 }
 
@@ -449,6 +458,7 @@ export async function browserSignIn(
     JSON.stringify({
       workspaceId: session.workspaceId,
       deviceId: session.deviceId,
+      expiresAt: session.expiresAt,
     }),
     {
       headers: {

@@ -199,7 +199,10 @@ export function WikiPage() {
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);     // mobile drawer
   // Pages unlocked this session (cleared on reload, so the password is needed again).
-  const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
+  const passwordVersion = data.profile?.notePassword?.hash ?? "legacy";
+  const [unlockState, setUnlockState] = useState<{ version: string; pages: Set<string> }>({ version: passwordVersion, pages: new Set() });
+  const unlocked = unlockState.version === passwordVersion ? unlockState.pages : new Set<string>();
+  const setUnlocked = (update: (pages: Set<string>) => Set<string>) => setUnlockState(current => ({ version: passwordVersion, pages: update(current.version === passwordVersion ? current.pages : new Set()) }));
 
   const activeId = pages.some((p) => p.id === rawActive) ? rawActive : (pages[0]?.id ?? "");
   const activePage = pages.find((p) => p.id === activeId) ?? null;

@@ -1,3 +1,4 @@
+import { WorkspaceNoteSettings } from "./workspace-note-settings";
 import { NotificationSettings } from "@/components/notification-settings";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
@@ -37,7 +38,6 @@ export function DesktopAccountSettings() {
   const status = useDesktopStatus();
   const workspace = currentWorkspace();
   const confirm = useConfirm();
-  const [notePassword, setNotePassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [update, setUpdate] = useState<string | null>(null);
@@ -81,7 +81,7 @@ export function DesktopAccountSettings() {
         <Laptop className="h-5 w-5 text-[var(--muted)]" />
         <div className="min-w-0">
           <p className="text-sm font-medium break-all">
-            {workspace?.origin || "Local workspace"}
+            {workspace?.workspaceId.startsWith("base_cloud_") ? "Base Cloud" : workspace?.origin || "Local workspace"}
           </p>
           <p role="status" className="mt-1 text-xs text-[var(--muted)]">
             {text}
@@ -108,38 +108,7 @@ export function DesktopAccountSettings() {
             <BrowserAccountSettings />
           </Suspense>
         )}
-        {(status.local ||
-          workspace?.workspaceId.startsWith("base_cloud_") ||
-          workspace?.origin === "http://127.0.0.1:53318") && (
-          <form
-            className="my-3 grid gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void action(async () => {
-                await native("set_local_note_password", {
-                  scope: workspace?.scope,
-                  password: notePassword,
-                });
-                setNotePassword("");
-              });
-            }}
-          >
-            <label className="grid gap-1 text-sm">
-              Note unlock password (this device)
-              <input
-                type="password"
-                required
-                autoComplete="new-password"
-                value={notePassword}
-                onChange={(event) => setNotePassword(event.target.value)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2"
-              />
-            </label>
-            <button disabled={busy} className="text-left text-xs underline">
-              Set local note password
-            </button>
-          </form>
-        )}
+        <WorkspaceNoteSettings />
         {error && (
           <p role="alert" className="my-3 text-sm text-red-500">
             {error}
@@ -159,11 +128,14 @@ export function DesktopAccountSettings() {
         </button>
         <button
           disabled={busy || status.hasUnsaved}
-          onClick={() => void action(importBackup)}
+          onClick={() => void action(async () => {
+            if (!isTauri() && !await confirm({ message: "Import a copy of this backup into your Cloud workspace? Existing records and the original backup are retained; collisions and deletions require review.", confirmLabel: "Import a copy" })) return;
+            await importBackup();
+          })}
         >
           <Upload className="h-4 w-4" /> Import workspace backup
         </button>
-        <button
+        {isTauri() && <button
           onClick={() =>
             void action(async () =>
               setOfflineWorkspaces(await native("list_offline_workspaces")),
@@ -171,8 +143,8 @@ export function DesktopAccountSettings() {
           }
         >
           <Laptop className="h-4 w-4" /> Choose offline workspace
-        </button>
-        {!status.local && (
+        </button>}
+        {isTauri() && !status.local && (
           <button
             disabled={busy || status.hasUnsaved}
             onClick={() =>
@@ -215,11 +187,11 @@ export function DesktopAccountSettings() {
             disabled={busy || status.hasUnsaved}
             onClick={() => void action(disconnect)}
           >
-            Sign out to local workspace
+            {isTauri() ? "Sign out to local workspace" : "Sign out"}
           </button>
         )}
       </div>
-      {offlineWorkspaces.length > 0 && (
+      {isTauri() && offlineWorkspaces.length > 0 && (
         <label className="my-3 grid gap-1 text-sm">
           Offline workspace
           <select
@@ -240,11 +212,11 @@ export function DesktopAccountSettings() {
           </select>
         </label>
       )}
-      <p className="my-2 text-xs text-[var(--muted)]">
+      {isTauri() && <p className="my-2 text-xs text-[var(--muted)]">
         Imports open an isolated offline copy. Adding it to an account queues
         records; collisions and legacy deletions require review. Original
         snapshots and local workspaces are retained.
-      </p>
+      </p>}
       {updateMessage && (
         <p role="status" className="my-2 text-xs">
           {updateMessage}

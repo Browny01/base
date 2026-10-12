@@ -22,6 +22,7 @@ export type BrowserState = {
   workspaces: Record<string, BrowserWorkspace>;
   archives: Record<string, unknown>;
   notes: Record<string, { salt: string; hash: string }>;
+  access?: { workspaceId: string; expiresAt: number };
   offlineSource?: string;
 };
 export function newBrowserState(): BrowserState {
@@ -32,6 +33,9 @@ export function newBrowserState(): BrowserState {
     archives: {},
     notes: {},
   };
+}
+export function canUseBrowserOffline(workspace: BrowserWorkspace | undefined, access: BrowserState["access"], at = Date.now()): boolean {
+  return !!workspace?.origin && workspace.workspaceId.startsWith("base_cloud_") && access?.workspaceId === workspace.workspaceId && Number.isFinite(access.expiresAt) && access.expiresAt > at;
 }
 export function newBrowserWorkspace(
   scope: string,

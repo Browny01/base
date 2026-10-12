@@ -42,6 +42,7 @@ export type Principal = {
   workspace: WorkspaceRow;
   deviceId: string;
   accountId: string;
+  sessionExpires?: number;
 };
 export class HttpError extends Error {
   status: number;

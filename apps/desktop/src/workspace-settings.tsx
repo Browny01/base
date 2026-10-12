@@ -49,9 +49,10 @@ const size = (bytes: number) =>
     bytes / (bytes >= 1e9 ? 1e9 : 1e6),
   ) + (bytes >= 1e9 ? " GB" : " MB");
 
-export function WorkspaceSettings() {
+export function WorkspaceSettings({ setupOnly = false }: { setupOnly?: boolean }) {
   const status = useDesktopStatus();
   const workspace = currentWorkspace();
+  const cloudConnected = !!workspace?.origin && workspace.workspaceId.startsWith("base_cloud_");
   const confirm = useConfirm();
   const [mode, setMode] = useState<"local" | "cloud">(
     workspace?.workspaceId.startsWith("base_cloud_") ||
@@ -59,8 +60,8 @@ export function WorkspaceSettings() {
       ? "cloud"
       : "local",
   );
-  const [method, setMethod] = useState<"run" | "connect">("run");
-  const [origin, setOrigin] = useState(workspace?.origin || BASE_CLOUD_URL);
+  const [method, setMethod] = useState<"run" | "connect">(workspace?.origin && !cloudConnected && workspace.origin !== "http://127.0.0.1:53318" ? "connect" : "run");
+  const [origin, setOrigin] = useState(cloudConnected ? "" : workspace?.origin || "");
   const [password, setPassword] = useState("");
   const [service, setService] = useState<Service | null>(null);
   const [detailResult, setDetailResult] = useState<{
@@ -326,13 +327,18 @@ export function WorkspaceSettings() {
             </form>
           )}
         </div>
+      ) : cloudConnected && !status.error.toLowerCase().includes("session expired") ? (
+        <div className="base-workspace-panel">
+          <div className="base-workspace-heading"><div><h3>Base Cloud</h3><p>Your workspace is connected. Changes synchronize across your devices.</p></div><span className="base-workspace-status">Connected</span></div>
+          <button className="base-button base-button-secondary mt-4" onClick={() => void action(() => native("open_external", { url: BASE_CLOUD_URL + "/account" }))}>Manage account <ArrowUpRight className="h-4 w-4" /></button>
+        </div>
       ) : (
         <div className="base-workspace-panel">
           <div className="base-workspace-heading">
             <div>
               <h3>Base Cloud</h3>
               <p>
-                Email, Google or Apple sign-in in your browser. Offline work
+                Secure sign-in in your browser. Offline work
                 stays on this device.
               </p>
             </div>
@@ -395,12 +401,12 @@ export function WorkspaceSettings() {
           )}
         </div>
       )}
-      {details && workspace?.origin && (
+      {!setupOnly && details && workspace?.origin && (
         <div className="base-workspace-panel">
           <div className="base-workspace-heading">
             <div>
               <h3>Connected workspace</h3>
-              <p>{details.account?.email || workspace.origin}</p>
+              <p>{details.account?.email || (cloudConnected ? "Base Cloud" : "Your local workspace")}</p>
             </div>
             <span className="base-workspace-status">
               {details.plan === "local"

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, chmodSync, renameSync } from "node:fs";
 import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const host = execFileSync("rustc", ["-vV"], { encoding: "utf8" }).match(
@@ -8,6 +8,9 @@ const host = execFileSync("rustc", ["-vV"], { encoding: "utf8" }).match(
 const target = process.env.TAURI_ENV_TARGET_TRIPLE || host;
 const destination = resolve(root, "apps/desktop/src-tauri/binaries");
 mkdirSync(destination, { recursive: true });
+// Replace the inode rather than truncating an executable that is still running.
+const output = resolve(destination, `base-workspace-${target}`);
+const temporary = output + `.build-${process.pid}`;
 const manifest = resolve(root, "native/BaseWorkspace/Cargo.toml");
 if (target === "universal-apple-darwin") {
   for (const arch of ["aarch64-apple-darwin", "x86_64-apple-darwin"])
@@ -27,7 +30,7 @@ if (target === "universal-apple-darwin") {
         ),
       ),
       "-output",
-      resolve(destination, `base-workspace-${target}`),
+      temporary,
     ],
     { stdio: "inherit" },
   );
@@ -42,6 +45,8 @@ if (target === "universal-apple-darwin") {
       root,
       `native/BaseWorkspace/target/${target}/release/base-workspace`,
     ),
-    resolve(destination, `base-workspace-${target}`),
+    temporary,
   );
 }
+chmodSync(temporary, 0o755);
+renameSync(temporary, output);

@@ -10,7 +10,8 @@ import { useTheme } from "@/lib/theme-context";
 import { useBase } from "@/lib/hooks";
 import { visiblePages, orderedKeys, DEFAULT_SIDEBAR_ORDER, SETTINGS_PAGE, type NavPage } from "@/lib/nav-config";
 import { ChevronsLeft, Sun, Moon, ChevronsRight } from "lucide-react";
-import { firstName, initialOf } from "@/lib/profile";
+import { ProfileAvatar } from "./profile-avatar";
+import { firstName } from "@/lib/profile";
 
 const isActive = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
@@ -135,10 +136,10 @@ export function Sidebar() {
               : <Moon className="shrink-0" style={{ width: 18, height: 18 }} strokeWidth={1.8} />}
           </button>
         </div>
-        {!collapsed && <Link href="/settings" className="flex items-center gap-2.5 rounded-md px-2 py-2 hover:bg-[var(--surface-2)]">
-          <span className="base-avatar">{initialOf(data.profile)}</span>
-          <span className="min-w-0"><span className="block truncate text-[12.5px] font-medium">{firstName(data.profile) || "Your workspace"}</span><span className="block text-[11px] text-[var(--faint)]">Personal command center</span></span>
-        </Link>}
+        <Link href="/settings" aria-label="Your profile" className="flex items-center gap-2.5 rounded-md px-2 py-2 hover:bg-[var(--surface-2)]">
+          <ProfileAvatar profile={data.profile} />
+          {!collapsed && <span className="min-w-0"><span className="block truncate text-[12.5px] font-medium">{firstName(data.profile) || "Your workspace"}</span><span className="block text-[11px] text-[var(--faint)]">Personal command center</span></span>}
+        </Link>
       </div>
     </aside>
   );

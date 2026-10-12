@@ -16,7 +16,7 @@ import {
   type SyncResponse,
   type Operation,
 } from "@/packages/sync/src/protocol";
-import { native, request, documentOf, type Workspace } from "./native";
+import { native, request, documentOf, isTauri, type Workspace } from "./native";
 import { prepareBatch } from "@/packages/sync/src/upload";
 import { clearSessionSecret } from "@/lib/vault";
 import { isRecovery, recoverSnapshot } from "@/packages/sync/src/recovery";
@@ -119,10 +119,15 @@ export async function initialize() {
   schedule(0);
 }
 function mutate(updater: (data: BaseData) => BaseData) {
+  void persistEdit(updater).catch(() => {});
+}
+export function persistEdit(updater: (data: BaseData) => BaseData) {
+  const scopeAtStart = workspace?.scope;
   edits++;
   setStatus({ saving: true });
-  void serialized(async () => {
+  return serialized(async () => {
     if (!workspace) throw new Error("Local storage has not loaded.");
+    if (workspace.scope !== scopeAtStart) throw new Error("The workspace changed before this edit could save. Reopen the original workspace to continue.");
     if (failedEdit)
       throw new Error(
         "Editing is paused. Retry saving or export the unsaved edit before closing Base.",
@@ -176,11 +181,12 @@ function mutate(updater: (data: BaseData) => BaseData) {
     failures = 0;
     schedule();
   })
-    .catch((error) =>
+    .catch((error) => {
       setStatus({
         error: `This edit could not be saved: ${String(error)}. Please retry or export your data.`,
-      }),
-    )
+      });
+      throw error;
+    })
     .finally(() => {
       edits--;
       setStatus({ saving: edits > 0 });
@@ -546,15 +552,18 @@ export async function retrySave() {
 }
 export async function importBackup() {
   window.dispatchEvent(new Event("base:flush-editors"));
-  return serialized(async () => {
+  const copyToAccount = await serialized(async () => {
     await flushLocalWritesBeforeSwitch();
-    const next = await native<Workspace | null>("import_workspace");
+    const next = await native<Workspace | null>("import_workspace", isTauri() ? {} : { keepActive: true });
     if (next) {
+      if (!isTauri()) return true;
       clearSessionSecret();
       accept(next);
       setStatus({ error: "" });
     }
+    return false;
   });
+  if (copyToAccount) await transferOffline();
 }
 function flushLocalWritesBeforeSwitch() {
   if (failedEdit)

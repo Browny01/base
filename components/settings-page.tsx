@@ -50,7 +50,7 @@ import {
   sessionSecret,
   setSessionSecret,
 } from "@/lib/vault";
-import { DEFAULT_NEWS_PREFS, type NewsPrefs } from "@/lib/news-prefs";
+import { DEFAULT_NEWS_PREFS } from "@/lib/news-prefs";
 import {
   ALL_PAGES,
   SETTINGS_PAGE,
@@ -355,7 +355,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   );
 }
 
-function NavigationManager({
+export function NavigationManager({
   prefs,
   setPrefs,
 }: {
@@ -531,10 +531,20 @@ function NavigationManager({
   );
 }
 
+export function NewsPreferences() {
+  const { data, mutate } = useBase();
+  return <>
+    <NewsSourceSettings prefs={data.newsPrefs ?? DEFAULT_NEWS_PREFS} setPrefs={prefs => mutate(d => ({ ...d, newsPrefs: typeof prefs === "function" ? prefs(d.newsPrefs ?? DEFAULT_NEWS_PREFS) : prefs }))} />
+    <IntegrationSettings />
+    <BriefingManager settings={data.aiSettings ?? DEFAULT_AI_SETTINGS} setSettings={aiSettings => mutate(d => ({ ...d, aiSettings }))} />
+  </>;
+}
 export function SettingsPage({
   accountSection,
+  profileSection,
 }: {
   accountSection?: ReactNode;
+  profileSection?: ReactNode;
 }) {
   const [section, setSection] = useState(() => {
     const requested =
@@ -567,21 +577,7 @@ export function SettingsPage({
   const { collapsed, toggle } = useSidebar();
   const { mode, setMode } = useNavMode();
   const { data, mutate } = useBase();
-  const newsPrefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
-  const aiSettings = data.aiSettings ?? DEFAULT_AI_SETTINGS;
   const navPrefs = data.navPrefs ?? DEFAULT_NAV_PREFS;
-  const setNewsPrefs = (
-    prefs: NewsPrefs | ((current: NewsPrefs) => NewsPrefs),
-  ) =>
-    mutate((d) => ({
-      ...d,
-      newsPrefs:
-        typeof prefs === "function"
-          ? prefs(d.newsPrefs ?? DEFAULT_NEWS_PREFS)
-          : prefs,
-    }));
-  const setAiSettings = (settings: AiSettings) =>
-    mutate((d) => ({ ...d, aiSettings: settings }));
   const setNavPrefs = (prefs: NavPrefs) =>
     mutate((d) => ({ ...d, navPrefs: prefs }));
 
@@ -617,6 +613,7 @@ export function SettingsPage({
           ))}
         </nav>
         <div className="base-settings-content" key={section}>
+          {section === "appearance" && profileSection}
           {section === "account" && accountSection}
           {section === "appearance" && (
             <section className="base-settings-intro">
@@ -800,16 +797,7 @@ export function SettingsPage({
               <NavigationManager prefs={navPrefs} setPrefs={setNavPrefs} />
             </>
           )}
-          {section === "news" && (
-            <>
-              <NewsSourceSettings prefs={newsPrefs} setPrefs={setNewsPrefs} />
-              <IntegrationSettings />
-              <BriefingManager
-                settings={aiSettings}
-                setSettings={setAiSettings}
-              />
-            </>
-          )}
+          {section === "news" && <NewsPreferences />}
         </div>
       </div>
     </div>

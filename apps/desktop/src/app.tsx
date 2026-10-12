@@ -15,6 +15,12 @@ import { usePathname } from "./navigation";
 import { DesktopAccountSettings, DesktopSyncButton, DesktopFeedback } from "./desktop-controls";
 import { useUnsaved, useWorkspaceScope } from "./store";
 import { PageSkeleton } from "@/components/ui/page-heading";
+import { isTauri } from "./native";
+import { useBase } from "@/lib/hooks";
+import { needsOnboarding } from "@/lib/profile";
+import { WorkspaceProfileSettings } from "./workspace-profile-settings";
+const Onboarding = lazy(() => import("./onboarding").then(m => ({ default: m.Onboarding })));
+const BrowserAccessGate = lazy(() => import("./browser-access-gate").then(m => ({ default: m.BrowserAccessGate })));
 
 class PageRecovery extends Component<{children:ReactNode},{error:Error|null}> {
   state:{error:Error|null}={error:null};
@@ -53,7 +59,7 @@ function Route() {
     case "/shopping-list": return <Shopping />;
     case "/reading-list": return <Reading />;
     case "/watch-list": return <Watch />;
-    case "/settings": return <Settings accountSection={<DesktopAccountSettings />} />;
+    case "/settings": return <Settings accountSection={<DesktopAccountSettings />} profileSection={<WorkspaceProfileSettings />} />;
     default: return path.startsWith("/projects/") ? <Project id={decodeURIComponent(path.slice(10))} /> : <div className="p-6">Page not found. Use the sidebar to return to your workspace.</div>;
   }
 }
@@ -65,10 +71,14 @@ function ReportReady() {
   },[]);
   return null;
 }
-export function App() {
+function WorkspaceEntry() {
+  const { data } = useBase();
+  return needsOnboarding(data.profile) ? <Suspense fallback={<PageSkeleton />}><Onboarding /></Suspense> : <WorkspaceShell />;
+}
+function WorkspaceShell() {
   const unsaved=useUnsaved();
   const path=usePathname(),scope=useWorkspaceScope();
-  return <ThemeProvider><AccentProvider><SidebarProvider><NavModeProvider><ToastProvider><ConfirmProvider>
+  return <>
     <KeyboardShortcuts />
     <a className="base-skip-link" href="#base-main" onClick={event=>{event.preventDefault();document.getElementById("base-main")?.focus();}}>Skip to content</a>
     <div className="flex h-dvh overflow-hidden bg-[var(--bg)]">
@@ -82,5 +92,10 @@ export function App() {
       <div className="nx-desktop-dock"><Dock /></div>
       <div className="md:hidden"><BottomNav /></div>
     </div>
+  </>;
+}
+export function App() {
+  return <ThemeProvider><AccentProvider><SidebarProvider><NavModeProvider><ToastProvider><ConfirmProvider>
+    {isTauri() ? <WorkspaceEntry /> : <Suspense fallback={<PageSkeleton />}><BrowserAccessGate><WorkspaceEntry /></BrowserAccessGate></Suspense>}
   </ConfirmProvider></ToastProvider></NavModeProvider></SidebarProvider></AccentProvider></ThemeProvider>;
 }

@@ -102,6 +102,12 @@ application runtime dependencies.
 
 ## Staging and remaining gates
 
+The latest onboarding/profile/shared-note-password checkpoint is documented in
+[onboarding and account checks](phase-2.5-onboarding.md): 153 JavaScript,
+11 desktop Rust and nine workspace Rust tests pass. Linux packaging and actual
+native/browser staging checks pass within that report's stated limits. Mac and
+production verification are still pending.
+
 Staging is **https://base-cloud-staging.kingbrownyplayz.workers.dev**. D1/R2/KV,
 queues and cron are provisioned. The owner enabled R2 and configured Clerk
 Development and the Stripe sandbox through the private helper. Provider checks

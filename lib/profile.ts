@@ -2,8 +2,11 @@
 // the display name, the timezone that "today" is measured in, and the marker
 // that says onboarding already ran.
 
+import type { WorkspaceNotePassword } from "@/packages/core/src/workspace-password";
 export interface UserProfile {
   name: string;
+  avatarUrl?: string;
+  notePassword?: WorkspaceNotePassword;
   timezone: string;              // IANA id, e.g. "Europe/London"
   timezoneOffsetMinutes: number; // fallback for places Intl can't format
   onboardedAt?: string;          // ISO — absent means onboarding still due

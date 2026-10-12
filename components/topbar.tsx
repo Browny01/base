@@ -7,7 +7,7 @@ import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import { CommandBar } from "@/components/command-bar";
 import { openShortcutSheet } from "@/lib/shortcuts";
 import { useBase } from "@/lib/hooks";
-import { initialOf } from "@/lib/profile";
+import { ProfileAvatar } from "./profile-avatar";
 import { BrowserSyncStatus } from "./browser-sync-status";
 import { usePathname } from "@/lib/navigation";
 import { PAGE_BY_HREF, SETTINGS_PAGE } from "@/lib/nav-config";
@@ -57,7 +57,7 @@ export function TopBar({ syncControl }: { syncControl?: ReactNode }) {
             title={data.profile?.name ? `Settings — ${data.profile.name}` : "Settings"}
             className="w-11 h-11 md:w-8 md:h-8 rounded-full bg-[var(--surface-2)] border border-[var(--border)] flex items-center justify-center text-[12px] font-semibold text-[var(--text)] hover:border-[var(--border-2)] transition-colors"
           >
-            {initialOf(data.profile)}
+            <ProfileAvatar profile={data.profile} />
           </Link>
         </div>
       </div>

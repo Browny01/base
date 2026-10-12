@@ -11,6 +11,8 @@ import {
 import { installApiTransport } from "@/lib/api-client";
 import { installPrinter } from "@/lib/print-document";
 import { installNoteVerifier } from "@/lib/note-lock";
+import { checkWorkspaceNotePassword } from "@/packages/core/src/workspace-password";
+import { getData } from "@/lib/store";
 import { installSecretCache } from "@/lib/vault";
 import { readStored } from "@/lib/prefs";
 import {
@@ -47,12 +49,14 @@ installApiTransport((input, init) => {
     return Promise.reject(new Error("Local workspace is not loaded."));
   return request(workspace.scope, input, init);
 });
-installNoteVerifier((password) =>
-  native("verify_note_password", {
+installNoteVerifier((password) => {
+  const shared = getData().profile?.notePassword;
+  if (shared !== undefined) return checkWorkspaceNotePassword(password, shared);
+  return native("verify_note_password", {
     scope: currentWorkspace()?.scope,
     password,
-  }),
-);
+  });
+});
 installCredentialActions({
   status: async () => {
     const workspace = currentWorkspace();
