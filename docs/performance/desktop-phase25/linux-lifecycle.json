@@ -1,0 +1,15 @@
+{
+  "ui_closed_service_healthy": true,
+  "crash_restart_healthy": true,
+  "workspace_identity_preserved": true,
+  "restart_seconds": 5.52,
+  "login_start_enable_disable": "verified unit configuration; actual new login pending",
+  "initial_unit_install_start": "passed from unloaded unit",
+  "ui_stop_restart": "passed",
+  "confirmation_keyboard": "Cancel initial focus, Tab wraps within dialog, Escape cancels, invoking button focus restored",
+  "appimage_fuse_launch": true,
+  "appimage_mount_removed_after_ui_quit": true,
+  "service_survives_appimage_unmount": true,
+  "service_restarts_after_appimage_unmount": true,
+  "profiled_ui_processes_exited": true
+}

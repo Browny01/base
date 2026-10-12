@@ -504,7 +504,7 @@ export function SettingsPage({ accountSection }: { accountSection?: ReactNode })
 
       <div className="base-settings-layout">
         <nav aria-label="Settings categories" className="base-settings-nav">
-          {[{id:"appearance",label:"Appearance",icon:MonitorCog},{id:"navigation",label:"Navigation",icon:Layers},{id:"news",label:"News & integrations",icon:Rss},...(accountSection?[{id:"account",label:"Account & sync",icon:KeyRound}]:[])].map(item=><button key={item.id} type="button" aria-current={section===item.id?"page":undefined} onClick={()=>{writeStored("base_settings_section_v1",item.id);setSection(item.id);}}><item.icon className="h-4 w-4"/>{item.label}</button>)}
+          {[{id:"appearance",label:"Appearance",icon:MonitorCog},{id:"navigation",label:"Navigation",icon:Layers},{id:"news",label:"News & integrations",icon:Rss},...(accountSection?[{id:"account",label:"Accounts & Sync",icon:KeyRound}]:[])].map(item=><button key={item.id} type="button" aria-current={section===item.id?"page":undefined} onClick={()=>{writeStored("base_settings_section_v1",item.id);setSection(item.id);}}><item.icon className="h-4 w-4"/>{item.label}</button>)}
         </nav>
         <div className="base-settings-content" key={section}>
         {section==="account"&&accountSection}

@@ -1,86 +1,16 @@
 import type { Redis } from "@upstash/redis";
 import type { BaseData, Task } from "./store.ts";
 import {
-  isAutonomyTask,
   reviewAutonomyTask,
   type AutonomyReviewDecision,
   type AutonomyTaskLike,
 } from "./autonomy.ts";
 import { mutateBaseDataAtomically, updateBaseDataAtomically, type BaseDataRecord } from "./versioned-base-store.ts";
 
-export const PROTECTED_AUTONOMY_FIELDS = [
-  "done",
-  "completedAt",
-  "executionState",
-  "executionId",
-  "executionStartedAt",
-  "executionFinishedAt",
-  "executionLeaseUntil",
-  "leaseUntil",
-  "executionOwner",
-  "startedAt",
-  "approvedAt",
-  "lastLeaseExpiredAt",
-  "lastExecutionStartedAt",
-  "requeuedAt",
-  "executionAgent",
-  "workerModel",
-  "executionEvidence",
-  "resultSummary",
-  "resultNoteId",
-  "nightExecutedAt",
-  "verificationStatus",
-  "verifiedAt",
-  "correctionAttempts",
-  "implementationApproved",
-  "blockedReason",
-] as const;
+export { PROTECTED_AUTONOMY_FIELDS } from "../packages/core/src/autonomy-contract.ts";
 
-function taskRecords(value: unknown): Array<Record<string, unknown>> {
-  return Array.isArray(value)
-    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
-    : [];
-}
-
-function protectAutonomyTask(current: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
-  const protectedTask = { ...incoming };
-  for (const field of PROTECTED_AUTONOMY_FIELDS) {
-    if (field in current) protectedTask[field] = current[field];
-    else delete protectedTask[field];
-  }
-  return protectedTask;
-}
-
-export function mergeBaseWrite(
-  current: BaseDataRecord,
-  incoming: BaseDataRecord,
-  preserveAutonomySettings: boolean,
-): BaseDataRecord {
-  const currentTasks = taskRecords(current.tasks);
-  const incomingTasks = taskRecords(incoming.tasks);
-  const currentById = new Map(currentTasks.filter((task) => typeof task.id === "string").map((task) => [task.id as string, task]));
-  const mergedTasks = incomingTasks.map((task) => {
-    const id = typeof task.id === "string" ? task.id : null;
-    const currentTask = id ? currentById.get(id) : undefined;
-    if (!currentTask || !isAutonomyTask(currentTask as unknown as AutonomyTaskLike)) return { ...task };
-    currentById.delete(id!);
-    return protectAutonomyTask(currentTask, task);
-  });
-
-  for (const task of currentById.values()) {
-    if (isAutonomyTask(task as unknown as AutonomyTaskLike)) mergedTasks.push(task);
-  }
-
-  const next: BaseDataRecord = {
-    ...current,
-    ...incoming,
-    tasks: mergedTasks,
-    dataRevision: Number(current.dataRevision ?? 0) + 1,
-  };
-  if (preserveAutonomySettings) next.autonomySettings = current.autonomySettings;
-  return next;
-}
-
+import {mergeBaseWrite,taskRecords} from "../packages/server/src/autonomy-merge.ts";
+export {mergeBaseWrite} from "../packages/server/src/autonomy-merge.ts";
 export async function safeWriteBaseData(redis: Redis, data: BaseData, preserveAutonomySettings: boolean, options: { allowStale?: boolean } = {}): Promise<void> {
   await updateBaseDataAtomically(redis, (current) => {
     if (!options.allowStale && Number(data.dataRevision ?? 0) !== Number(current.dataRevision ?? 0)) throw new StaleBaseWriteError();

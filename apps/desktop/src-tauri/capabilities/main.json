@@ -35,6 +35,14 @@
     "allow-verify-note-password",
     "allow-set-local-note-password",
     "allow-record-frontend-ready",
-    "allow-record-scroll-sample"
+    "allow-record-scroll-sample",
+    "allow-workspace-service-start",
+    "allow-workspace-service-stop",
+    "allow-workspace-service-status",
+    "allow-workspace-service-autostart",
+    "allow-connect-hosted-workspace",
+    "allow-cloud-sign-in-start",
+    "allow-cloud-sign-in-finish",
+    "allow-download-workspace-file"
   ]
 }

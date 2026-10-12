@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-download-workspace-file"
+description = "Enables the download_workspace_file command without any pre-configured scope."
+commands.allow = ["download_workspace_file"]
+
+[[permission]]
+identifier = "deny-download-workspace-file"
+description = "Denies the download_workspace_file command without any pre-configured scope."
+commands.deny = ["download_workspace_file"]

@@ -18,7 +18,14 @@
     "desktop:frontend": "npm run build -w @base/desktop",
     "desktop:typecheck": "npm run typecheck -w @base/desktop",
     "desktop:check": "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cloud:dev": "npm run dev -w @base/cloud",
+    "cloud:check": "npm run check -w @base/cloud",
+    "cloud:build": "npm run build -w @base/cloud",
+    "workspace:test": "cargo test --manifest-path native/BaseWorkspace/Cargo.toml",
+    "workspace:bundle": "node scripts/build-workspace.mjs",
+    "cloud:configure": "node scripts/configure-cloud.mjs",
+    "cloud:test-runtime": "node --experimental-strip-types scripts/test-cloud-runtime.mts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -45,7 +52,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
@@ -55,6 +62,7 @@
   },
   "workspaces": [
     "apps/desktop",
+    "apps/cloud",
     "packages/*"
   ]
 }

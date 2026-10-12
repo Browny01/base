@@ -26,6 +26,12 @@ const PATHS: &[&str] = &[
     "/api/native/sync",
     "/api/native/sync/chunk",
     "/api/auth/desktop",
+    "/api/workspace",
+    "/api/workspace/export",
+    "/api/workspace/integrations/revoke",
+    "/api/devices/revoke",
+    "/api/billing/checkout",
+    "/api/billing/portal",
     "/api/news",
     "/api/news/summary",
     "/api/social-feed",
@@ -64,7 +70,13 @@ fn scoped_url(origin: &str, path: &str) -> Result<Url, String> {
         return Err("Unsupported API path".into());
     }
     let url = Url::parse(&format!("{origin}{path}")).map_err(|e| e.to_string())?;
-    if url.origin().ascii_serialization() != origin || !PATHS.contains(&url.path()) {
+    if url.origin().ascii_serialization() != origin
+        || !(PATHS.contains(&url.path())
+            || url
+                .path()
+                .strip_prefix("/api/files/")
+                .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok()))
+    {
         return Err("API path is outside the desktop permissions".into());
     }
     Ok(url)
@@ -168,10 +180,16 @@ pub async fn cache_media(
     scope: String,
     url: String,
 ) -> Result<ApiResponse, String> {
-    workspace_scope_check(&db, &scope)?;
+    let workspace = workspace(&db, &scope)?;
     let parsed = Url::parse(&url).map_err(|_| "Invalid media URL")?;
     let host = parsed.host_str().unwrap_or("");
-    let permitted = host.ends_with(".public.blob.vercel-storage.com")
+    let private_attachment = parsed.origin().ascii_serialization() == workspace.origin
+        && parsed
+            .path()
+            .strip_prefix("/api/files/")
+            .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok());
+    let permitted = private_attachment
+        || host.ends_with(".public.blob.vercel-storage.com")
         || matches!(
             host,
             "assets.coingecko.com"
@@ -180,7 +198,7 @@ pub async fn cache_media(
                 | "images.unsplash.com"
                 | "unavatar.io"
         );
-    if parsed.scheme() != "https"
+    if (parsed.scheme() != "https" && !private_attachment)
         || !permitted
         || !parsed.username().is_empty()
         || parsed.password().is_some()
@@ -191,9 +209,17 @@ pub async fn cache_media(
     if let Some(response) = cached(&db, &scope, &key) {
         return Ok(response);
     }
-    let response = transport
-        .client
-        .get(parsed)
+    let request = transport.client.get(parsed);
+    let request = if private_attachment {
+        request.bearer_auth(
+            credential(&scope)?
+                .get_password()
+                .map_err(|_| "Reconnect this workspace to view its attachments")?,
+        )
+    } else {
+        request
+    };
+    let response = request
         .send()
         .await
         .map_err(|_| "Media is not cached and the service is offline.")?;
@@ -247,6 +273,7 @@ pub async fn api_request(
     if !matches!(method.as_str(), "GET" | "POST" | "DELETE") {
         return Err("Unsupported request method".into());
     }
+    let file_upload = url.path() == "/api/blob/upload";
     let method_value = Method::from_bytes(method.as_bytes()).map_err(|e| e.to_string())?;
     let mut request = transport
         .client
@@ -256,7 +283,7 @@ pub async fn api_request(
         let bytes = STANDARD
             .decode(body)
             .map_err(|_| "Invalid request encoding")?;
-        if bytes.len() > 16 * 1024 * 1024 {
+        if bytes.len() > (if file_upload { 128 } else { 16 }) * 1024 * 1024 {
             return Err("Upload exceeded the safety limit.".into());
         }
         request = request.body(bytes);
@@ -311,30 +338,7 @@ pub async fn connect_account(
     if password.is_empty() || password.len() > 4096 || !defaults.is_object() {
         return Err("Invalid login details".into());
     }
-    let device_id = {
-        use rusqlite::OptionalExtension;
-        let connection = db.0.lock().map_err(|e| e.to_string())?;
-        let device: Option<String> = connection
-            .query_row(
-                "SELECT value FROM metadata WHERE key='device_id'",
-                [],
-                |r| r.get(0),
-            )
-            .optional()
-            .map_err(|e| e.to_string())?;
-        if let Some(device) = device {
-            device
-        } else {
-            let device = uuid::Uuid::new_v4().to_string();
-            connection
-                .execute(
-                    "INSERT INTO metadata(key,value) VALUES('device_id',?1)",
-                    [&device],
-                )
-                .map_err(|e| e.to_string())?;
-            device
-        }
-    };
+    let device_id = device_id(&db)?;
     let response = transport
         .client
         .post(format!("{origin}/api/auth/login"))
@@ -522,4 +526,284 @@ pub fn print_document(app: tauri::AppHandle, html: String) -> Result<(), String>
     .build()
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn connect_hosted_workspace(
+    db: tauri::State<'_, Database>,
+    transport: tauri::State<'_, Transport>,
+    app: tauri::AppHandle,
+    defaults: Value,
+) -> Result<Workspace, String> {
+    let status = crate::workspace_service::workspace_service_status(app.clone()).await?;
+    if status["running"] != true {
+        return Err("Start your local workspace first.".into());
+    }
+    let workspace = connect_account(
+        db,
+        transport,
+        "http://127.0.0.1:53318".into(),
+        crate::workspace_service::hosted_password(&app)?,
+        defaults,
+    )
+    .await?;
+    // A generated service password is never presented as the user's note password.
+    // Local note protection instead has a separate OS-stored verifier.
+    Ok(workspace)
+}
+
+fn device_id(db: &Database) -> Result<String, String> {
+    use rusqlite::OptionalExtension;
+    let connection = db.0.lock().map_err(|e| e.to_string())?;
+    let device: Option<String> = connection
+        .query_row(
+            "SELECT value FROM metadata WHERE key='device_id'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    if let Some(device) = device {
+        Ok(device)
+    } else {
+        let device = uuid::Uuid::new_v4().to_string();
+        connection
+            .execute(
+                "INSERT INTO metadata(key,value) VALUES('device_id',?1)",
+                [&device],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(device)
+    }
+}
+
+#[derive(Default)]
+pub struct CloudLogin(pub std::sync::Mutex<Option<PendingCloudLogin>>);
+pub struct PendingCloudLogin {
+    origin: String,
+    id: String,
+    verifier: String,
+    expires_at: u64,
+}
+async fn auth_json(response: reqwest::Response) -> Result<Value, String> {
+    let status = response.status();
+    let response = response_bytes(response).await?;
+    let bytes = STANDARD
+        .decode(response.body_base64)
+        .map_err(|_| "Invalid sign-in response")?;
+    if bytes.len() > 65536 {
+        return Err("Invalid sign-in response".into());
+    }
+    let value: Value = serde_json::from_slice(&bytes).map_err(|_| "Invalid sign-in response")?;
+    if !status.is_success() {
+        return Err(value["error"]
+            .as_str()
+            .unwrap_or("Cloud sign-in is unavailable")
+            .into());
+    }
+    Ok(value)
+}
+#[tauri::command]
+pub async fn cloud_sign_in_start(
+    db: tauri::State<'_, Database>,
+    transport: tauri::State<'_, Transport>,
+    login: tauri::State<'_, CloudLogin>,
+    origin: String,
+) -> Result<Value, String> {
+    let origin = normalized_origin(&origin)?;
+    let verifier = format!(
+        "{}{}",
+        uuid::Uuid::new_v4().simple(),
+        uuid::Uuid::new_v4().simple()
+    );
+    let challenge = format!("{:x}", Sha256::digest(verifier.as_bytes()));
+    let result = auth_json(
+        transport
+            .client
+            .post(format!("{origin}/api/auth/device/start"))
+            .json(&json!({"challenge":challenge,"deviceId":device_id(&db)?}))
+            .send()
+            .await
+            .map_err(|_| "Could not reach Base Cloud")?,
+    )
+    .await?;
+    let id = result["id"]
+        .as_str()
+        .filter(|id| {
+            id.len() == 43
+                && id
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        })
+        .ok_or("Invalid sign-in identity")?
+        .to_string();
+    let url = Url::parse(
+        result["verificationUrl"]
+            .as_str()
+            .ok_or("Missing sign-in URL")?,
+    )
+    .map_err(|_| "Invalid sign-in URL")?;
+    if url.origin().ascii_serialization() != origin
+        || url.path() != "/sign-in"
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err("Sign-in URL is outside Base Cloud".into());
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis() as u64;
+    let expires_at = result["expiresAt"]
+        .as_u64()
+        .filter(|time| *time > now && *time <= now + 610000)
+        .ok_or("Sign-in expiry is invalid")?;
+    *login.0.lock().map_err(|e| e.to_string())? = Some(PendingCloudLogin {
+        origin,
+        id,
+        verifier,
+        expires_at,
+    });
+    open::that(url.as_str()).map_err(|_| "Could not open your system browser")?;
+    Ok(json!({"expiresAt":expires_at}))
+}
+#[tauri::command]
+pub async fn cloud_sign_in_finish(
+    db: tauri::State<'_, Database>,
+    transport: tauri::State<'_, Transport>,
+    login: tauri::State<'_, CloudLogin>,
+    defaults: Value,
+) -> Result<Workspace, String> {
+    let (origin, id, verifier, expires_at) = {
+        let guard = login.0.lock().map_err(|e| e.to_string())?;
+        let pending = guard.as_ref().ok_or("Start sign-in first")?;
+        (
+            pending.origin.clone(),
+            pending.id.clone(),
+            pending.verifier.clone(),
+            pending.expires_at,
+        )
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_millis() as u64;
+    if now >= expires_at {
+        return Err("Sign-in expired; start again. Your offline data is retained.".into());
+    }
+    let result = auth_json(
+        transport
+            .client
+            .post(format!("{origin}/api/auth/device/exchange"))
+            .json(&json!({"id":id,"verifier":verifier}))
+            .send()
+            .await
+            .map_err(|_| "Could not reach Base Cloud")?,
+    )
+    .await?;
+    let token = result["token"]
+        .as_str()
+        .filter(|token| token.len() == 56 && token.starts_with("base_desktop_"))
+        .ok_or("Invalid Cloud session")?;
+    let workspace_id = result["workspaceId"]
+        .as_str()
+        .filter(|id| id.starts_with("base_cloud_") && id.len() == 51)
+        .ok_or("Invalid Cloud workspace identity")?;
+    let scope = format!("{:x}", Sha256::digest(format!("{origin}/{workspace_id}")));
+    credential(&scope)?
+        .set_password(token)
+        .map_err(|_| "Unlock your OS credential store, then sign in again")?;
+    let mut connection = db.0.lock().map_err(|e| e.to_string())?;
+    connection.execute("INSERT INTO metadata(key,value) VALUES(?1,'cloud') ON CONFLICT(key) DO UPDATE SET value=excluded.value",[format!("workspace_kind:{scope}")]).map_err(|e|e.to_string())?;
+    let workspace = Database::activate(&mut connection, &scope, &origin, workspace_id, &defaults)?;
+    *login.0.lock().map_err(|e| e.to_string())? = None;
+    Ok(workspace)
+}
+
+#[tauri::command]
+pub async fn download_workspace_file(
+    db: tauri::State<'_, Database>,
+    transport: tauri::State<'_, Transport>,
+    app: tauri::AppHandle,
+    scope: String,
+    id: String,
+    name: String,
+) -> Result<bool, String> {
+    use std::io::Write;
+    use tauri_plugin_dialog::DialogExt;
+    let current = workspace(&db, &scope)?;
+    if uuid::Uuid::parse_str(&id).is_err() || current.origin.is_empty() {
+        return Err("Invalid workspace attachment".into());
+    }
+    let filename = name.rsplit(['/', '\\']).next().unwrap_or("Attachment");
+    let filename: String = filename
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(200)
+        .collect();
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(if filename.is_empty() {
+            "Attachment"
+        } else {
+            &filename
+        })
+        .blocking_save_file();
+    let Some(chosen) = chosen else {
+        return Ok(false);
+    };
+    let path = chosen
+        .into_path()
+        .map_err(|_| "Choose a local file destination")?;
+    workspace_scope_check(&db, &scope)?;
+    let token = credential(&scope)?
+        .get_password()
+        .map_err(|_| "Reconnect this workspace to download its files")?;
+    let mut response = transport
+        .client
+        .get(scoped_url(&current.origin, &format!("/api/files/{id}"))?)
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(|_| "The file is unavailable while offline")?;
+    if !response.status().is_success() {
+        return Err("The file is unavailable or your session expired".into());
+    }
+    let parent = path.parent().ok_or("Invalid file destination")?;
+    let temporary = parent.join(format!(".base-download-{}.part", uuid::Uuid::new_v4()));
+    let result = async {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            file.set_permissions(std::fs::Permissions::from_mode(0o600))
+                .map_err(|e| e.to_string())?;
+        }
+        let mut bytes = 0usize;
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_| "The download was interrupted; the server copy is retained")?
+        {
+            bytes += chunk.len();
+            if bytes > 128 * 1024 * 1024 {
+                return Err("The file exceeds the download safety limit".to_owned());
+            }
+            file.write_all(&chunk).map_err(|e| e.to_string())?;
+        }
+        file.sync_all().map_err(|e| e.to_string())?;
+        workspace_scope_check(&db, &scope)?;
+        std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+        Ok::<_, String>(true)
+    }
+    .await;
+    if result.is_err() {
+        let _ = std::fs::remove_file(temporary);
+    }
+    result
 }

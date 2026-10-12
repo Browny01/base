@@ -80,7 +80,19 @@ pub async fn set_local_note_password(
     scope: String,
     password: String,
 ) -> Result<(), String> {
-    if !active(&db, &scope)?.origin.is_empty() {
+    let workspace = active(&db, &scope)?;
+    let cloud =
+        db.0.lock()
+            .map_err(|e| e.to_string())?
+            .query_row(
+                "SELECT value FROM metadata WHERE key=?1",
+                [format!("workspace_kind:{scope}")],
+                |r| r.get::<_, String>(0),
+            )
+            .ok()
+            .as_deref()
+            == Some("cloud");
+    if !workspace.origin.is_empty() && !cloud && workspace.origin != "http://127.0.0.1:53318" {
         return Err("Account notes use the Base account password.".into());
     }
     tauri::async_runtime::spawn_blocking(move || remember(&scope, &password))

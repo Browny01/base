@@ -150,6 +150,11 @@ export async function connect(origin: string, password: string) {
     accept(next); failures = 0; setStatus({ error: "" }); schedule(0);
   });
 }
+export async function connectHosted(){return connectNative("connect_hosted_workspace");}
+export async function completeCloudSignIn(){return connectNative("cloud_sign_in_finish");}
+async function connectNative(command:string){
+ window.dispatchEvent(new Event("base:flush-editors"));return serialized(async()=>{flushLocalWritesBeforeSwitch();const next=await native<Workspace>(command,{defaults:documentOf(normalize(documentOf(DEFAULT)))});clearSessionSecret();accept(next);failures=0;setStatus({error:""});schedule(0);});
+}
 export async function disconnect() {
   window.dispatchEvent(new Event("base:flush-editors"));
   return serialized(async () => {

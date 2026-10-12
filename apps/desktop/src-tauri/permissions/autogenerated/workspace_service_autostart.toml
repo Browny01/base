@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-workspace-service-autostart"
+description = "Enables the workspace_service_autostart command without any pre-configured scope."
+commands.allow = ["workspace_service_autostart"]
+
+[[permission]]
+identifier = "deny-workspace-service-autostart"
+description = "Denies the workspace_service_autostart command without any pre-configured scope."
+commands.deny = ["workspace_service_autostart"]

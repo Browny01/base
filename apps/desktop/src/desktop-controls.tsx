@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { RefreshCw, CloudOff, Check, ShieldCheck, Download, Upload, Bell, ArrowRight, Laptop } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { useRouter } from "./navigation";
-import { useDesktopStatus, currentWorkspace, connect, disconnect, sync, resolve, unsavedCopy, retrySave, importBackup, selectOffline, transferOffline } from "./store";
+import { useDesktopStatus, currentWorkspace, disconnect, sync, resolve, unsavedCopy, retrySave, importBackup, selectOffline, transferOffline } from "./store";
 import { native } from "./native";
+import { WorkspaceSettings } from "./workspace-settings";
+import { useConfirm } from "@/lib/confirm-context";
 
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 
 export function DesktopAccountSettings() {
   const status = useDesktopStatus();
   const workspace = currentWorkspace();
-  const [origin, setOrigin] = useState(workspace?.origin || "https://base.lucasbrown.xyz");
-  const [password, setPassword] = useState("");
+  const confirm = useConfirm();
   const [notePassword, setNotePassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,16 +22,12 @@ export function DesktopAccountSettings() {
   const text = status.saving ? "Saving on this device…" : status.syncing ? "Synchronizing…" : status.local ? "Local workspace" : status.pending ? `${status.pending} changes saved locally` : "Saved on this device";
   const action = async (fn: () => Promise<unknown>) => { setBusy(true); setError(""); try { await fn(); } catch (e) { setError(String(e)); } finally { setBusy(false); } };
   return <section className="base-account-settings base-settings-card">
-    <div className="base-settings-card-heading"><ShieldCheck className="h-5 w-5"/><div><h2>Account & sync</h2><p>Your workspace is saved on this device. Connect your Base account to sync across devices.</p></div></div>
+    <div className="base-settings-card-heading"><ShieldCheck className="h-5 w-5"/><div><h2>Accounts & Sync</h2><p>Choose where your workspace lives. Your records remain available offline.</p></div></div>
     <div className="base-account-summary"><Laptop className="h-5 w-5 text-[var(--muted)]"/><div className="min-w-0"><p className="text-sm font-medium break-all">{workspace?.origin || "Local workspace"}</p><p role="status" className="mt-1 text-xs text-[var(--muted)]">{text}{status.conflicts ? ` · ${status.conflicts} conflicts to review` : ""}</p></div>{!status.local&&<button className="base-button base-button-secondary ml-auto" disabled={status.syncing} onClick={()=>void sync()}><RefreshCw className="h-4 w-4"/> Sync</button>}</div>
     <div className="base-account-form">
-        <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void action(async () => { await connect(origin, password); setPassword(""); }); }}>
-          <label className="grid gap-1 text-sm">Service URL<input type="url" required value={origin} onChange={e => setOrigin(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
-          <label className="grid gap-1 text-sm">Base password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
-          <button disabled={busy || status.saving || status.hasUnsaved} className="rounded-lg bg-[var(--action)] px-3 py-2 text-sm text-[var(--on-action)]">{busy ? "Connecting…" : "Connect / renew session"}</button>
-        </form>
-        {status.local && <form className="my-3 grid gap-2" onSubmit={event=>{event.preventDefault();void action(async()=>{await native("set_local_note_password",{scope:workspace?.scope,password:notePassword});setNotePassword("");});}}>
-          <label className="grid gap-1 text-sm">Local note password<input type="password" required autoComplete="new-password" value={notePassword} onChange={event=>setNotePassword(event.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
+        <WorkspaceSettings />
+        {(status.local||workspace?.workspaceId.startsWith("base_cloud_")||workspace?.origin==="http://127.0.0.1:53318") && <form className="my-3 grid gap-2" onSubmit={event=>{event.preventDefault();void action(async()=>{await native("set_local_note_password",{scope:workspace?.scope,password:notePassword});setNotePassword("");});}}>
+          <label className="grid gap-1 text-sm">Note unlock password (this device)<input type="password" required autoComplete="new-password" value={notePassword} onChange={event=>setNotePassword(event.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2" /></label>
           <button disabled={busy} className="text-left text-xs underline">Set local note password</button>
         </form>}
         {error && <p role="alert" className="my-3 text-sm text-red-500">{error}</p>}
@@ -39,7 +36,7 @@ export function DesktopAccountSettings() {
           <button onClick={() => void action(() => native("export_workspace",{ unsaved: unsavedCopy() }))}><Download className="h-4 w-4"/> Export workspace & pending edits</button>
           <button disabled={busy||status.hasUnsaved} onClick={()=>void action(importBackup)}><Upload className="h-4 w-4"/> Import workspace backup</button>
           <button onClick={()=>void action(async()=>setOfflineWorkspaces(await native("list_offline_workspaces")))}><Laptop className="h-4 w-4"/> Choose offline workspace</button>
-          {!status.local&&<button disabled={busy||status.hasUnsaved} onClick={()=>void action(transferOffline)}><ArrowRight className="h-4 w-4"/> Add selected offline workspace to account</button>}
+          {!status.local&&<button disabled={busy||status.hasUnsaved} onClick={()=>void action(async()=>{if(await confirm({message:"Import a copy of the selected offline workspace into this account? Collisions and deletions need review. Both source records and the destination snapshot are retained for rollback.",confirmLabel:"Import a copy",danger:false}))await transferOffline();})}><ArrowRight className="h-4 w-4"/> Add selected offline workspace to account</button>}
           <button onClick={() => void action(async () => { const version = await native<string | null>("check_update"); setUpdate(version); setUpdateMessage(version ? `Version ${version} is available.` : "This build is up to date."); })}>Check for updates</button>
           {!status.local && <button disabled={busy || status.hasUnsaved} onClick={() => void action(disconnect)}>Sign out to local workspace</button>}
         </div>
@@ -91,5 +88,6 @@ export function DesktopFeedback() {
     shown.current={message:status.error,time:Date.now()};
     toast(status.error.replace(/^Error: /,""),{duration:9000,action:{label:"Settings",onClick:()=>openAccount(router)}});
   },[status.error,toast,router]);
+  useEffect(()=>{const failed=(event:Event)=>toast(String((event as CustomEvent).detail).replace(/^Error: /,""),{duration:9000});window.addEventListener("base:download-error",failed);return()=>window.removeEventListener("base:download-error",failed);},[toast]);
   return null;
 }

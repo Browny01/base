@@ -60,3 +60,7 @@ xcuserdata/
 /apps/desktop/src-tauri/target/
 /apps/desktop/src-tauri/gen/
 **/node_modules/
+/native/BaseWorkspace/target/
+/apps/desktop/src-tauri/binaries/
+/apps/cloud/.wrangler/
+/apps/cloud/.dev.vars

@@ -455,7 +455,7 @@ html[data-inactive="true"] *, html[data-inactive="true"] *::before, html[data-in
 .base-settings-card-heading h2 { font-size: 16px; font-weight: 550; }
 .base-settings-card-heading p { margin-top: 5px; font-size: 12px; color: var(--muted); max-width: 480px; line-height: 1.6; }
 .base-account-summary { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 9px; background: var(--surface-2); margin-bottom: 20px; }
-.base-account-form { max-width: 520px; padding-bottom: 20px; }
+.base-account-form { max-width: 780px; padding-bottom: 20px; }
 .base-account-form input { height: 40px; }
 .base-account-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 20px 0; border-top: 1px solid var(--border); }
 .base-account-actions button { display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; text-align: left; font-size: 12px; background: var(--bg); }
@@ -475,7 +475,7 @@ html[data-inactive="true"] *, html[data-inactive="true"] *::before, html[data-in
 .base-template-item strong, .base-template-item small { display: block; }
 .base-template-item strong { font-size: 12.5px; font-weight: 550; }
 .base-template-item small { font-size: 11px; line-height: 1.5; color: var(--muted); margin-top: 2px; }
-.base-dashboard-grid { grid-template-columns: repeat(4,minmax(0,1fr)); align-items: start; }
+.base-dashboard-grid { grid-template-columns: repeat(4,minmax(0,1fr)); grid-auto-rows: 1px; row-gap: 0; column-gap: 16px; align-items: start; }
 .base-dashboard-widget { position: relative; grid-column: span var(--widget-columns,2); height: var(--widget-height,auto); border-radius: 10px; }
 .base-dashboard-widget > .base-widget-body { height: 100%; min-height: 220px; }
 .base-dashboard-metric > .base-widget-body { min-height: 112px; }
@@ -529,3 +529,26 @@ html[data-inactive="true"] *, html[data-inactive="true"] *::before, html[data-in
 .base-widget-body { display: flex; flex-direction: column; }
 .base-widget-body > div { flex: 1; }
 .base-widget-body > * { flex: 1; min-height: 0; }
+
+.base-workspace-modes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:20px; }
+.base-workspace-modes button { display:grid; gap:8px; text-align:left; border:1px solid var(--border); background:var(--bg); border-radius:10px; padding:18px; transition:background .15s ease,border-color .15s ease; }
+.base-workspace-modes button[aria-pressed="true"] { border-color:var(--action); background:var(--surface-2); }
+.base-workspace-modes strong { font-size:14px; font-weight:550; }
+.base-workspace-modes span { color:var(--muted); font-size:12px; }
+.base-workspace-panel { padding:20px; margin-top:16px; background:var(--bg); border:1px solid var(--border); border-radius:10px; }
+.base-workspace-panel input[type="url"],.base-workspace-panel input[type="password"] { height:40px; border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:var(--surface); color:var(--text); width:100%; }
+.base-workspace-tabs { display:flex; gap:4px; padding:4px; border-radius:8px; background:var(--surface-2); margin-bottom:24px; width:fit-content; }
+.base-workspace-tabs button { padding:8px 12px; font-size:12px; border-radius:6px; color:var(--muted); }
+.base-workspace-tabs button[aria-pressed="true"] { background:var(--surface); color:var(--text); box-shadow:0 1px 3px #0001; }
+.base-workspace-heading { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.base-workspace-heading h3 { font-size:14px; font-weight:550; }
+.base-workspace-heading p { margin-top:6px; font-size:12px; line-height:1.6; color:var(--muted); }
+.base-workspace-status { font-size:11px; white-space:nowrap; background:var(--surface-2); border:1px solid var(--border); border-radius:20px; padding:5px 10px; }
+.base-workspace-status[data-online="true"] { color:var(--success,#43a880); }
+.base-workspace-facts { display:flex; flex-wrap:wrap; gap:14px; color:var(--muted); font-size:11px; }
+.base-workspace-facts span { display:flex; align-items:center; gap:8px; }
+.base-cloud-plans { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.base-cloud-plans>div { display:grid; gap:8px; padding:16px; border:1px solid var(--border); border-radius:8px; }
+.base-cloud-plans strong { font-size:14px; font-weight:550; }.base-cloud-plans small { display:block; font-size:11px; color:var(--muted); margin-top:4px; }.base-cloud-plans span { font-size:12px; color:var(--muted); }
+.base-storage-progress { width:100%; height:5px; margin-top:16px; appearance:none; border:0; border-radius:5px; overflow:hidden; background:var(--surface-2); }.base-storage-progress::-webkit-progress-bar { background:var(--surface-2); }.base-storage-progress::-webkit-progress-value { background:var(--action); }
+@media(max-width:600px) { .base-workspace-modes,.base-cloud-plans { grid-template-columns:1fr; }.base-workspace-panel { padding:16px; }.base-workspace-tabs { width:100%; } }

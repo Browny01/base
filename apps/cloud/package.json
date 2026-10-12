@@ -1,0 +1,20 @@
+{
+  "name": "@base/cloud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "build": "wrangler deploy --dry-run --outdir .wrangler/build",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply base-cloud-staging --local"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261011.1",
+    "wrangler": "^4.147.0"
+  }
+}

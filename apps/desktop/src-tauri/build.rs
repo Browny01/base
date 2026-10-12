@@ -1,4 +1,8 @@
 fn main() {
+    println!(
+        "cargo:rustc-env=BASE_TARGET_TRIPLE={}",
+        std::env::var("TARGET").expect("Rust target")
+    );
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "load_workspace",
@@ -6,8 +10,11 @@ fn main() {
             "apply_sync",
             "resolve_conflict",
             "connect_account",
+            "cloud_sign_in_start",
+            "cloud_sign_in_finish",
             "disconnect_account",
             "api_request",
+            "download_workspace_file",
             "open_external",
             "export_workspace",
             "check_update",
@@ -25,6 +32,11 @@ fn main() {
             "set_local_note_password",
             "record_frontend_ready",
             "record_scroll_sample",
+            "workspace_service_start",
+            "workspace_service_stop",
+            "workspace_service_status",
+            "workspace_service_autostart",
+            "connect_hosted_workspace",
         ]),
     ))
     .expect("Tauri build setup failed");

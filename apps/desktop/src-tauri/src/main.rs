@@ -5,6 +5,7 @@ mod note_lock;
 mod performance;
 mod transport;
 mod updates;
+mod workspace_service;
 fn main() {
     base_run();
 }
@@ -35,6 +36,7 @@ fn base_run() {
             }
             app.manage(database::Database::open(&directory.join("base.sqlite3"))?);
             app.manage(transport::Transport::new());
+            app.manage(transport::CloudLogin::default());
             app.manage(lifecycle::Shutdown::default());
             app.manage(updates::Updates(std::sync::Mutex::new(None)));
             use tauri::{
@@ -104,8 +106,11 @@ fn base_run() {
             database::apply_sync,
             database::resolve_conflict,
             transport::connect_account,
+            transport::cloud_sign_in_start,
+            transport::cloud_sign_in_finish,
             transport::disconnect_account,
             transport::api_request,
+            transport::download_workspace_file,
             transport::open_external,
             transport::export_workspace,
             updates::check_update,
@@ -122,7 +127,12 @@ fn base_run() {
             note_lock::verify_note_password,
             note_lock::set_local_note_password,
             performance::record_frontend_ready,
-            performance::record_scroll_sample
+            performance::record_scroll_sample,
+            workspace_service::workspace_service_start,
+            workspace_service::workspace_service_stop,
+            workspace_service::workspace_service_status,
+            workspace_service::workspace_service_autostart,
+            transport::connect_hosted_workspace
         ])
         .build(tauri::generate_context!())
         .expect("Base desktop failed to initialize")

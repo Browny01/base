@@ -19,7 +19,7 @@ import { PageSkeleton } from "@/components/ui/page-heading";
 class PageRecovery extends Component<{children:ReactNode},{error:Error|null}> {
   state:{error:Error|null}={error:null};
   static getDerivedStateFromError(error:Error){return {error};}
-  render(){return this.state.error?<div role="alert" className="p-6"><h1 className="text-lg font-semibold">This page could not open</h1><p className="mt-2">Your stored workspace is retained. Use Settings → Account & sync to export a recovery copy, or open another page.</p><p className="mt-2 text-sm text-[var(--muted)]">{this.state.error.message}</p><button className="mt-3 underline" onClick={()=>this.setState({error:null})}>Retry page</button></div>:this.props.children;}
+  render(){return this.state.error?<div role="alert" className="p-6"><h1 className="text-lg font-semibold">This page could not open</h1><p className="mt-2">Your stored workspace is retained. Use Settings → Accounts & Sync to export a recovery copy, or open another page.</p><p className="mt-2 text-sm text-[var(--muted)]">{this.state.error.message}</p><button className="mt-3 underline" onClick={()=>this.setState({error:null})}>Retry page</button></div>:this.props.children;}
 }
 
 const Dashboard = lazy(() => import("@/components/dashboard").then(m => ({ default: m.Dashboard })));

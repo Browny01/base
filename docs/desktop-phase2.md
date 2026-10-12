@@ -3,8 +3,10 @@
 ## Status and phase gate
 
 The redesigned interface is implemented. Linux release verification and measured
-results are recorded below. **Phase 2 is not complete until the redesigned build
-has been checked and profiled on actual macOS hardware.** Phase 3 has not started.
+results are recorded below. The owner accepted the updated interface and requested
+[Phase 2.5](phase-2.5.md) before the original Phase 3. Remaining macOS performance
+and hosted reconnection measurements carry forward as explicit release gates;
+acceptance does not replace those measurements. Phase 3 has not started.
 
 The user confirmed Phase 1 build/launch and offline restart on a MacBook Air M3
 with 16 GB RAM, running their reported Tahoe 26.5.2. They explicitly deferred

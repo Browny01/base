@@ -1,0 +1,59 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "base-cloud-staging",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "vars": {
+    "PUBLIC_URL": "https://base-cloud-staging.kingbrownyplayz.workers.dev",
+    "ENVIRONMENT": "staging"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "base-cloud-staging",
+      "database_id": "f318eaac-9824-4dfe-a582-6381fd86b1dc",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "base-cloud-files-staging"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "9adfbd59cbbc4f7f9ea55263c010a55e"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "JOBS",
+        "queue": "base-cloud-jobs-staging"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "base-cloud-jobs-staging",
+        "max_batch_size": 10,
+        "max_retries": 5,
+        "dead_letter_queue": "base-cloud-jobs-dead-staging"
+      }
+    ]
+  },
+  "triggers": {
+    "crons": [
+      "15 * * * *"
+    ]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

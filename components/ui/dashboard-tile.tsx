@@ -1,10 +1,22 @@
 "use client";
-import { useRef, type CSSProperties, type ReactNode } from "react";
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { GripHorizontal, MoveDownRight } from "lucide-react";
 import { clampWidgetSize, type DashboardWidget, type WidgetSize } from "@/lib/dashboard-widgets";
 
 export function DashboardTile({ id, label, customizing, size, onMove, onResize, children }: { id: DashboardWidget; label: string; customizing: boolean; size?: WidgetSize; onMove: (source: DashboardWidget, target: DashboardWidget) => void; onResize: (size: WidgetSize) => void; children: ReactNode }) {
   const tile=useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const node = tile.current;
+    if (!node) return;
+    // Each column packs independently: a taller calendar must not leave a gap
+    // under both small metrics. Observe actual content, including saved sizes.
+    const observer = new ResizeObserver(() => {
+      const rows = Math.ceil(node.getBoundingClientRect().height + 16);
+      if (node.style.gridRowEnd !== `span ${rows}`) node.style.gridRowEnd = `span ${rows}`;
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const gesture=useRef<{ mode:"move"|"resize"; x:number; y:number; left:number; top:number; width:number; height:number; columns:number; target:DashboardWidget; drop:HTMLElement|null; next:WidgetSize|null }|null>(null);
   function start(event: React.PointerEvent<HTMLButtonElement>, mode:"move"|"resize") {
     if(event.button!==0)return;

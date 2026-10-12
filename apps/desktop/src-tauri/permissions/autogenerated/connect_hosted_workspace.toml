@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-connect-hosted-workspace"
+description = "Enables the connect_hosted_workspace command without any pre-configured scope."
+commands.allow = ["connect_hosted_workspace"]
+
+[[permission]]
+identifier = "deny-connect-hosted-workspace"
+description = "Denies the connect_hosted_workspace command without any pre-configured scope."
+commands.deny = ["connect_hosted_workspace"]

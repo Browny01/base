@@ -5,8 +5,11 @@
 There are three phases: (1) locally bundled desktop and offline sync, (2) visual
 redesign and measured optimization, (3) native iPhone modernization. A phase must
 be implemented, tested, documented and committed before the next begins. The
-user has subsequently authorized the UI upgrade before hosted-backend
-reconnection verification, which will follow Vercel backend setup. Record that
+user subsequently authorized the UI upgrade before hosted-backend reconnection
+verification. After accepting the desktop feedback fixes, they inserted
+[Phase 2.5](phase-2.5.md): local workspaces and Cloudflare/Clerk/Stripe accounts
+before the original Phase 3. This supersedes the planned Vercel backend setup;
+the existing Vercel data remains intact during staging verification. Record that
 exception without claiming the deferred checks passed. macOS and iPhone hardware
 cannot be tested directly on this Linux workstation; user-run checks are credited
 only to their reported scope.

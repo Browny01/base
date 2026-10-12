@@ -1,4 +1,4 @@
-import type { CreatorPlatform } from "@/lib/news-prefs";
+import type { CreatorPlatform } from "../../../lib/news-prefs.ts";
 
 export interface LiveStatusItem {
   id: string;

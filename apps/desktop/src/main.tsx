@@ -26,7 +26,13 @@ installApiTransport((input, init) => {
   return request(workspace.scope, input, init);
 });
 installNoteVerifier(password => native("verify_note_password", { scope: currentWorkspace()?.scope, password }));
-const external = (url: string) => { void native("open_external", { url }).catch(error => console.error(String(error))); };
+const external = (value:string,name="Attachment") => {
+  const workspace=currentWorkspace();
+  let id:string|undefined;
+  try{const url=new URL(value);if(workspace?.origin===url.origin&&/^\/api\/files\/[0-9a-f-]{36}$/i.test(url.pathname))id=url.pathname.split("/").at(-1);}catch{/* ordinary external URL */}
+  const operation=id&&workspace?native("download_workspace_file",{scope:workspace.scope,id,name}):native("open_external",{url:value});
+  void operation.catch(error=>window.dispatchEvent(new CustomEvent("base:download-error",{detail:String(error)})));
+};
 installPrinter(async html => {
   const document = new DOMParser().parseFromString(html,"text/html");
   for (const element of document.querySelectorAll("script,iframe,object,embed,base,form")) element.remove();
@@ -37,7 +43,7 @@ installPrinter(async html => {
 });
 document.addEventListener("click", event => {
   const anchor = (event.target as Element).closest?.("a");
-  if (anchor && /^(https?:|mailto:)/.test(anchor.getAttribute("href") ?? "")) { event.preventDefault(); external(anchor.href); }
+  if (anchor && /^(https?:|mailto:)/.test(anchor.getAttribute("href") ?? "")) { event.preventDefault(); external(anchor.href,anchor.download||anchor.textContent?.trim()||"Attachment"); }
 }, true);
 const originalOpen = window.open.bind(window);
 window.open = ((url?: string | URL, ...args: [string?, string?]) => {
