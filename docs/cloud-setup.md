@@ -34,10 +34,12 @@ while production will eventually use `https://base.lucasbrown.xyz`.
    `user.created`, `user.updated` and `user.deleted`. Keep its signing secret
    ready. This updates account details and revokes sessions on account deletion;
    workspace data is retained. Signature checks happen before any account write.
-5. Apple is supported through Clerk's social connection, but its setup requires
-   your Apple Developer Services ID, Team ID and signing key. Configure these
-   inside Clerk, never in the desktop bundle. Until configured, Apple sign-in
-   must be recorded as pending, not passed.
+5. Clerk offers shared Apple OAuth credentials for its Development instance.
+   Apple can be enabled there without creating your own Services ID. Production
+   Apple sign-in requires your Apple Developer Services ID, Team ID and signing
+   key. The owner has no Apple Developer account, so production Apple remains
+   unavailable/pending. Email and Google can be tested independently. Configure
+   any Apple credentials inside Clerk, never in the desktop bundle.
 6. For production, create the Production instance for **base.lucasbrown.xyz**,
    follow Clerk's DNS instructions in Cloudflare, and configure your own Google
    and Apple OAuth credentials. Keep staging and production accounts separate.
@@ -59,12 +61,12 @@ and [Apple setup](https://clerk.com/docs/guides/configure/auth-strategies/social
    Select `customer.subscription.created`, `customer.subscription.updated`,
    `customer.subscription.deleted`, `checkout.session.completed`,
    `invoice.paid`, and `invoice.payment_failed`. Use API version
-   **2025-09-30.clover**, also explicitly pinned by this backend.
+   **2026-09-30.endive**, also explicitly pinned by this backend.
 5. Keep the sandbox secret API key and endpoint signing secret ready. The
    publishable Stripe key is not needed: Checkout and the Portal are hosted.
 
 See [Stripe webhook setup](https://docs.stripe.com/events/manage-webhook-endpoints)
-and [the pinned API release](https://docs.stripe.com/changelog/clover).
+and [the pinned API release](https://docs.stripe.com/changelog/endive).
 
 ## Enter keys privately
 

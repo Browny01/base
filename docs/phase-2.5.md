@@ -100,9 +100,11 @@ application runtime dependencies.
 ## Staging and remaining gates
 
 Staging is **https://base-cloud-staging.kingbrownyplayz.workers.dev**. D1/R2/KV,
-queues and cron are provisioned. The owner enabled R2. **Clerk Base and the Stripe
-sandbox are not created yet.** Follow [private setup](cloud-setup.md); do not
-paste secrets in chat. `base.lucasbrown.xyz`, Vercel/Upstash/Blob production data,
+queues and cron are provisioned. The owner enabled R2 and configured Clerk
+Development and the Stripe sandbox through the private helper. Provider checks
+are recorded in [staging acceptance](phase-2.5-staging-checks.md). Follow
+[private setup](cloud-setup.md); do not paste secrets in chat.
+`base.lucasbrown.xyz`, Vercel/Upstash/Blob production data,
 legacy secrets and existing Swift clients have not been switched or reset.
 
 Before marking Phase 2.5 complete:
@@ -114,10 +116,11 @@ Before marking Phase 2.5 complete:
    JSON outboxes protect record edits, not a failed upload's entire file payload.
    Cal.com's shared handler preserves its contract but the cloud adapter has no
    tenant credential yet and reports `configured: false`.
-2. Exercise real Clerk email/Google/Apple and Stripe sandbox checkout, portal,
-   cancellation, expiry, webhook retries/order and downgrade recovery. Fixtures
-   cannot replace provider acceptance. Apple requires the owner's developer
-   credentials configured directly in Clerk.
+2. Finish provider acceptance beyond the isolated staging account: email/Google
+   interactive sign-in, expiry, webhook retries/order and downgrade recovery.
+   Apple is disabled in the current Clerk instance; Development can use Clerk's
+   shared credentials, while production needs an Apple Developer account.
+   See the staging acceptance report for the real provider flows already tested.
 3. Verify two actual desktop devices against staging: independent offline edits,
    restart, reconnection, conflicts, protected files and workspace switching.
    Test the service on actual macOS, including UI quit, crash recovery, login

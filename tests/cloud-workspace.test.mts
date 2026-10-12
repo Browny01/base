@@ -17,7 +17,11 @@ import {
   exchangeDevice,
   provision,
 } from "../apps/cloud/src/auth.ts";
-import { verifyStripeSignature, webhook } from "../apps/cloud/src/billing.ts";
+import {
+  STRIPE_API_VERSION,
+  verifyStripeSignature,
+  webhook,
+} from "../apps/cloud/src/billing.ts";
 import { sha, now, boundedText } from "../apps/cloud/src/types.ts";
 import { schedule, runJob } from "../apps/cloud/src/jobs.ts";
 import {
@@ -467,9 +471,14 @@ test("Stripe lifecycle reconciles authoritative state despite delayed and replay
     started: (() => void) | null = null,
     delay = false;
   const original = globalThis.fetch;
-  globalThis.fetch = (async (url: string | URL | Request) => {
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     if (!String(url).startsWith("https://api.stripe.com/v1/subscriptions"))
       throw new Error("Unexpected Stripe fixture request");
+    assert.equal(STRIPE_API_VERSION, "2026-09-30.endive");
+    assert.equal(
+      new Headers(init?.headers).get("Stripe-Version"),
+      STRIPE_API_VERSION,
+    );
     const value = structuredClone(state);
     if (delay && String(url).includes("/sub_fixture")) {
       delay = false;

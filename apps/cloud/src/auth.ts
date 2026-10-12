@@ -269,7 +269,10 @@ export function clerkPage(
       "Content-Type": "text/html;charset=utf-8",
       "Cache-Control": "no-store",
       "Referrer-Policy": "no-referrer",
-      "Content-Security-Policy": `default-src 'none';script-src 'nonce-${nonce}' https://${host};style-src 'nonce-${nonce}' 'unsafe-inline';connect-src 'self' https://${host};img-src https: data:;font-src https: data:;frame-src https:;base-uri 'none';form-action 'self';frame-ancestors 'none'`,
+      // Clerk injects runtime styles and uses blob workers and protection hosts.
+      // A style nonce would make browsers ignore unsafe-inline and break its UI.
+      // Scripts retain nonce protection; only the documented provider hosts load.
+      "Content-Security-Policy": `default-src 'none';script-src 'nonce-${nonce}' https://${host} https://challenges.cloudflare.com https://*.protect.clerk.com;style-src 'unsafe-inline';worker-src 'self' blob:;connect-src 'self' https://${host} https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com;img-src https://img.clerk.com data:;font-src https://${host} data:;frame-src https://${host} https://challenges.cloudflare.com https://*.protect.clerk.com;base-uri 'none';form-action 'self';frame-ancestors 'none'`,
     },
   });
 }

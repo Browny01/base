@@ -7,6 +7,8 @@ import {
   type Principal,
   type WorkspaceRow,
 } from "./types.ts";
+export const STRIPE_API_VERSION = "2026-09-30.endive";
+
 type StripePrice = {
   id: string;
   active: boolean;
@@ -40,7 +42,7 @@ export async function stripe<T>(
     method: params ? "POST" : "GET",
     headers: {
       Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-      "Stripe-Version": "2025-09-30.clover",
+      "Stripe-Version": STRIPE_API_VERSION,
       ...(params
         ? { "Content-Type": "application/x-www-form-urlencoded" }
         : {}),
