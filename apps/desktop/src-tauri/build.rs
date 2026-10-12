@@ -14,6 +14,8 @@ fn main() {
             "cloud_sign_in_finish",
             "disconnect_account",
             "api_request",
+            "integration_status",
+            "set_integration_key",
             "download_workspace_file",
             "open_external",
             "export_workspace",

@@ -151,7 +151,7 @@ function AddWatch({ items, close, append }: {
 
       {notConfigured && (
         <p className="rounded-xl border border-[var(--c-yellow)]/40 bg-[var(--c-yellow)]/10 px-3 py-2.5 text-[12px] text-[var(--text)]">
-          Movies &amp; shows search needs a TMDB API key — add <code className="font-semibold">TMDB_API_KEY</code> to your environment variables. YouTube links still work.
+          Movies &amp; shows search needs your TMDB key. Connect it in Settings → News &amp; integrations. YouTube links still work.
         </p>
       )}
 

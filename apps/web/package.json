@@ -1,0 +1,1 @@
+{"name":"@base/web","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1 --port 5174","build":"vite build && node ../../scripts/build-web-offline.mjs","typecheck":"tsc --noEmit -p tsconfig.json"}}

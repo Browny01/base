@@ -18,13 +18,14 @@ npm test
 npm run typecheck
 npm run desktop:typecheck
 npm run cloud:check
+npm run web:typecheck
 cargo test --manifest-path native/BaseWorkspace/Cargo.toml
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run desktop:build
 open apps/desktop/src-tauri/target/release/bundle/macos/Base.app
 ```
 
-Expected tests for this checkpoint: 139 JavaScript, nine standalone workspace
+Expected tests for this checkpoint: 148 JavaScript, nine standalone workspace
 Rust and ten desktop Rust. macOS build/runtime results must still be recorded on
 your Mac; passing Linux tests does not substitute for them.
 
@@ -42,8 +43,8 @@ Open **Settings → Accounts & Sync**.
 - **Local → Connect to Existing Workspace**: enter its compatible service URL
   and password. Remote services require HTTPS; loopback may use HTTP. Passwords
   and session tokens use Keychain.
-- **Cloud → Connect to a staging cloud**: enter
-  `https://base-cloud-staging.kingbrownyplayz.workers.dev`. Sign in in your browser,
+- **Cloud → Sign in / create account**: the release connects to the configured
+  Base Cloud service; there is no editable Cloud URL. Sign in in your browser,
   explicitly approve the desktop, then return to Base and click Complete sign-in.
   Email and Google are enabled. Apple is currently disabled. Keep this workspace
   separate when prompted; use explicit copy/import only when you intend it.
@@ -72,3 +73,20 @@ CVC for Plus testing. Never enter a real payment card for these acceptance check
 
 Remaining integration/file-upload/migration gates are listed in the status
 report. Production data migration and original Phase 3 have not begun.
+
+## Check the latest interface fixes
+
+Open Settings → News & integrations. Save/remove a TMDB, Cal.com, X or CoinGecko
+key and verify the relevant provider with your own account. Cloud keys are
+encrypted in the Cloud workspace; local desktop keys use Keychain. AI keys
+retain their encrypted News briefing vault. News headlines and market cards
+work without a Cloud account. Check index values are labelled in points.
+
+Use Send test notification under Accounts & Sync. If no banner arrives, allow
+Base in macOS System Settings → Notifications. Test a short focus session while
+Base stays open; native permission reporting cannot establish delivery by itself.
+
+The website is available at the staging URL above: `/` is the landing page and
+`/app/` is the browser workspace. Browser local data and separate Cloud data use
+IndexedDB, not your desktop SQLite database. Test an actual disconnected browser
+reload after the service worker installs; that physical network check is pending.

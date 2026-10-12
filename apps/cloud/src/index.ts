@@ -1,3 +1,5 @@
+import { credentialStatus, saveCredential } from "./credentials.ts";
+import { PUBLIC_INTEGRATION_PATHS } from "../../../packages/core/src/providers.ts";
 import {
   authenticateMcp,
   oauthMetadata,
@@ -20,6 +22,7 @@ import type {
 } from "@cloudflare/workers-types";
 import {
   authenticate,
+  browserSignIn,
   beginDevice,
   approveDevice,
   exchangeDevice,
@@ -58,6 +61,73 @@ async function route(request: Request, env: Env) {
         "Access-Control-Allow-Headers": "Authorization,Content-Type",
       },
     });
+  if (path === "/api/config" && method === "GET")
+    return response({
+      clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY ?? "",
+      environment: env.ENVIRONMENT,
+    });
+  if (path === "/api/auth/browser" && method === "POST") {
+    await rateLimit(env, request, "browser-login", 10);
+    return browserSignIn(env, request, await body(request, 4096));
+  }
+  if (
+    env.ASSETS &&
+    !path.startsWith("/api/") &&
+    !["/health", "/sign-in", "/account", "/billing"].includes(path) &&
+    !path.startsWith("/.well-known/")
+  ) {
+    if (!["GET", "HEAD"].includes(method))
+      throw new HttpError(405, "Method not allowed");
+    if (path === "/") url.pathname = "/index.html";
+    if (path === "/app" || path === "/app/") url.pathname = "/app/index.html";
+    const asset = await env.ASSETS.fetch(new Request(url, request));
+    const headers = new Headers(asset.headers);
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (headers.get("Content-Type")?.includes("text/html")) {
+      const host = env.CLERK_ISSUER ? new URL(env.CLERK_ISSUER).origin : "";
+      headers.set(
+        "Content-Security-Policy",
+        [
+          "default-src 'self'",
+          "script-src 'self' " +
+            host +
+            " https://challenges.cloudflare.com https://*.protect.clerk.com",
+          "style-src 'self' 'unsafe-inline'",
+          "worker-src 'self' blob:",
+          "connect-src 'self' " +
+            host +
+            " https://*.protect.clerk.com:* https://clerk-telemetry.com https://*.clerk-telemetry.com",
+          "img-src 'self' https: data: blob:",
+          "font-src 'self' data:",
+          "frame-src " +
+            host +
+            " https://challenges.cloudflare.com https://*.protect.clerk.com",
+          "base-uri 'none'",
+          "form-action 'self'",
+          "frame-ancestors 'none'",
+        ].join(";"),
+      );
+      headers.set("Cache-Control", "no-cache");
+    }
+    return new Response(asset.body, { status: asset.status, headers });
+  }
+  if (path.startsWith("/api/public/")) {
+    const target = path.replace("/api/public/", "/api/");
+    if (
+      !(PUBLIC_INTEGRATION_PATHS as readonly string[]).includes(target) ||
+      !["GET", "POST"].includes(method)
+    )
+      throw new HttpError(404, "Unknown integration");
+    if (method === "POST" && target !== "/api/news/summary")
+      throw new HttpError(405, "Method not allowed");
+    await rateLimit(env, request, "public-integrations", 60);
+    url.pathname = target;
+    return (
+      (await integration(env, new Request(url, request))) ??
+      response({ error: "Integration unavailable" }, 404)
+    );
+  }
   if (path === "/health")
     return response({
       product: "Base Cloud",
@@ -201,6 +271,25 @@ async function route(request: Request, env: Env) {
     )
   )
     await requireSyncDevice(env, principal);
+  if (path === "/api/auth/browser" && method === "GET")
+    return response({ workspaceId: workspace, deviceId: principal.deviceId });
+  if (path === "/api/auth/browser" && method === "DELETE") {
+    await revokeDevice(env, principal, principal.deviceId);
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "Set-Cookie":
+          "__Host-base_session=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict",
+      },
+    });
+  }
+  if (path === "/api/workspace/credentials" && method === "GET")
+    return response(await credentialStatus(env, principal));
+  if (path === "/api/workspace/credentials" && method === "POST")
+    return response(
+      await saveCredential(env, principal, await body(request, 12000)),
+    );
   if (path === "/api/auth/desktop" && method === "GET")
     return response({ workspaceId: workspace, deviceId: principal.deviceId });
   if (path === "/api/auth/desktop" && method === "DELETE")

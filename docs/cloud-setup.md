@@ -135,3 +135,24 @@ devices, offline edits/restart/reconnect, simultaneous edits and retained
 conflicts before testing a third Free device. Exercise sandbox Checkout and
 Portal, cancellation/expiry and exports after downgrade. Record which checks
 used the real Clerk/Stripe projects; synthetic fixture tests are separate.
+
+## Browser workspace and personal integration keys
+
+`npm run web:build` produces the landing page and shared React browser workspace.
+Build it before deploying `apps/cloud`; the Worker ASSETS binding serves `/` and
+`/app/` from `apps/web/dist`. The browser uses same-origin HttpOnly session cookies
+and isolated IndexedDB workspaces, with a service worker caching public UI assets
+only. Production domain/Clerk production setup remains a separate release gate.
+
+Migration `0004_integration_credentials.sql` is additive and has been applied to
+staging. Run `node scripts/configure-integration-storage.mjs` once for a new
+backend: it initializes a 256-bit AES-GCM Worker secret privately and preserves
+an existing secret. Never replace `INTEGRATION_ENCRYPTION_KEY` casually: it is
+needed to decrypt existing credentials. Back up it privately alongside D1
+backups; future rotation requires a tested decrypt/re-encrypt migration and
+rollback, not rerunning configuration. Keys do not enter ordinary record sync,
+exports or KV caches. Local desktop workspaces use OS credential storage instead.
+
+The fixed desktop Base Cloud origin lives in `packages/core/src/service.json`.
+Changing the release service is an operator build decision, not an end-user
+setting; remote local-workspace connections remain configurable.

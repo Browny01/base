@@ -17,6 +17,7 @@ export interface CreatorLink {
 }
 
 export interface NewsPrefs {
+  newsSources?: string[];
   youtube: YoutubeChannel[];
   reddit: string[];
   x: string[];

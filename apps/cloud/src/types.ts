@@ -6,6 +6,8 @@ import type {
 } from "@cloudflare/workers-types";
 export interface Env {
   TMDB_API_KEY?: string;
+  INTEGRATION_ENCRYPTION_KEY?: string;
+  ASSETS?: { fetch: (request: Request) => Promise<Response> };
   DB: D1Database;
   FILES: R2Bucket;
   CACHE: KVNamespace;

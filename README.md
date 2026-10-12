@@ -5,9 +5,16 @@
 Base is a personal command center for planning, focus, money, notes, projects,
 and AI-assisted daily work. Its new Tauri desktop workspace bundles the React
 interface locally for Linux and macOS, with SQLite and durable offline edits.
-Next.js hosts the web application and cloud APIs. Existing SwiftUI iPhone and
+The new browser workspace and reference-inspired landing page run on the
+Cloudflare staging Worker. Next.js retains the legacy web application and APIs
+as the production rollback path. Existing SwiftUI iPhone and
 legacy Mac applications remain available during migration. Actual macOS
 verification is pending; see [desktop verification](docs/desktop-verification.md).
+
+Preview the [website](https://base-cloud-staging.kingbrownyplayz.workers.dev/) or
+[open Base in your browser](https://base-cloud-staging.kingbrownyplayz.workers.dev/app/).
+Cloud uses Clerk Development and Stripe sandbox; the production domain has not
+been cut over. See [latest fixes and verification](docs/phase-2.5-improvements.md).
 
 ## Highlights
 

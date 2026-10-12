@@ -110,6 +110,8 @@ fn base_run() {
             transport::cloud_sign_in_finish,
             transport::disconnect_account,
             transport::api_request,
+            transport::integration_status,
+            transport::set_integration_key,
             transport::download_workspace_file,
             transport::open_external,
             transport::export_workspace,

@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "apps/desktop/dist/**",
+    "apps/web/dist/**",
     "apps/cloud/.wrangler/**",
     "native/BaseWorkspace/target/**",
     "apps/desktop/src-tauri/target/**",

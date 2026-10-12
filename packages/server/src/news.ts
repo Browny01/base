@@ -7,26 +7,31 @@ export type { NewsArticle } from "../../core/src/integrations.ts";
 const FEEDS = [
   {
     url: "https://feeds.marketwatch.com/marketwatch/topstories",
+    id: "marketwatch",
     source: "MarketWatch",
     category: "markets" as const,
   },
   {
     url: "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    id: "coindesk",
     source: "CoinDesk",
     category: "crypto" as const,
   },
   {
     url: "https://cointelegraph.com/rss",
+    id: "cointelegraph",
     source: "CoinTelegraph",
     category: "crypto" as const,
   },
   {
     url: "https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US",
+    id: "yahoo",
     source: "Yahoo Finance",
     category: "markets" as const,
   },
   {
     url: "https://www.theverge.com/rss/index.xml",
+    id: "verge",
     source: "The Verge",
     category: "general" as const,
   },
@@ -42,27 +47,31 @@ const parser = new Parser({
   },
 });
 
-export async function getArticles(): Promise<NewsArticle[]> {
+export async function getArticles(
+  sourceIds?: string[],
+): Promise<NewsArticle[]> {
   const settled = await Promise.allSettled(
-    FEEDS.map(async (feed) => {
-      const response = await fetch(feed.url, {
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!response.ok) throw new Error("Feed unavailable");
-      const xml = await response.text();
-      if (xml.length > 2_000_000) throw new Error("Feed too large");
-      const parsed = await parser.parseString(xml);
-      return parsed.items.slice(0, 12).map((item) => ({
-        title: item.title ?? "",
-        link: item.link ?? "",
-        description: (item.contentSnippet ?? item.content ?? "")
-          .replace(/<[^>]*>/g, "")
-          .slice(0, 200),
-        pubDate: item.pubDate ?? item.isoDate ?? "",
-        source: feed.source,
-        category: feed.category,
-      }));
-    }),
+    FEEDS.filter((feed) => !sourceIds || sourceIds.includes(feed.id)).map(
+      async (feed) => {
+        const response = await fetch(feed.url, {
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!response.ok) throw new Error("Feed unavailable");
+        const xml = await response.text();
+        if (xml.length > 2_000_000) throw new Error("Feed too large");
+        const parsed = await parser.parseString(xml);
+        return parsed.items.slice(0, 12).map((item) => ({
+          title: item.title ?? "",
+          link: item.link ?? "",
+          description: (item.contentSnippet ?? item.content ?? "")
+            .replace(/<[^>]*>/g, "")
+            .slice(0, 200),
+          pubDate: item.pubDate ?? item.isoDate ?? "",
+          source: feed.source,
+          category: feed.category,
+        }));
+      },
+    ),
   );
 
   const articles: NewsArticle[] = [];
@@ -77,8 +86,13 @@ export async function getArticles(): Promise<NewsArticle[]> {
   return articles.slice(0, 60);
 }
 
-export async function GET() {
-  const articles = await getArticles();
+export async function GET(request?: Request) {
+  const selected = request
+    ? new URL(request.url).searchParams.get("sources")
+    : null;
+  const articles = await getArticles(
+    selected === null ? undefined : selected.split(","),
+  );
   return Response.json(
     { articles },
     {

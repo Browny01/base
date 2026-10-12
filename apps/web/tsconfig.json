@@ -1,0 +1,1 @@
+{"extends":"../desktop/tsconfig.json","compilerOptions":{"paths":{"@/lib/navigation":["../desktop/src/navigation.tsx"],"@/lib/link":["../desktop/src/link.tsx"],"@/lib/hooks":["../desktop/src/store.ts"],"@/lib/image":["../desktop/src/media.tsx"],"@/*":["../../*"]}},"include":["src/**/*.ts","src/**/*.tsx","vite.config.ts","../desktop/src/**/*.ts","../desktop/src/**/*.tsx"]}

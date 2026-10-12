@@ -1,5 +1,8 @@
 "use client";
 
+import { loadNewsBriefing } from "@/lib/news-briefing";
+import { DEFAULT_AI_SETTINGS } from "@/lib/ai-settings";
+
 import { BaseImage } from "@/lib/image";
 
 import { apiFetch } from "@/lib/api-client";
@@ -441,18 +444,18 @@ function MetricCard({
 
 // Hourly AI news briefing, condensed for the dashboard.
 function DashNewsBriefing() {
+  const { data } = useBase();
+  const settings = data.aiSettings ?? DEFAULT_AI_SETTINGS;
   const [state, setState] = useState<{ loading: boolean; summary?: string; error?: string }>({ loading: true });
   const load = () => {
     setState((s) => ({ ...s, loading: true }));
-    apiFetch("/api/news/summary")
-      .then((r) => r.json())
-      .then((j) => setState(j.ok ? { loading: false, summary: j.summary } : { loading: false, error: j.error || "Couldn't load the briefing." }))
-      .catch((e) => setState({ loading: false, error: String(e) }));
+    void loadNewsBriefing(settings).then(setState);
   };
   useEffect(() => {
     const timer = window.setTimeout(load, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.model, settings.briefingEnabled, settings.keyCipher, settings.keySalt]);
   return (
     <section className="card h-full p-5 overflow-auto">
       <div className="flex items-center justify-between mb-3">

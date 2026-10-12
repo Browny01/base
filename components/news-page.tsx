@@ -6,8 +6,15 @@ import { BaseImage } from "@/lib/image";
 
 import { apiFetch } from "@/lib/api-client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,8 +26,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { mdToHtml } from "@/lib/markdown";
-import { DEFAULT_AI_SETTINGS, hasSavedKey, normalizeAiSettings } from "@/lib/ai-settings";
-import { decryptSecret, sessionSecret } from "@/lib/vault";
+import { DEFAULT_AI_SETTINGS, normalizeAiSettings } from "@/lib/ai-settings";
+import { loadNewsBriefing } from "@/lib/news-briefing";
 import Link from "@/lib/link";
 import { cn } from "@/lib/utils";
 import { useBase } from "@/lib/hooks";
@@ -36,10 +43,15 @@ import {
   type VideoCategory,
 } from "@/lib/news-prefs";
 
-function formatPrice(price: number | null): string {
-  if (price === null) return "-";
-  if (price >= 1000) return `A$${price.toLocaleString("en-AU", { maximumFractionDigits: 1 })}`;
-  return `A$${price.toFixed(2)}`;
+function formatPrice(price: number | null, currency = "AUD"): string {
+  if (price === null) return "—";
+  const formatted = price.toLocaleString("en-AU", {
+    minimumFractionDigits: price >= 1000 ? 0 : 2,
+    maximumFractionDigits: price >= 1000 ? 1 : 2,
+  });
+  if (currency === "points") return formatted + " pts";
+  const unit = currency.includes("/") ? "/" + currency.split("/")[1] : "";
+  return (currency.startsWith("USD") ? "US$" : "A$") + formatted + unit;
 }
 
 function timeAgo(dateStr: string): string {
@@ -53,7 +65,15 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hrs / 24)}d`;
 }
 
-function MarketTile({ asset, active, onClick }: { asset: AssetData; active: boolean; onClick: () => void }) {
+function MarketTile({
+  asset,
+  active,
+  onClick,
+}: {
+  asset: AssetData;
+  active: boolean;
+  onClick: () => void;
+}) {
   const up = (asset.change24h ?? 0) >= 0;
   const data = asset.history.slice(-18);
 
@@ -62,32 +82,64 @@ function MarketTile({ asset, active, onClick }: { asset: AssetData; active: bool
       onClick={onClick}
       className={cn(
         "rounded-lg border bg-[var(--surface)] px-3 py-2 text-left transition-colors",
-        active ? "border-[var(--border-2)] bg-[var(--chip)]" : "border-[var(--border)] hover:bg-[var(--surface-2)]"
+        active
+          ? "border-[var(--border-2)] bg-[var(--chip)]"
+          : "border-[var(--border)] hover:bg-[var(--surface-2)]",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">{asset.symbol}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+          {asset.symbol}
+        </p>
         {asset.change24h !== null && (
-          <span className="flex items-center gap-0.5 text-[10.5px] font-semibold" style={{ color: up ? "var(--c-emerald)" : "var(--c-rose)" }}>
-            {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {up ? "+" : ""}{asset.change24h.toFixed(1)}%
+          <span
+            className="flex items-center gap-0.5 text-[10.5px] font-semibold"
+            style={{ color: up ? "var(--c-emerald)" : "var(--c-rose)" }}
+          >
+            {up ? (
+              <TrendingUp className="w-3 h-3" />
+            ) : (
+              <TrendingDown className="w-3 h-3" />
+            )}
+            {up ? "+" : ""}
+            {asset.change24h.toFixed(1)}%
           </span>
         )}
       </div>
       <div className="mt-1 flex items-end justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-[12px] font-semibold text-[var(--text)]">{asset.name}</p>
+          <p className="truncate text-[12px] font-semibold text-[var(--text)]">
+            {asset.name}
+          </p>
           {asset.price === null && asset.note ? (
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)]">{asset.note}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--faint)]">
+              {asset.note}
+            </p>
           ) : (
-            <p className="text-sm font-bold tabular text-[var(--text)]">{formatPrice(asset.price)}</p>
+            <p className="text-sm font-bold tabular text-[var(--text)]">
+              {formatPrice(asset.price, asset.currency)}
+            </p>
           )}
         </div>
-        <div className={cn("h-8 w-16 shrink-0", up ? "nx-chart-up" : "nx-chart-down")}>
+        <div
+          className={cn(
+            "h-8 w-16 shrink-0",
+            up ? "nx-chart-up" : "nx-chart-down",
+          )}
+        >
           {data.length > 1 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.map((d) => ({ value: d.v }))}>
-                <Area type="monotone" dataKey="value" stroke="var(--text)" strokeWidth={1.4} fill="var(--text)" fillOpacity={0.08} dot={false} />
+                <Area
+                  isAnimationActive={false}
+                  type="monotone"
+                  dataKey="value"
+                  stroke="var(--text)"
+                  strokeWidth={1.4}
+                  fill="var(--text)"
+                  fillOpacity={0.08}
+                  dot={false}
+                />
               </AreaChart>
             </ResponsiveContainer>
           ) : null}
@@ -107,22 +159,42 @@ function MarketChart({ asset }: { asset: AssetData | null }) {
   }
 
   const data = asset.history.map((d) => ({
-    date: new Date(d.t).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    date: new Date(d.t).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
     price: d.v,
   }));
   const up = (asset.change24h ?? 0) >= 0;
 
   return (
-    <section className={cn("rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4", up ? "nx-chart-up" : "nx-chart-down")}>
+    <section
+      className={cn(
+        "rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4",
+        up ? "nx-chart-up" : "nx-chart-down",
+      )}
+    >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Market detail</p>
-          <h2 className="mt-1 text-lg font-bold text-[var(--text)]">{asset.name}</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+            Market detail
+          </p>
+          <h2 className="mt-1 text-lg font-bold text-[var(--text)]">
+            {asset.name}
+          </h2>
         </div>
         <div className="text-right">
-          <p className="text-xl font-bold tabular text-[var(--text)]">{formatPrice(asset.price)}</p>
+          <p className="text-xl font-bold tabular text-[var(--text)]">
+            {formatPrice(asset.price, asset.currency)}
+          </p>
           {asset.change24h !== null && (
-            <p className="text-[12px] font-semibold tabular" style={{ color: up ? "var(--c-emerald)" : "var(--c-rose)" }}>{up ? "+" : ""}{asset.change24h.toFixed(2)}%</p>
+            <p
+              className="text-[12px] font-semibold tabular"
+              style={{ color: up ? "var(--c-emerald)" : "var(--c-rose)" }}
+            >
+              {up ? "+" : ""}
+              {asset.change24h.toFixed(2)}%
+            </p>
           )}
         </div>
       </div>
@@ -135,23 +207,67 @@ function MarketChart({ asset }: { asset: AssetData | null }) {
                 <stop offset="95%" stopColor="var(--text)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="date" tick={{ fill: "var(--faint)", fontSize: 10 }} tickLine={false} axisLine={false} interval={6} />
-            <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--faint)", fontSize: 10 }} tickLine={false} axisLine={false} width={52} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "var(--surface)", border: "1px solid var(--border-2)", borderRadius: "8px", color: "var(--text)", fontSize: "12px" }}
-              formatter={(v: unknown) => [formatPrice(Number(v)), asset.symbol]}
+            <XAxis
+              dataKey="date"
+              tick={{ fill: "var(--faint)", fontSize: 10 }}
+              tickLine={false}
+              axisLine={false}
+              interval={6}
             />
-            <Area type="monotone" dataKey="price" stroke="var(--text)" strokeWidth={2} fill="url(#market-detail)" dot={false} isAnimationActive={false} />
+            <YAxis
+              domain={["auto", "auto"]}
+              tick={{ fill: "var(--faint)", fontSize: 10 }}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--border-2)",
+                borderRadius: "8px",
+                color: "var(--text)",
+                fontSize: "12px",
+              }}
+              formatter={(v: unknown) => [
+                formatPrice(Number(v), asset.currency),
+                asset.symbol,
+              ]}
+            />
+            <Area
+              type="monotone"
+              dataKey="price"
+              stroke="var(--text)"
+              strokeWidth={2}
+              fill="url(#market-detail)"
+              dot={false}
+              isAnimationActive={false}
+            />
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex h-[170px] items-center justify-center text-sm text-[var(--muted)]">Chart data unavailable</div>
+        <div className="flex h-[170px] items-center justify-center text-sm text-[var(--muted)]">
+          Chart data unavailable
+        </div>
+      )}
+      {asset.note === "Yahoo Finance" && (
+        <p className="mt-2 text-[10px] text-[var(--muted)]">
+          Crypto chart source: Yahoo Finance
+        </p>
       )}
     </section>
   );
 }
 
-function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; articles: NewsArticle[]; newsLoading: boolean }) {
+function SocialHub({
+  prefs,
+  articles,
+  newsLoading,
+}: {
+  prefs: NewsPrefs;
+  articles: NewsArticle[];
+  newsLoading: boolean;
+}) {
   const [category, setCategory] = useState<VideoCategory>("all");
   const [items, setItems] = useState<SocialFeedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -170,17 +286,29 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
   useEffect(() => {
     let cancelled = false;
     if (!feedQuery) {
-      Promise.resolve().then(() => { if (!cancelled) setItems([]); });
+      Promise.resolve().then(() => {
+        if (!cancelled) setItems([]);
+      });
       return;
     }
 
-    Promise.resolve().then(() => { if (!cancelled) setLoading(true); });
+    Promise.resolve().then(() => {
+      if (!cancelled) setLoading(true);
+    });
     apiFetch(`/api/social-feed?${feedQuery}`)
       .then((res) => res.json())
-      .then((data) => { if (!cancelled) setItems(data.items ?? []); })
-      .catch(() => { if (!cancelled) setItems([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((data) => {
+        if (!cancelled) setItems(data.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [feedQuery]);
 
   const filteredItems = useMemo(() => {
@@ -190,23 +318,38 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
     });
   }, [items, category]);
 
-  const youtubeItems = filteredItems.filter((item) => item.sourceType === "youtube");
-  const redditItems = filteredItems.filter((item) => item.sourceType === "reddit");
+  const youtubeItems = filteredItems.filter(
+    (item) => item.sourceType === "youtube",
+  );
+  const redditItems = filteredItems.filter(
+    (item) => item.sourceType === "reddit",
+  );
   const xItems = filteredItems.filter((item) => item.sourceType === "x");
 
   return (
     <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Content radar</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+            Content radar
+          </p>
           <h2 className="text-lg font-bold text-[var(--text)]">Social feeds</h2>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/settings" className="flex h-8 items-center justify-center rounded-lg border border-[var(--border)] px-2.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--text)]">
+          <Link
+            href="/settings?section=news"
+            className="flex h-8 items-center justify-center rounded-lg border border-[var(--border)] px-2.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--text)]"
+          >
             Edit sources
           </Link>
-          <button onClick={refresh} disabled={loading || !feedQuery} className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-40">
-            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          <button
+            onClick={refresh}
+            disabled={loading || !feedQuery}
+            className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-40"
+          >
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", loading && "animate-spin")}
+            />
             Refresh
           </button>
         </div>
@@ -214,11 +357,17 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
 
       <div className="mb-4">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Headlines</p>
-          <span className="text-[11px] text-[var(--faint)]">{articles.length} stories</span>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+            Headlines
+          </p>
+          <span className="text-[11px] text-[var(--faint)]">
+            {articles.length} stories
+          </span>
         </div>
         {newsLoading ? (
-          <div className="flex h-28 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg)]"><Loader2 className="h-5 w-5 animate-spin text-[var(--text)]" /></div>
+          <div className="flex h-28 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg)]">
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--text)]" />
+          </div>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
             {articles.slice(0, 24).map((article, i) => (
@@ -230,61 +379,116 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
                 className="group flex min-h-[104px] w-[240px] shrink-0 flex-col rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 transition-colors hover:bg-[var(--surface-2)]"
               >
                 <div className="mb-1.5 flex items-center gap-2">
-                  <span className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">{article.category}</span>
-                  <span className="truncate text-[11px] font-medium text-[var(--muted)]">{article.source}</span>
-                  <span className="ml-auto shrink-0 text-[11px] text-[var(--faint)]">{timeAgo(article.pubDate)}</span>
+                  <span className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    {article.category}
+                  </span>
+                  <span className="truncate text-[11px] font-medium text-[var(--muted)]">
+                    {article.source}
+                  </span>
+                  <span className="ml-auto shrink-0 text-[11px] text-[var(--faint)]">
+                    {timeAgo(article.pubDate)}
+                  </span>
                 </div>
-                <p className="line-clamp-3 text-[13px] font-semibold leading-snug text-[var(--text)]">{article.title}</p>
+                <p className="line-clamp-3 text-[13px] font-semibold leading-snug text-[var(--text)]">
+                  {article.title}
+                </p>
               </a>
             ))}
             {articles.length === 0 && (
-              <div className="flex h-28 min-w-[280px] items-center justify-center rounded-lg border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">No headlines available.</div>
+              <div className="flex h-28 min-w-[280px] items-center justify-center rounded-lg border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">
+                No headlines available.
+              </div>
             )}
           </div>
         )}
       </div>
 
       <div className="mb-4 flex flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-1">
-        {(["all", "crypto", "ai", "irl", "gaming", "general"] as const).map((item) => (
-          <button key={item} onClick={() => setCategory(item)} className={cn("rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors", category === item ? "bg-[var(--text)] text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--text)]")}>
-            {CATEGORY_LABEL[item]}
-          </button>
-        ))}
+        {(["all", "crypto", "ai", "irl", "gaming", "general"] as const).map(
+          (item) => (
+            <button
+              key={item}
+              onClick={() => setCategory(item)}
+              className={cn(
+                "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                category === item
+                  ? "bg-[var(--text)] text-[var(--bg)]"
+                  : "text-[var(--muted)] hover:text-[var(--text)]",
+              )}
+            >
+              {CATEGORY_LABEL[item]}
+            </button>
+          ),
+        )}
       </div>
 
       {loading ? (
-        <div className="flex h-60 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[var(--text)]" /></div>
+        <div className="flex h-60 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--text)]" />
+        </div>
       ) : (
         <div className="space-y-5">
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">YouTube</p>
-              <span className="text-[11px] text-[var(--faint)]">{youtubeItems.length} videos</span>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+                YouTube
+              </p>
+              <span className="text-[11px] text-[var(--faint)]">
+                {youtubeItems.length} videos
+              </span>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
               {youtubeItems.map((item) => (
-                <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer" className="group w-[260px] shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 transition-colors hover:bg-[var(--surface-2)]">
+                <a
+                  key={item.id}
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group w-[260px] shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 transition-colors hover:bg-[var(--surface-2)]"
+                >
                   <div className="aspect-video overflow-hidden rounded-md bg-[var(--chip)]">
                     {item.thumbnail ? (
-                      <BaseImage src={item.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" loading="lazy" />
+                      <BaseImage
+                        src={item.thumbnail}
+                        alt=""
+                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        loading="lazy"
+                      />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-[11px] text-[var(--faint)]">No thumbnail</div>
+                      <div className="flex h-full items-center justify-center text-[11px] text-[var(--faint)]">
+                        No thumbnail
+                      </div>
                     )}
                   </div>
                   <div className="min-w-0 pt-2">
                     <div className="mb-1 flex items-center gap-2">
-                      <span className="truncate text-[11px] font-medium text-[var(--muted)]">{item.source}</span>
-                      <span className="text-[11px] text-[var(--faint)]">{timeAgo(item.publishedAt)}</span>
+                      <span className="truncate text-[11px] font-medium text-[var(--muted)]">
+                        {item.source}
+                      </span>
+                      <span className="text-[11px] text-[var(--faint)]">
+                        {timeAgo(item.publishedAt)}
+                      </span>
                     </div>
-                    <p className="line-clamp-2 text-sm font-semibold leading-snug text-[var(--text)]">{item.title}</p>
-                    {item.description && <p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">{item.description}</p>}
+                    <p className="line-clamp-2 text-sm font-semibold leading-snug text-[var(--text)]">
+                      {item.title}
+                    </p>
+                    {item.description && (
+                      <p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
+                        {item.description}
+                      </p>
+                    )}
                   </div>
                 </a>
               ))}
               {youtubeItems.length === 0 && (
                 <div className="flex h-40 min-w-[280px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">
                   <p>No YouTube videos for this filter.</p>
-                  <Link href="/settings" className="text-xs font-semibold text-[var(--text)] hover:opacity-70">Edit YouTube sources</Link>
+                  <Link
+                    href="/settings?section=news"
+                    className="text-xs font-semibold text-[var(--text)] hover:opacity-70"
+                  >
+                    Edit YouTube sources
+                  </Link>
                 </div>
               )}
             </div>
@@ -292,25 +496,52 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Reddit</p>
-              <span className="text-[11px] text-[var(--faint)]">{redditItems.length} posts</span>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+                Reddit
+              </p>
+              <span className="text-[11px] text-[var(--faint)]">
+                {redditItems.length} posts
+              </span>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
               {redditItems.map((item) => (
-                <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer" className="group min-h-[122px] w-[280px] shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 transition-colors hover:bg-[var(--surface-2)]">
+                <a
+                  key={item.id}
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group min-h-[122px] w-[280px] shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 transition-colors hover:bg-[var(--surface-2)]"
+                >
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--muted)]">Reddit</span>
-                    <span className="truncate text-[11px] font-medium text-[var(--muted)]">{item.source}</span>
-                    <span className="ml-auto text-[11px] text-[var(--faint)]">{timeAgo(item.publishedAt)}</span>
+                    <span className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                      Reddit
+                    </span>
+                    <span className="truncate text-[11px] font-medium text-[var(--muted)]">
+                      {item.source}
+                    </span>
+                    <span className="ml-auto text-[11px] text-[var(--faint)]">
+                      {timeAgo(item.publishedAt)}
+                    </span>
                   </div>
-                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-[var(--text)]">{item.title}</p>
-                  {item.description && <p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">{item.description}</p>}
+                  <p className="line-clamp-2 text-sm font-semibold leading-snug text-[var(--text)]">
+                    {item.title}
+                  </p>
+                  {item.description && (
+                    <p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
+                      {item.description}
+                    </p>
+                  )}
                 </a>
               ))}
               {redditItems.length === 0 && (
                 <div className="flex h-32 min-w-[280px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">
                   <p>No Reddit sources configured.</p>
-                  <Link href="/settings" className="text-xs font-semibold text-[var(--text)] hover:opacity-70">Edit Reddit sources</Link>
+                  <Link
+                    href="/settings?section=news"
+                    className="text-xs font-semibold text-[var(--text)] hover:opacity-70"
+                  >
+                    Edit Reddit sources
+                  </Link>
                 </div>
               )}
             </div>
@@ -318,25 +549,52 @@ function SocialHub({ prefs, articles, newsLoading }: { prefs: NewsPrefs; article
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">X</p>
-              <span className="text-[11px] text-[var(--faint)]">{xItems.length} posts</span>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+                X
+              </p>
+              <span className="text-[11px] text-[var(--faint)]">
+                {xItems.length} posts
+              </span>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
               {xItems.map((item) => (
-                <a key={item.id} href={item.link} target="_blank" rel="noopener noreferrer" className="group min-h-[142px] w-[280px] shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 transition-colors hover:bg-[var(--surface-2)]">
+                <a
+                  key={item.id}
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group min-h-[142px] w-[280px] shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 transition-colors hover:bg-[var(--surface-2)]"
+                >
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--muted)]">X</span>
-                    <span className="truncate text-[11px] font-medium text-[var(--muted)]">{item.source}</span>
-                    <span className="ml-auto text-[11px] text-[var(--faint)]">{timeAgo(item.publishedAt)}</span>
+                    <span className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                      X
+                    </span>
+                    <span className="truncate text-[11px] font-medium text-[var(--muted)]">
+                      {item.source}
+                    </span>
+                    <span className="ml-auto text-[11px] text-[var(--faint)]">
+                      {timeAgo(item.publishedAt)}
+                    </span>
                     <ExternalLink className="ml-auto h-3.5 w-3.5 text-[var(--faint)] group-hover:text-[var(--text)]" />
                   </div>
-                  <p className="line-clamp-4 whitespace-pre-line text-sm font-semibold leading-snug text-[var(--text)]">{item.title}</p>
+                  <p className="line-clamp-4 whitespace-pre-line text-sm font-semibold leading-snug text-[var(--text)]">
+                    {item.title}
+                  </p>
                 </a>
               ))}
               {xItems.length === 0 && (
                 <div className="flex h-32 min-w-[280px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border)] px-4 text-center text-sm text-[var(--muted)]">
-                  <p>{prefs.x.length ? "No X posts available. Add X_BEARER_TOKEN to enable synced post fetching." : "No X accounts configured."}</p>
-                  <Link href="/settings" className="text-xs font-semibold text-[var(--text)] hover:opacity-70">Edit X sources</Link>
+                  <p>
+                    {prefs.x.length
+                      ? "No X posts available. Add X_BEARER_TOKEN to enable synced post fetching."
+                      : "No X accounts configured."}
+                  </p>
+                  <Link
+                    href="/settings?section=news"
+                    className="text-xs font-semibold text-[var(--text)] hover:opacity-70"
+                  >
+                    Edit X sources
+                  </Link>
                 </div>
               )}
             </div>
@@ -359,7 +617,12 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
-    prefs.creators.forEach((creator) => params.append("creator", `${creator.platform}|${creator.handle}|${creator.name}`));
+    prefs.creators.forEach((creator) =>
+      params.append(
+        "creator",
+        `${creator.platform}|${creator.handle}|${creator.name}`,
+      ),
+    );
     return params.toString();
   }, [prefs.creators]);
 
@@ -376,46 +639,96 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
   useEffect(() => {
     let cancelled = false;
     if (!query) {
-      Promise.resolve().then(() => { if (!cancelled) setItems([]); });
+      Promise.resolve().then(() => {
+        if (!cancelled) setItems([]);
+      });
       return;
     }
 
-    Promise.resolve().then(() => { if (!cancelled) setLoading(true); });
+    Promise.resolve().then(() => {
+      if (!cancelled) setLoading(true);
+    });
     apiFetch(`/api/live-status?${query}`)
       .then((res) => res.json())
-      .then((data) => { if (!cancelled) setItems(data.items ?? []); })
-      .catch(() => { if (!cancelled) setItems([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((data) => {
+        if (!cancelled) setItems(data.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [query]);
 
   return (
     <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Live watch</p>
-          <h2 className="text-base font-bold text-[var(--text)]">Twitch / Kick</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+            Live watch
+          </p>
+          <h2 className="text-base font-bold text-[var(--text)]">
+            Twitch / Kick
+          </h2>
         </div>
-        <button onClick={refresh} disabled={loading || !query} className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)] disabled:opacity-40" title="Refresh live status">
+        <button
+          onClick={refresh}
+          disabled={loading || !query}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)] disabled:opacity-40"
+          title="Refresh live status"
+        >
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </button>
       </div>
 
       <div className="max-h-[330px] space-y-2 overflow-y-auto pr-1">
         {items.map((creator) => (
-          <div key={creator.id} className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2">
+          <div
+            key={creator.id}
+            className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2"
+          >
             <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--chip)]">
-              <BaseImage src={creator.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <BaseImage
+                src={creator.avatarUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold text-[var(--text)]">{creator.name}</p>
-                <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide", statusStyle(creator.status))}>{creator.status}</span>
+                <p className="truncate text-sm font-semibold text-[var(--text)]">
+                  {creator.name}
+                </p>
+                <span
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                    statusStyle(creator.status),
+                  )}
+                >
+                  {creator.status}
+                </span>
               </div>
-              <p className="truncate text-[11px] uppercase tracking-wide text-[var(--faint)]">{creator.platform} · @{creator.handle}</p>
-              {creator.title && <p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">{creator.title}</p>}
+              <p className="truncate text-[11px] uppercase tracking-wide text-[var(--faint)]">
+                {creator.platform} · @{creator.handle}
+              </p>
+              {creator.title && (
+                <p className="mt-0.5 truncate text-[11px] text-[var(--muted)]">
+                  {creator.title}
+                </p>
+              )}
             </div>
-            <a href={creator.url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)]" title="Open channel">
+            <a
+              href={creator.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--text)]"
+              title="Open channel"
+            >
               <ExternalLink className="h-4 w-4" />
             </a>
           </div>
@@ -423,7 +736,12 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
         {items.length === 0 && (
           <div className="rounded-lg border border-dashed border-[var(--border)] px-3 py-6 text-center text-xs text-[var(--muted)]">
             <p>No live creators configured.</p>
-            <Link href="/settings" className="mt-2 inline-block font-semibold text-[var(--text)] hover:opacity-70">Edit in Settings</Link>
+            <Link
+              href="/settings?section=news"
+              className="mt-2 inline-block font-semibold text-[var(--text)] hover:opacity-70"
+            >
+              Edit in Settings
+            </Link>
           </div>
         )}
       </div>
@@ -433,50 +751,72 @@ function LiveTracker({ prefs }: { prefs: NewsPrefs }) {
 function NewsBriefing() {
   const { data } = useBase();
   const settings = normalizeAiSettings(data.aiSettings ?? DEFAULT_AI_SETTINGS);
-  const [state, setState] = useState<{ loading: boolean; summary?: string; generatedAt?: string; error?: string }>({ loading: true });
+  const [state, setState] = useState<{
+    loading: boolean;
+    summary?: string;
+    generatedAt?: string;
+    error?: string;
+  }>({ loading: true });
 
-  async function fetchBriefing(signal?: AbortSignal): Promise<typeof state> {
-    try {
-      let apiKey: string | undefined;
-      if (hasSavedKey(settings)) {
-        const password = sessionSecret();
-        if (!password) return { loading: false, error: "Your briefing key is locked. Unlock it in Settings → News briefing." };
-        apiKey = (await decryptSecret(settings.keyCipher!, settings.keySalt!, password)) ?? undefined;
-      }
-      const res = await apiFetch("/api/news/summary", {
-        method: "POST", headers: { "Content-Type": "application/json" }, signal,
-        body: JSON.stringify({ model: settings.model, apiKey }),
-      });
-      const result = await res.json();
-      return result.ok ? { loading: false, summary: result.summary, generatedAt: result.generatedAt } : { loading: false, error: result.error || "Couldn't load the briefing." };
-    } catch (error) { return { loading: false, error: String((error as Error)?.message || error) }; }
-  }
-  const load = async () => { setState(previous => ({ ...previous,loading: true }));setState(await fetchBriefing()); };
+  const fetchBriefing = (signal?: AbortSignal) =>
+    loadNewsBriefing(settings, signal);
+  const load = async () => {
+    setState((previous) => ({ ...previous, loading: true }));
+    setState(await fetchBriefing());
+  };
   useEffect(() => {
     if (!settings.briefingEnabled) return;
     const controller = new AbortController();
-    void fetchBriefing(controller.signal).then(result => { if (!controller.signal.aborted) setState(result); });
+    void fetchBriefing(controller.signal).then((result) => {
+      if (!controller.signal.aborted) setState(result);
+    });
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.briefingEnabled, settings.model]);
+  }, [
+    settings.briefingEnabled,
+    settings.model,
+    settings.keyCipher,
+    settings.keySalt,
+  ]);
 
   if (!settings.briefingEnabled) return null;
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="mb-3 flex items-center justify-between">
-        <p className="flex items-center gap-2 text-sm font-bold text-[var(--text)]"><Sparkles className="h-4 w-4" strokeWidth={1.9} /> Hourly briefing</p>
+        <p className="flex items-center gap-2 text-sm font-bold text-[var(--text)]">
+          <Sparkles className="h-4 w-4" strokeWidth={1.9} /> Hourly briefing
+        </p>
         <div className="flex items-center gap-2">
-          {state.generatedAt && <span className="text-[11px] text-[var(--muted)]">Updated {timeAgo(state.generatedAt)}</span>}
-          <button onClick={load} disabled={state.loading} title="Refresh" className="rounded p-1 text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-40"><RefreshCw className={cn("h-3.5 w-3.5", state.loading && "animate-spin")} /></button>
+          {state.generatedAt && (
+            <span className="text-[11px] text-[var(--muted)]">
+              Updated {timeAgo(state.generatedAt)}
+            </span>
+          )}
+          <button
+            onClick={load}
+            disabled={state.loading}
+            title="Refresh"
+            className="rounded p-1 text-[var(--faint)] hover:text-[var(--text)] disabled:opacity-40"
+          >
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", state.loading && "animate-spin")}
+            />
+          </button>
         </div>
       </div>
       {state.loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-[var(--faint)]"><Loader2 className="h-4 w-4 animate-spin" /> Summarising the latest headlines…</div>
+        <div className="flex items-center gap-2 text-[13px] text-[var(--faint)]">
+          <Loader2 className="h-4 w-4 animate-spin" /> Summarising the latest
+          headlines…
+        </div>
       ) : state.error ? (
         <p className="text-[13px] text-[var(--faint)]">{state.error}</p>
       ) : (
-        <div className="nx-md text-[13.5px]" dangerouslySetInnerHTML={{ __html: mdToHtml(state.summary || "") }} />
+        <div
+          className="nx-md text-[13.5px]"
+          dangerouslySetInnerHTML={{ __html: mdToHtml(state.summary || "") }}
+        />
       )}
     </div>
   );
@@ -487,6 +827,8 @@ export function NewsPage() {
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [chartsLoading, setChartsLoading] = useState(true);
   const [newsLoading, setNewsLoading] = useState(true);
+  const [marketError, setMarketError] = useState("");
+  const [newsError, setNewsError] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [mktPage, setMktPage] = useState(0);
@@ -494,7 +836,11 @@ export function NewsPage() {
   const { data } = useBase();
   const prefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
 
-  const selectedAsset = assets.find((asset) => asset.id === selectedAssetId) ?? assets[3] ?? assets[0] ?? null;
+  const selectedAsset =
+    assets.find((asset) => asset.id === selectedAssetId) ??
+    assets[3] ??
+    assets[0] ??
+    null;
 
   // Market widgets are capped at 3 rows and paged with arrows. Column count is
   // responsive so "3 rows" stays accurate across breakpoints.
@@ -503,92 +849,178 @@ export function NewsPage() {
     const mq4 = window.matchMedia("(min-width: 1024px)");
     const update = () => setCols(mq4.matches ? 4 : mq3.matches ? 3 : 2);
     update();
-    mq3.addEventListener("change", update); mq4.addEventListener("change", update);
-    return () => { mq3.removeEventListener("change", update); mq4.removeEventListener("change", update); };
+    mq3.addEventListener("change", update);
+    mq4.addEventListener("change", update);
+    return () => {
+      mq3.removeEventListener("change", update);
+      mq4.removeEventListener("change", update);
+    };
   }, []);
   const pageSize = cols * 3;
   const pageCount = Math.max(1, Math.ceil(assets.length / pageSize));
   const mktPageClamped = Math.min(mktPage, pageCount - 1);
-  const visibleAssets = assets.slice(mktPageClamped * pageSize, mktPageClamped * pageSize + pageSize);
+  const visibleAssets = assets.slice(
+    mktPageClamped * pageSize,
+    mktPageClamped * pageSize + pageSize,
+  );
 
-  function loadAll() {
-    setChartsLoading(true);
-    setNewsLoading(true);
-    apiFetch("/api/market/charts")
-      .then((res) => res.json())
-      .then((data) => {
-        const nextAssets = data.assets ?? [];
-        setAssets(nextAssets);
-        setSelectedAssetId((current) => current ?? nextAssets[3]?.id ?? nextAssets[0]?.id ?? null);
-      })
-      .catch(() => setAssets([]))
-      .finally(() => setChartsLoading(false));
-
-    apiFetch("/api/news")
-      .then((res) => res.json())
-      .then((data) => setNews(data.articles ?? []))
-      .catch(() => setNews([]))
-      .finally(() => {
-        setNewsLoading(false);
-        setLastRefreshed(new Date());
-      });
-  }
-
+  const newsQuery =
+    prefs.newsSources === undefined
+      ? ""
+      : "?sources=" + encodeURIComponent(prefs.newsSources.join(","));
+  const loadAll = useCallback(
+    async (signal?: AbortSignal) => {
+      setChartsLoading(true);
+      setNewsLoading(true);
+      setMarketError("");
+      setNewsError("");
+      await Promise.allSettled([
+        (async () => {
+          try {
+            const res = await apiFetch("/api/market/charts", { signal });
+            const value = await res.json();
+            if (!res.ok || !Array.isArray(value.assets))
+              throw new Error(value.error || "Markets could not refresh.");
+            if (signal?.aborted) return;
+            setAssets(value.assets);
+            setSelectedAssetId(
+              (current) =>
+                current ?? value.assets[3]?.id ?? value.assets[0]?.id ?? null,
+            );
+            if (!value.assets.some((asset: AssetData) => asset.price !== null))
+              setMarketError(
+                "Price providers are unavailable. Try refreshing later.",
+              );
+          } catch (e) {
+            if (!signal?.aborted)
+              setMarketError(
+                e instanceof Error ? e.message : "Markets could not refresh.",
+              );
+          } finally {
+            if (!signal?.aborted) setChartsLoading(false);
+          }
+        })(),
+        (async () => {
+          try {
+            const res = await apiFetch("/api/news" + newsQuery, { signal });
+            const value = await res.json();
+            if (!res.ok || !Array.isArray(value.articles))
+              throw new Error(value.error || "News could not refresh.");
+            if (signal?.aborted) return;
+            setNews(value.articles);
+            setLastRefreshed(new Date());
+          } catch (e) {
+            if (!signal?.aborted)
+              setNewsError(
+                e instanceof Error ? e.message : "News could not refresh.",
+              );
+          } finally {
+            if (!signal?.aborted) setNewsLoading(false);
+          }
+        })(),
+      ]);
+    },
+    [newsQuery],
+  );
   useEffect(() => {
-    let cancelled = false;
-    apiFetch("/api/market/charts")
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        const nextAssets = data.assets ?? [];
-        setAssets(nextAssets);
-        setSelectedAssetId(nextAssets[3]?.id ?? nextAssets[0]?.id ?? null);
-      })
-      .catch(() => { if (!cancelled) setAssets([]); })
-      .finally(() => { if (!cancelled) setChartsLoading(false); });
-
-    apiFetch("/api/news")
-      .then((res) => res.json())
-      .then((data) => { if (!cancelled) setNews(data.articles ?? []); })
-      .catch(() => { if (!cancelled) setNews([]); })
-      .finally(() => {
-        if (!cancelled) {
-          setNewsLoading(false);
-          setLastRefreshed(new Date());
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, []);
+    const controller = new AbortController();
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) void loadAll(controller.signal);
+    });
+    const changed = () => void loadAll(controller.signal);
+    window.addEventListener("base:integrations-changed", changed);
+    return () => {
+      controller.abort();
+      window.removeEventListener("base:integrations-changed", changed);
+    };
+  }, [loadAll]);
 
   return (
     <div className="base-page news-page min-h-full">
-      <PageHeading title="News" description="Your daily briefing, markets and creators.">
+      <PageHeading
+        title="News"
+        description="Your daily briefing, markets and creators."
+      >
         <div className="flex items-center gap-3">
-          {lastRefreshed && <span className="text-xs text-[var(--muted)]">Updated {lastRefreshed.toLocaleTimeString()}</span>}
-          <button onClick={loadAll} disabled={chartsLoading || newsLoading} className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-40">
-            <RefreshCw className={cn("h-3.5 w-3.5", (chartsLoading || newsLoading) && "animate-spin")} />
+          {lastRefreshed && (
+            <span className="text-xs text-[var(--muted)]">
+              Updated {lastRefreshed.toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={() => void loadAll()}
+            disabled={chartsLoading || newsLoading}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-40"
+          >
+            <RefreshCw
+              className={cn(
+                "h-3.5 w-3.5",
+                (chartsLoading || newsLoading) && "animate-spin",
+              )}
+            />
             Refresh
           </button>
         </div>
       </PageHeading>
 
+      {(marketError || newsError) && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-[var(--muted)]"
+        >
+          {marketError && <p>Markets: {marketError}</p>}
+          {newsError && <p>News: {newsError}</p>}
+          <p className="mt-1 text-xs">
+            Previously loaded content stays available. Refresh when connected.
+          </p>
+        </div>
+      )}
       <div className="mb-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div>
           {chartsLoading ? (
-            <div className="flex h-[74px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)]"><Loader2 className="h-5 w-5 animate-spin text-[var(--text)]" /></div>
+            <div className="flex h-[74px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--text)]" />
+            </div>
           ) : (
             <>
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+              <div
+                className="grid gap-2"
+                style={{
+                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                }}
+              >
                 {visibleAssets.map((asset) => (
-                  <MarketTile key={asset.id} asset={asset} active={selectedAsset?.id === asset.id} onClick={() => setSelectedAssetId(asset.id)} />
+                  <MarketTile
+                    key={asset.id}
+                    asset={asset}
+                    active={selectedAsset?.id === asset.id}
+                    onClick={() => setSelectedAssetId(asset.id)}
+                  />
                 ))}
               </div>
               {pageCount > 1 && (
                 <div className="mt-2.5 flex items-center justify-center gap-3">
-                  <button onClick={() => setMktPage(Math.max(0, mktPageClamped - 1))} disabled={mktPageClamped === 0} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:bg-transparent" aria-label="Previous markets"><ChevronLeft className="h-4 w-4" /></button>
-                  <span className="text-[11px] font-medium tabular text-[var(--faint)]">{mktPageClamped + 1} / {pageCount}</span>
-                  <button onClick={() => setMktPage(Math.min(pageCount - 1, mktPageClamped + 1))} disabled={mktPageClamped === pageCount - 1} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:bg-transparent" aria-label="More markets"><ChevronRight className="h-4 w-4" /></button>
+                  <button
+                    onClick={() => setMktPage(Math.max(0, mktPageClamped - 1))}
+                    disabled={mktPageClamped === 0}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:bg-transparent"
+                    aria-label="Previous markets"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-[11px] font-medium tabular text-[var(--faint)]">
+                    {mktPageClamped + 1} / {pageCount}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setMktPage(Math.min(pageCount - 1, mktPageClamped + 1))
+                    }
+                    disabled={mktPageClamped === pageCount - 1}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text)] disabled:opacity-30 disabled:hover:bg-transparent"
+                    aria-label="More markets"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               )}
             </>
@@ -610,7 +1042,10 @@ export function NewsPage() {
             <p className="text-xs leading-relaxed text-[var(--muted)]">
               Manage YouTube, Reddit, X, Twitch, and Kick sources from Settings.
             </p>
-            <Link href="/settings" className="mt-3 inline-flex h-8 items-center rounded-lg border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--text)] hover:bg-[var(--chip)]">
+            <Link
+              href="/settings?section=news"
+              className="mt-3 inline-flex h-8 items-center rounded-lg border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--text)] hover:bg-[var(--chip)]"
+            >
               Open Settings
             </Link>
           </div>

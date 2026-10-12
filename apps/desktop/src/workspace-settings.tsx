@@ -1,3 +1,4 @@
+import { BASE_CLOUD_URL } from "@/packages/core/src/service";
 import { useEffect, useState, useRef } from "react";
 import {
   Cloud,
@@ -54,19 +55,12 @@ export function WorkspaceSettings() {
   const confirm = useConfirm();
   const [mode, setMode] = useState<"local" | "cloud">(
     workspace?.workspaceId.startsWith("base_cloud_") ||
-      workspace?.origin === "https://base.lucasbrown.xyz"
+      workspace?.origin === BASE_CLOUD_URL
       ? "cloud"
       : "local",
   );
   const [method, setMethod] = useState<"run" | "connect">("run");
-  const [origin, setOrigin] = useState(
-    workspace?.origin || "https://base.lucasbrown.xyz",
-  );
-  const [cloudOrigin, setCloudOrigin] = useState(
-    workspace?.workspaceId.startsWith("base_cloud_")
-      ? workspace.origin
-      : "https://base.lucasbrown.xyz",
-  );
+  const [origin, setOrigin] = useState(workspace?.origin || BASE_CLOUD_URL);
   const [password, setPassword] = useState("");
   const [service, setService] = useState<Service | null>(null);
   const [detailResult, setDetailResult] = useState<{
@@ -368,7 +362,7 @@ export function WorkspaceSettings() {
               className="base-button base-button-primary"
               onClick={() =>
                 void action(async () => {
-                  await native("cloud_sign_in_start", { origin: cloudOrigin });
+                  await native("cloud_sign_in_start");
                   setSigningIn(true);
                 })
               }
@@ -399,17 +393,6 @@ export function WorkspaceSettings() {
               This request expires after ten minutes.
             </p>
           )}
-          <details className="mt-4 text-xs text-[var(--muted)]">
-            <summary>Connect to a staging cloud</summary>
-            <label className="grid gap-1 mt-2">
-              Cloud service URL
-              <input
-                type="url"
-                value={cloudOrigin}
-                onChange={(event) => setCloudOrigin(event.target.value)}
-              />
-            </label>
-          </details>
         </div>
       )}
       {details && workspace?.origin && (

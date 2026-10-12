@@ -1,9 +1,10 @@
 import { cachedFetch as fetch } from "./fetch.ts";
-export async function GET() {
+export async function GET(_request?: Request, apiKey?: string) {
   try {
     const response = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,hyperliquid&vs_currencies=usd",
       {
+        headers: apiKey ? { "x-cg-demo-api-key": apiKey } : undefined,
         next: { revalidate: 60 },
         signal: AbortSignal.timeout(15_000),
       } as RequestInit,

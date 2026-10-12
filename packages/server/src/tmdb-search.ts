@@ -16,17 +16,31 @@ export async function GET(request: Request, TMDB_KEY?: string) {
 
   if (!TMDB_KEY) {
     return Response.json(
-      { ok: false, configured: false, error: "TMDB_API_KEY isn't configured." },
+      {
+        ok: false,
+        configured: false,
+        error: "Connect TMDB in Settings → Integrations.",
+      },
       { status: 501 },
     );
   }
 
-  const url = `https://api.themoviedb.org/3/search/multi?api_key=${encodeURIComponent(TMDB_KEY)}&query=${encodeURIComponent(q)}&language=en-US&page=1`;
+  const params = new URLSearchParams({
+    query: q,
+    language: "en-US",
+    page: "1",
+  });
+  const bearer = !/^[a-f0-9]{32}$/i.test(TMDB_KEY);
+  if (!bearer) params.set("api_key", TMDB_KEY);
+  const url = `https://api.themoviedb.org/3/search/multi?${params}`;
 
   let data: { results?: unknown[] };
   try {
     const res = await fetch(url, {
-      headers: { accept: "application/json" },
+      headers: {
+        accept: "application/json",
+        ...(bearer ? { Authorization: `Bearer ${TMDB_KEY}` } : {}),
+      },
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`TMDB responded ${res.status}`);

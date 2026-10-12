@@ -43,6 +43,8 @@
     "allow-connect-hosted-workspace",
     "allow-cloud-sign-in-start",
     "allow-cloud-sign-in-finish",
-    "allow-download-workspace-file"
+    "allow-download-workspace-file",
+    "allow-integration-status",
+    "allow-set-integration-key"
   ]
 }

@@ -1,3 +1,6 @@
+import { GET as youtubeChannel } from "../../../packages/server/src/youtube-channel.ts";
+import { readCredential } from "./credentials.ts";
+import type { IntegrationProvider } from "../../../packages/core/src/providers.ts";
 import { summarize } from "../../../packages/server/src/news-summary.ts";
 import { GET as liveStatus } from "../../../packages/server/src/live-status.ts";
 import { GET as socialFeed } from "../../../packages/server/src/social-feed.ts";
@@ -20,6 +23,7 @@ const handlers: Record<string, (request: Request) => Promise<Response>> = {
   "/api/fx/rate": rate,
   "/api/news": news,
   "/api/youtube/oembed": youtube,
+  "/api/youtube/channel": youtubeChannel,
   "/api/wallet/balance": balance,
   "/api/wallet/tokens": tokens,
 };
@@ -32,9 +36,13 @@ const ttl: Record<string, number> = {
 export async function integration(
   env: Env,
   request: Request,
-  principal: Principal,
+  principal?: Principal,
 ) {
   const url = new URL(request.url);
+  const credential = async (provider: IntegrationProvider) =>
+    principal
+      ? readCredential(env, principal, provider)
+      : request.headers.get(`X-Base-Key-${provider}`) || undefined;
   if (
     url.pathname === "/api/news/summary" &&
     ["GET", "POST"].includes(request.method)
@@ -52,18 +60,37 @@ export async function integration(
             expirationTtl: options.ex,
           }),
       },
-      `workspace:${principal.workspace.id}:`,
+      `workspace:${principal?.workspace.id ?? "public"}:`,
       true,
     );
   }
   if (url.pathname === "/api/tmdb/search")
-    return tmdb(request, env.TMDB_API_KEY);
-  const handler = handlers[url.pathname];
+    return tmdb(request, await credential("tmdb"));
+  if (url.pathname === "/api/calcom/bookings")
+    return calcom(request, await credential("calcom"));
+  if (url.pathname === "/api/social-feed")
+    return socialFeed(request, await credential("x"));
+  const marketKey = ["/api/market/prices", "/api/market/charts"].includes(
+    url.pathname,
+  )
+    ? await credential("coingecko")
+    : undefined;
+  const handler =
+    url.pathname === "/api/market/charts"
+      ? (r: Request) => charts(r, marketKey)
+      : url.pathname === "/api/market/prices"
+        ? (r: Request) => prices(r, marketKey)
+        : handlers[url.pathname];
   if (!handler || request.method !== "GET") return null;
   // Only public market/news data is shared in disposable KV. Wallet addresses
   // and user-specific integration results never enter a cross-account cache.
   const seconds = ttl[url.pathname];
-  const key = seconds ? `public:${url.pathname}:${await sha(url.search)}` : "";
+  const key = seconds
+    ? "public-v2:" +
+      url.pathname +
+      ":" +
+      (await sha(url.search + (marketKey ? ":" + marketKey : "")))
+    : "";
   if (key) {
     try {
       const cached = await env.CACHE.get(key);

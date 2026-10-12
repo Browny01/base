@@ -70,9 +70,28 @@ export async function authenticate(
   env: Env,
   request: Request,
 ): Promise<Principal> {
-  const token = request.headers
-    .get("Authorization")
-    ?.match(/^Bearer (base_desktop_[\w-]{43})$/)?.[1];
+  const authorization = request.headers.get("Authorization");
+  const cookie = request.headers
+    .get("Cookie")
+    ?.split(";")
+    .map((value) => value.trim())
+    .find((value) => value.startsWith("__Host-base_session="))
+    ?.slice("__Host-base_session=".length);
+  const token =
+    authorization?.match(/^Bearer (base_desktop_[\w-]{43})$/)?.[1] ??
+    (!authorization && /^base_desktop_[\w-]{43}$/.test(cookie ?? "")
+      ? cookie
+      : undefined);
+  if (!authorization && token) {
+    const origin = request.headers.get("Origin");
+    if (
+      (origin && origin !== new URL(env.PUBLIC_URL).origin) ||
+      (!["GET", "HEAD"].includes(request.method) &&
+        origin !== new URL(env.PUBLIC_URL).origin) ||
+      request.headers.get("Sec-Fetch-Site") === "cross-site"
+    )
+      throw new HttpError(403, "Browser origin is not authorized");
+  }
   if (!token) throw new HttpError(401, "Unauthorized");
   const row = await env.DB.prepare(
     "SELECT w.*,s.device_id FROM sessions s JOIN devices d ON d.workspace_id=s.workspace_id AND d.id=s.device_id JOIN workspaces w ON w.id=s.workspace_id JOIN accounts a ON a.id=w.owner_id WHERE s.hash=? AND s.expires>? AND d.enabled=1 AND a.status='active'",
@@ -83,6 +102,12 @@ export async function authenticate(
     throw new HttpError(
       401,
       "Session expired or device revoked. Your offline changes are retained.",
+    );
+  const expectedWorkspace = request.headers.get("X-Base-Workspace");
+  if (expectedWorkspace && expectedWorkspace !== row.id)
+    throw new HttpError(
+      409,
+      "Your browser is signed in to a different workspace. Cached records and offline edits remain separate.",
     );
   // Once a day, on actual requests only; no periodic heartbeat or idle timer.
   await env.DB.prepare(
@@ -282,7 +307,7 @@ export function signInPage(env: Env, flow: string | null, account = false) {
     throw new HttpError(400, "Open Sign in from the Base app");
   const flowJson = JSON.stringify(flow),
     keyJson = JSON.stringify(env.CLERK_PUBLISHABLE_KEY ?? "");
-  const code = `const clerk=window.Clerk;await clerk.load({publishableKey:${keyJson}});const root=document.getElementById('clerk');const approve=document.getElementById('approve');if(${account}){if(clerk.user)clerk.mountUserProfile(root);else clerk.mountSignIn(root);return;}const update=()=>{if(clerk.user){root.replaceChildren();const label=document.createElement('p');label.textContent='Connect Base desktop as '+(clerk.user.primaryEmailAddress?.emailAddress||clerk.user.fullName||'your account');root.append(label);const change=document.createElement('button');change.textContent='Use another account';change.onclick=()=>clerk.signOut();root.append(change);approve.hidden=false;}else{clerk.mountSignIn(root);approve.hidden=true;}};clerk.addListener(update);update();approve.onclick=async()=>{approve.disabled=true;try{const token=await clerk.session.getToken();const result=await fetch('/api/auth/device/approve',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({id:${flowJson}})});const value=await result.json();if(!result.ok)throw new Error(value.error);document.getElementById('status').textContent='Connected. Return to Base and click Complete sign-in.';}catch(e){document.getElementById('status').textContent=e.message;approve.disabled=false;}};`;
+  const code = `const clerk=window.Clerk;await clerk.load({publishableKey:${keyJson}});const root=document.getElementById('clerk');const approve=document.getElementById('approve');if(${account}){if(clerk.user)clerk.mountUserProfile(root);else clerk.mountSignIn(root,{forceRedirectUrl:window.location.href,signUpForceRedirectUrl:window.location.href});return;}const update=()=>{if(clerk.user){root.replaceChildren();const label=document.createElement('p');label.textContent='Connect Base desktop as '+(clerk.user.primaryEmailAddress?.emailAddress||clerk.user.fullName||'your account');root.append(label);const change=document.createElement('button');change.textContent='Use another account';change.onclick=()=>clerk.signOut();root.append(change);approve.hidden=false;}else{clerk.mountSignIn(root,{forceRedirectUrl:window.location.href,signUpForceRedirectUrl:window.location.href});approve.hidden=true;}};clerk.addListener(update);update();approve.onclick=async()=>{approve.disabled=true;try{const token=await clerk.session.getToken();const result=await fetch('/api/auth/device/approve',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({id:${flowJson}})});const value=await result.json();if(!result.ok)throw new Error(value.error);document.getElementById('status').textContent='Connected. Return to Base and click Complete sign-in.';}catch(e){document.getElementById('status').textContent=e.message;approve.disabled=false;}};`;
   return clerkPage(
     env,
     code,
@@ -394,4 +419,46 @@ export async function rateLimit(
       429,
       "Too many attempts. Please wait a minute before trying again.",
     );
+}
+
+export async function browserSignIn(
+  env: Env,
+  request: Request,
+  input: Record<string, unknown>,
+) {
+  if (request.headers.get("Origin") !== new URL(env.PUBLIC_URL).origin)
+    throw new HttpError(403, "Browser origin is not authorized");
+  if (
+    typeof input.deviceId !== "string" ||
+    !/^browser-[A-Za-z0-9_-]{1,100}$/.test(input.deviceId)
+  )
+    throw new HttpError(400, "Invalid browser device");
+  const verifier = random();
+  const flow = await beginDevice(env, {
+    challenge: await sha(verifier),
+    deviceId: input.deviceId,
+  });
+  await approveDevice(env, request, { id: flow.id });
+  const session = await exchangeDevice(env, { id: flow.id, verifier });
+  await env.DB.prepare(
+    "UPDATE devices SET label='Base web' WHERE workspace_id=? AND id=?",
+  )
+    .bind(session.workspaceId, input.deviceId)
+    .run();
+  return new Response(
+    JSON.stringify({
+      workspaceId: session.workspaceId,
+      deviceId: session.deviceId,
+    }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "Set-Cookie":
+          "__Host-base_session=" +
+          session.token +
+          "; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=Strict",
+      },
+    },
+  );
 }

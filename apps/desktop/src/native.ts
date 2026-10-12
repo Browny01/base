@@ -1,33 +1,77 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { BaseData } from "@/lib/store";
-import type { Document, Operation, Conflict } from "@/packages/sync/src/protocol";
+import type {
+  Document,
+  Operation,
+  Conflict,
+} from "@/packages/sync/src/protocol";
 export type Workspace = {
-  scope: string; origin: string; workspaceId: string;
-  document: Document; baseline: Document; revision: number; localRevision: number;
-  pending: Operation[]; conflicts: Conflict[];
+  scope: string;
+  origin: string;
+  workspaceId: string;
+  document: Document;
+  baseline: Document;
+  revision: number;
+  localRevision: number;
+  pending: Operation[];
+  conflicts: Conflict[];
 };
 export { isTauri };
-export function native<T>(command: string, args: Record<string, unknown> = {}): Promise<T> {
-  if (!isTauri()) return Promise.reject(new Error("Open the installed desktop app to use SQLite and native services."));
+export function native<T>(
+  command: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
+  if (!isTauri())
+    return import("./browser-native").then((module) =>
+      module.browserCommand<T>(command, args),
+    );
   return invoke<T>(command, args);
 }
 export const encoded = (bytes: Uint8Array) => {
   let binary = "";
-  for (let i = 0; i < bytes.length; i += 16384) binary += String.fromCharCode(...bytes.subarray(i, i + 16384));
+  for (let i = 0; i < bytes.length; i += 16384)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 16384));
   return btoa(binary);
 };
-export async function request(scope: string, input: string, init: RequestInit = {}): Promise<Response> {
-  if (init.signal?.aborted) throw new DOMException("Request aborted", "AbortError");
+export async function request(
+  scope: string,
+  input: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  if (init.signal?.aborted)
+    throw new DOMException("Request aborted", "AbortError");
   const headers = new Headers(init.headers);
   let body: Uint8Array | undefined;
   if (typeof init.body === "string") body = new TextEncoder().encode(init.body);
-  else if (init.body instanceof Blob) { body = new Uint8Array(await init.body.arrayBuffer()); if (!headers.has("content-type")) headers.set("content-type", init.body.type); }
-  else if (init.body) throw new Error("Unsupported request body.");
-  const result = await native<{ status: number; contentType: string; bodyBase64: string; cached: boolean }>("api_request", {
-    scope, path: input, method: init.method ?? "GET", bodyBase64: body ? encoded(body) : null, contentType: headers.get("content-type"),
+  else if (init.body instanceof Blob) {
+    body = new Uint8Array(await init.body.arrayBuffer());
+    if (!headers.has("content-type"))
+      headers.set("content-type", init.body.type);
+  } else if (init.body) throw new Error("Unsupported request body.");
+  const result = await native<{
+    status: number;
+    contentType: string;
+    bodyBase64: string;
+    cached: boolean;
+  }>("api_request", {
+    scope,
+    path: input,
+    method: init.method ?? "GET",
+    bodyBase64: body ? encoded(body) : null,
+    contentType: headers.get("content-type"),
   });
-  if (init.signal?.aborted) throw new DOMException("Request aborted", "AbortError");
-  const bytes = Uint8Array.from(atob(result.bodyBase64), ch => ch.charCodeAt(0));
-  return new Response(bytes, { status: result.status, headers: { "Content-Type": result.contentType, ...(result.cached ? { "X-Base-Cached": "1" } : {}) } });
+  if (init.signal?.aborted)
+    throw new DOMException("Request aborted", "AbortError");
+  const bytes = Uint8Array.from(atob(result.bodyBase64), (ch) =>
+    ch.charCodeAt(0),
+  );
+  return new Response(bytes, {
+    status: result.status,
+    headers: {
+      "Content-Type": result.contentType,
+      ...(result.cached ? { "X-Base-Cached": "1" } : {}),
+    },
+  });
 }
-export const documentOf = (data: BaseData): Document => JSON.parse(JSON.stringify(data)) as Document;
+export const documentOf = (data: BaseData): Document =>
+  JSON.parse(JSON.stringify(data)) as Document;

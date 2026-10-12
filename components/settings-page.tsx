@@ -1,11 +1,32 @@
 "use client";
 
+import { NewsSourceSettings } from "./news-source-settings";
+import { IntegrationSettings } from "./integration-settings";
+
 import { readStored, writeStored } from "@/lib/prefs";
+import { hasCustomApiTransport } from "@/lib/api-client";
 import { ReorderList } from "./ui/reorder-list";
 import { PageHeading } from "./ui/page-heading";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Check, Eye, EyeOff, KeyRound, Layers, MonitorCog, Moon, PanelLeft, PanelBottom, PanelLeftClose, PanelLeftOpen, Play, Plus, Radio, Rss, Search, Settings, Sun, Trash2 } from "lucide-react";
+import {
+  Check,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Layers,
+  MonitorCog,
+  Moon,
+  PanelLeft,
+  PanelBottom,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Rss,
+  Settings,
+  Sun,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/lib/sidebar-context";
 import { useNavMode } from "@/lib/nav-mode-context";
@@ -22,15 +43,14 @@ import {
   type AiProvider,
   type AiSettings,
 } from "@/lib/ai-settings";
-import { decryptSecret, encryptSecret, clearSessionSecret, sessionSecret, setSessionSecret } from "@/lib/vault";
 import {
-  CATEGORY_LABEL,
-  DEFAULT_NEWS_PREFS,
-  uid,
-  type CreatorPlatform,
-  type NewsPrefs,
-  type YoutubeChannel,
-} from "@/lib/news-prefs";
+  decryptSecret,
+  encryptSecret,
+  clearSessionSecret,
+  sessionSecret,
+  setSessionSecret,
+} from "@/lib/vault";
+import { DEFAULT_NEWS_PREFS, type NewsPrefs } from "@/lib/news-prefs";
 import {
   ALL_PAGES,
   SETTINGS_PAGE,
@@ -39,150 +59,17 @@ import {
   type NavPrefs,
 } from "@/lib/nav-config";
 
-function SourceManager({ prefs, setPrefs }: { prefs: NewsPrefs; setPrefs: (prefs: NewsPrefs) => void }) {
-  const [youtubeName, setYoutubeName] = useState("");
-  const [youtubeId, setYoutubeId] = useState("");
-  const [youtubeCategory, setYoutubeCategory] = useState<YoutubeChannel["category"]>("general");
-  const [redditInput, setRedditInput] = useState("");
-  const [xInput, setXInput] = useState("");
-  const [creatorName, setCreatorName] = useState("");
-  const [creatorHandle, setCreatorHandle] = useState("");
-  const [creatorPlatform, setCreatorPlatform] = useState<CreatorPlatform>("twitch");
-
-  function update(next: NewsPrefs) {
-    setPrefs(next);
-  }
-
-  function addYoutube() {
-    if (!youtubeName.trim() || !youtubeId.trim()) return;
-    update({
-      ...prefs,
-      youtube: [...prefs.youtube, { id: uid(), name: youtubeName.trim(), channelId: youtubeId.trim(), category: youtubeCategory }],
-    });
-    setYoutubeName("");
-    setYoutubeId("");
-  }
-
-  function addReddit() {
-    if (!redditInput.trim()) return;
-    update({ ...prefs, reddit: [...new Set([...prefs.reddit, redditInput.trim().replace(/^r\//, "")])] });
-    setRedditInput("");
-  }
-
-  function addX() {
-    if (!xInput.trim()) return;
-    update({ ...prefs, x: [...new Set([...prefs.x, xInput.trim().replace(/^@/, "")])] });
-    setXInput("");
-  }
-
-  function addCreator() {
-    if (!creatorName.trim() || !creatorHandle.trim()) return;
-    update({
-      ...prefs,
-      creators: [...prefs.creators, { id: uid(), name: creatorName.trim(), handle: creatorHandle.trim().replace(/^@/, ""), platform: creatorPlatform }],
-    });
-    setCreatorName("");
-    setCreatorHandle("");
-  }
-
-  return (
-    <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 lg:col-span-2">
-      <div className="flex items-center gap-2 mb-5">
-        <Rss className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
-        <h2 className="text-sm font-bold text-[var(--text)]">News Sources</h2>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Play className="h-4 w-4 text-[var(--text)]" />
-            <p className="text-sm font-bold text-[var(--text)]">YouTube</p>
-          </div>
-          <div className="grid gap-2 md:grid-cols-[1fr_1.25fr_130px_36px]">
-            <input value={youtubeName} onChange={(e) => setYoutubeName(e.target.value)} placeholder="Channel name" className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm text-[var(--text)] outline-none" />
-            <input value={youtubeId} onChange={(e) => setYoutubeId(e.target.value)} placeholder="Channel ID (UC...)" className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm text-[var(--text)] outline-none" />
-            <select value={youtubeCategory} onChange={(e) => setYoutubeCategory(e.target.value as YoutubeChannel["category"])} className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 text-sm text-[var(--text)] outline-none">
-              {(["crypto", "ai", "irl", "gaming", "general"] as const).map((item) => <option key={item} value={item}>{CATEGORY_LABEL[item]}</option>)}
-            </select>
-            <button onClick={addYoutube} className="flex h-9 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--bg)]"><Plus className="h-4 w-4" /></button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {prefs.youtube.map((channel) => (
-              <button key={channel.id} onClick={() => update({ ...prefs, youtube: prefs.youtube.filter((item) => item.id !== channel.id) })} className="flex items-center gap-1 rounded-full bg-[var(--chip)] px-2 py-1 text-[11px] text-[var(--muted)] hover:text-[var(--text)]">
-                {channel.name} · {CATEGORY_LABEL[channel.category]}
-                <Trash2 className="h-3 w-3" />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Rss className="h-4 w-4 text-[var(--text)]" />
-              <p className="text-sm font-bold text-[var(--text)]">Reddit</p>
-            </div>
-            <div className="flex gap-2">
-              <input value={redditInput} onChange={(e) => setRedditInput(e.target.value)} placeholder="subreddit" className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm text-[var(--text)] outline-none" />
-              <button onClick={addReddit} className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--bg)]"><Plus className="h-4 w-4" /></button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {prefs.reddit.map((sub) => (
-                <button key={sub} onClick={() => update({ ...prefs, reddit: prefs.reddit.filter((item) => item !== sub) })} className="rounded-full bg-[var(--chip)] px-2 py-1 text-[11px] text-[var(--muted)] hover:text-[var(--text)]">r/{sub}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Search className="h-4 w-4 text-[var(--text)]" />
-              <p className="text-sm font-bold text-[var(--text)]">X Accounts</p>
-            </div>
-            <div className="flex gap-2">
-              <input value={xInput} onChange={(e) => setXInput(e.target.value)} placeholder="@handle" className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm text-[var(--text)] outline-none" />
-              <button onClick={addX} className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--bg)]"><Plus className="h-4 w-4" /></button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {prefs.x.map((handle) => (
-                <button key={handle} onClick={() => update({ ...prefs, x: prefs.x.filter((item) => item !== handle) })} className="rounded-full bg-[var(--chip)] px-2 py-1 text-[11px] text-[var(--muted)] hover:text-[var(--text)]">@{handle}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4 xl:col-span-2">
-          <div className="mb-3 flex items-center gap-2">
-            <Radio className="h-4 w-4 text-[var(--text)]" />
-            <p className="text-sm font-bold text-[var(--text)]">Twitch / Kick</p>
-          </div>
-          <div className="grid gap-2 md:grid-cols-[1fr_1fr_110px_36px]">
-            <input value={creatorName} onChange={(e) => setCreatorName(e.target.value)} placeholder="Creator name" className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm text-[var(--text)] outline-none" />
-            <input value={creatorHandle} onChange={(e) => setCreatorHandle(e.target.value)} placeholder="handle" className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm text-[var(--text)] outline-none" />
-            <select value={creatorPlatform} onChange={(e) => setCreatorPlatform(e.target.value as CreatorPlatform)} className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 text-sm text-[var(--text)] outline-none">
-              <option value="twitch">Twitch</option>
-              <option value="kick">Kick</option>
-            </select>
-            <button onClick={addCreator} className="flex h-9 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--bg)]"><Plus className="h-4 w-4" /></button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {prefs.creators.map((creator) => (
-              <button key={creator.id} onClick={() => update({ ...prefs, creators: prefs.creators.filter((item) => item.id !== creator.id) })} className="flex items-center gap-1 rounded-full bg-[var(--chip)] px-2 py-1 text-[11px] text-[var(--muted)] hover:text-[var(--text)]">
-                {creator.name} · {creator.platform}
-                <Trash2 className="h-3 w-3" />
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // The news briefing is the only AI left in Base, so this is where its provider,
 // model and (optional) API key live. The key is encrypted with the login
 // password before it touches storage — see lib/vault.ts — and the password
 // itself is never saved by this page.
-function BriefingManager({ settings, setSettings }: { settings: AiSettings; setSettings: (settings: AiSettings) => void }) {
+function BriefingManager({
+  settings,
+  setSettings,
+}: {
+  settings: AiSettings;
+  setSettings: (settings: AiSettings) => void;
+}) {
   const [password, setPassword] = useState("");
   const [draftKey, setDraftKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -192,13 +79,21 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
 
   const models = modelsForProvider(settings.provider);
   const saved = hasSavedKey(settings);
-  const info = PROVIDER_INFO.find((p) => p.value === settings.provider) ?? PROVIDER_INFO[0];
+  const info =
+    PROVIDER_INFO.find((p) => p.value === settings.provider) ??
+    PROVIDER_INFO[0];
 
   async function unlock() {
     if (!password) return;
-    const plain = await decryptSecret(settings.keyCipher!, settings.keySalt!, password);
+    const plain = await decryptSecret(
+      settings.keyCipher!,
+      settings.keySalt!,
+      password,
+    );
     if (plain === null) {
-      setNote("That password doesn't match the one this key was encrypted with.");
+      setNote(
+        "That password doesn't match the one this key was encrypted with.",
+      );
       return;
     }
     setSessionSecret(password);
@@ -212,13 +107,20 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
     if (!trimmed) return;
     const secret = sessionSecret() ?? password;
     if (!secret) {
-      setNote("Unlock the saved key (or type your login password) before saving a new one.");
+      setNote(
+        "Unlock the saved key (or type your login password) before saving a new one.",
+      );
       return;
     }
     setBusy(true);
     try {
       const { cipher, salt, iterations } = await encryptSecret(trimmed, secret);
-      setSettings({ ...settings, keyCipher: cipher, keySalt: salt, keyIterations: iterations });
+      setSettings({
+        ...settings,
+        keyCipher: cipher,
+        keySalt: salt,
+        keyIterations: iterations,
+      });
       setSessionSecret(secret);
       setDraftKey("");
       setPassword("");
@@ -233,7 +135,12 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
 
   function forgetKey() {
     clearSessionSecret();
-    setSettings({ ...settings, keyCipher: undefined, keySalt: undefined, keyIterations: undefined });
+    setSettings({
+      ...settings,
+      keyCipher: undefined,
+      keySalt: undefined,
+      keyIterations: undefined,
+    });
     setDraftKey("");
     setPassword("");
     setUnlocked(false);
@@ -247,25 +154,47 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
         <h2 className="text-sm font-bold text-[var(--text)]">News briefing</h2>
       </div>
       <p className="mb-4 text-[11px] text-[var(--faint)]">
-        The only AI in Base. It writes the briefing at the top of the News page from the same headlines.
+        The only AI in Base. It writes the briefing at the top of the News page
+        from the same headlines.
       </p>
 
       <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4 space-y-4">
         <label className="flex items-start gap-3">
-          <Toggle on={settings.briefingEnabled} onClick={() => setSettings({ ...settings, briefingEnabled: !settings.briefingEnabled })} />
+          <Toggle
+            on={settings.briefingEnabled}
+            onClick={() =>
+              setSettings({
+                ...settings,
+                briefingEnabled: !settings.briefingEnabled,
+              })
+            }
+          />
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-[var(--text)]">Generate the briefing</span>
-            <span className="block text-[11px] text-[var(--faint)]">Off means the News page shows headlines only, and no provider is called.</span>
+            <span className="block text-sm font-semibold text-[var(--text)]">
+              Generate the briefing
+            </span>
+            <span className="block text-[11px] text-[var(--faint)]">
+              Off means the News page shows headlines only, and no provider is
+              called.
+            </span>
           </span>
         </label>
 
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Provider</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+            Provider
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {PROVIDER_INFO.map((p) => (
               <button
                 key={p.value}
-                onClick={() => setSettings({ ...settings, provider: p.value as AiProvider, model: p.defaultModel })}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    provider: p.value as AiProvider,
+                    model: p.defaultModel,
+                  })
+                }
                 className={cn(
                   "rounded-lg border px-3 py-2 text-left transition-colors",
                   settings.provider === p.value
@@ -274,29 +203,43 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
                 )}
               >
                 <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
-                  {settings.provider === p.value && <Check className="h-3.5 w-3.5" />}
+                  {settings.provider === p.value && (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
                   {p.label}
                 </span>
-                <span className="block text-[11px] text-[var(--faint)]">{p.blurb}</span>
+                <span className="block text-[11px] text-[var(--faint)]">
+                  {p.blurb}
+                </span>
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <label htmlFor="briefing-model" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Model</label>
+          <label
+            htmlFor="briefing-model"
+            className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--faint)]"
+          >
+            Model
+          </label>
           <select
             id="briefing-model"
             value={settings.model}
-            onChange={(e) => setSettings({ ...settings, model: e.target.value })}
+            onChange={(e) =>
+              setSettings({ ...settings, model: e.target.value })
+            }
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text)] focus:border-[var(--border-2)] focus:outline-none"
           >
             {models.map((m) => (
-              <option key={m.id} value={m.id}>{m.label} · {m.note}</option>
+              <option key={m.id} value={m.id}>
+                {m.label} · {m.note}
+              </option>
             ))}
           </select>
           <p className="mt-1 text-[11px] text-[var(--faint)]">
-            Currently using {modelLabel(settings.model)} via {providerLabel(settings.provider)}.
+            Currently using {modelLabel(settings.model)} via{" "}
+            {providerLabel(settings.provider)}.
           </p>
         </div>
 
@@ -304,8 +247,10 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
           <p className="mb-1 text-sm font-bold text-[var(--text)]">API key</p>
           <p className="mb-3 text-[11px] text-[var(--faint)]">
             {saved
-              ? "A key is saved, encrypted with your login password. Only this browser can unlock it."
-              : `No key saved — the server falls back to its own ${info.envKeys[0]} env var. Add one at ${info.keyHint} to use your own.`}
+              ? "Your key is encrypted with your vault password. Unlock it here to generate briefings."
+              : hasCustomApiTransport()
+                ? `Add your own key from ${info.keyHint} to generate briefings. No provider is called without one.`
+                : `No key saved — the server falls back to its own ${info.envKeys[0]} env var. Add one at ${info.keyHint} to use your own.`}
           </p>
 
           {saved && !unlocked && (
@@ -314,14 +259,22 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") unlock(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") unlock();
+                }}
                 placeholder="Login password to unlock"
                 className="flex-1 min-w-[180px] rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-[13px] text-[var(--text)] placeholder-[var(--faint)] focus:border-[var(--border-2)] focus:outline-none"
               />
-              <button onClick={unlock} className="rounded-lg bg-[var(--text)] px-3 py-2 text-[13px] font-medium text-[var(--bg)] hover:bg-[var(--text-hover)]">
+              <button
+                onClick={unlock}
+                className="rounded-lg bg-[var(--text)] px-3 py-2 text-[13px] font-medium text-[var(--bg)] hover:bg-[var(--text-hover)]"
+              >
                 Unlock
               </button>
-              <button onClick={forgetKey} className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] text-[var(--muted)] hover:text-[var(--text)]">
+              <button
+                onClick={forgetKey}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] text-[var(--muted)] hover:text-[var(--text)]"
+              >
                 Remove saved key
               </button>
             </div>
@@ -346,7 +299,11 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
                     aria-label={showKey ? "Hide key" : "Show key"}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--faint)] hover:text-[var(--text)]"
                   >
-                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showKey ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
                 <button
@@ -359,12 +316,15 @@ function BriefingManager({ settings, setSettings }: { settings: AiSettings; setS
               </div>
               <p className="flex items-center gap-1.5 text-[11px] text-[var(--faint)]">
                 <KeyRound className="h-3 w-3" />
-                Encrypted in this browser with AES-GCM, keyed by your password. Sent only when a briefing is generated.
+                Encrypted in this browser with AES-GCM, keyed by your password.
+                Sent only when a briefing is generated.
               </p>
             </div>
           )}
 
-          {note && <p className="mt-2 text-[11px] text-[var(--muted)]">{note}</p>}
+          {note && (
+            <p className="mt-2 text-[11px] text-[var(--muted)]">{note}</p>
+          )}
         </div>
       </div>
     </section>
@@ -379,13 +339,15 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
       aria-checked={on}
       className={cn(
         "relative h-6 w-10 shrink-0 rounded-full transition-colors",
-        on ? "bg-[var(--text)]" : "bg-[var(--chip)] border border-[var(--border-2)]"
+        on
+          ? "bg-[var(--text)]"
+          : "bg-[var(--chip)] border border-[var(--border-2)]",
       )}
     >
       <span
         className={cn(
           "absolute top-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-all",
-          on ? "left-[22px]" : "left-[3px] bg-[var(--muted)]"
+          on ? "left-[22px]" : "left-[3px] bg-[var(--muted)]",
         )}
         style={{ width: 18, height: 18 }}
       />
@@ -393,21 +355,32 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   );
 }
 
-function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (prefs: NavPrefs) => void }) {
+function NavigationManager({
+  prefs,
+  setPrefs,
+}: {
+  prefs: NavPrefs;
+  setPrefs: (prefs: NavPrefs) => void;
+}) {
   const hidden = new Set(prefs.hiddenPages);
   const order = orderedKeys(prefs);
-  const tabs = prefs.bottomTabs?.length ? prefs.bottomTabs : DEFAULT_NAV_PREFS.bottomTabs;
+  const tabs = prefs.bottomTabs?.length
+    ? prefs.bottomTabs
+    : DEFAULT_NAV_PREFS.bottomTabs;
 
   function toggleHidden(key: string) {
     const next = new Set(hidden);
-    if (next.has(key)) next.delete(key); else next.add(key);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
     setPrefs({ ...prefs, hiddenPages: [...next] });
   }
 
   function toggleTab(key: string) {
     setPrefs({
       ...prefs,
-      bottomTabs: tabs.includes(key) ? tabs.filter((k) => k !== key) : [...tabs, key],
+      bottomTabs: tabs.includes(key)
+        ? tabs.filter((k) => k !== key)
+        : [...tabs, key],
     });
   }
 
@@ -417,30 +390,53 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
     <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 lg:col-span-2">
       <div className="flex items-center gap-2 mb-5">
         <Layers className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
-        <h2 className="text-sm font-bold text-[var(--text)]">Pages &amp; Navigation</h2>
+        <h2 className="text-sm font-bold text-[var(--text)]">
+          Pages &amp; Navigation
+        </h2>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Page visibility */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
           <p className="mb-1 text-sm font-bold text-[var(--text)]">Pages</p>
-          <p className="mb-3 text-[11px] text-[var(--faint)]">Switch a page off to remove it from the sidebar, dock and command bar. The page itself still works if you open it directly.</p>
+          <p className="mb-3 text-[11px] text-[var(--faint)]">
+            Switch a page off to remove it from the sidebar, dock and command
+            bar. The page itself still works if you open it directly.
+          </p>
           <div className="space-y-1">
             {ALL_PAGES.map((page) => (
-              <div key={page.key} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-[var(--chip)] transition-colors">
+              <div
+                key={page.key}
+                className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-[var(--chip)] transition-colors"
+              >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <page.icon className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
-                  <span className="text-[13px] text-[var(--text)] truncate">{page.label}</span>
+                  <page.icon
+                    className="w-4 h-4 text-[var(--muted)] shrink-0"
+                    strokeWidth={1.9}
+                  />
+                  <span className="text-[13px] text-[var(--text)] truncate">
+                    {page.label}
+                  </span>
                 </div>
-                <Toggle on={!hidden.has(page.key)} onClick={() => toggleHidden(page.key)} />
+                <Toggle
+                  on={!hidden.has(page.key)}
+                  onClick={() => toggleHidden(page.key)}
+                />
               </div>
             ))}
             <div className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 bg-[var(--chip)]">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Settings className="w-4 h-4 text-[var(--muted)] shrink-0" strokeWidth={1.9} />
-                <span className="text-[13px] text-[var(--text)] truncate">{SETTINGS_PAGE.label}</span>
+                <Settings
+                  className="w-4 h-4 text-[var(--muted)] shrink-0"
+                  strokeWidth={1.9}
+                />
+                <span className="text-[13px] text-[var(--text)] truncate">
+                  {SETTINGS_PAGE.label}
+                </span>
               </div>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--faint)]">Always on</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--faint)]">
+                Always on
+              </span>
             </div>
           </div>
         </div>
@@ -448,18 +444,73 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
         <div className="grid gap-6">
           {/* Sidebar order */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
-            <p className="text-sm font-bold text-[var(--text)]">Sidebar order</p>
-            <p className="mb-3 text-[11px] text-[var(--faint)]">Drag a handle up or down to reorder. Keyboard: focus a handle and use ↑ / ↓.</p>
-            <ReorderList label="Sidebar order" items={order.flatMap(key=>{const page=pageFor(key);return page?[{id:key,label:page.label,icon:<page.icon className="h-4 w-4 text-[var(--muted)]"/>}]:[];})} onChange={sidebarOrder=>setPrefs({...prefs,sidebarOrder})}/>
-
+            <p className="text-sm font-bold text-[var(--text)]">
+              Sidebar order
+            </p>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">
+              Drag a handle up or down to reorder. Keyboard: focus a handle and
+              use ↑ / ↓.
+            </p>
+            <ReorderList
+              label="Sidebar order"
+              items={order.flatMap((key) => {
+                const page = pageFor(key);
+                return page
+                  ? [
+                      {
+                        id: key,
+                        label: page.label,
+                        icon: (
+                          <page.icon className="h-4 w-4 text-[var(--muted)]" />
+                        ),
+                      },
+                    ]
+                  : [];
+              })}
+              onChange={(sidebarOrder) => setPrefs({ ...prefs, sidebarOrder })}
+            />
           </div>
 
           {/* Mobile dock tabs */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-4">
-            <p className="text-sm font-bold text-[var(--text)]">Mobile dock tabs</p>
-            <p className="mb-3 text-[11px] text-[var(--faint)]">Drag to arrange the fixed tabs in the mobile bottom bar. Other pages remain in “More”.</p>
-            <ReorderList label="Mobile dock tabs" items={tabs.flatMap(key=>{const page=pageFor(key);return page?[{id:key,label:page.label,icon:<page.icon className="h-4 w-4 text-[var(--muted)]"/>,action:<button type="button" onClick={()=>toggleTab(key)} className="base-icon-button" aria-label={`Remove ${page.label}`}><Trash2 className="h-3.5 w-3.5"/></button>}]:[];})} onChange={bottomTabs=>setPrefs({...prefs,bottomTabs})}/>
-            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Add a tab</p>
+            <p className="text-sm font-bold text-[var(--text)]">
+              Mobile dock tabs
+            </p>
+            <p className="mb-3 text-[11px] text-[var(--faint)]">
+              Drag to arrange the fixed tabs in the mobile bottom bar. Other
+              pages remain in “More”.
+            </p>
+            <ReorderList
+              label="Mobile dock tabs"
+              items={tabs.flatMap((key) => {
+                const page = pageFor(key);
+                return page
+                  ? [
+                      {
+                        id: key,
+                        label: page.label,
+                        icon: (
+                          <page.icon className="h-4 w-4 text-[var(--muted)]" />
+                        ),
+                        action: (
+                          <button
+                            type="button"
+                            onClick={() => toggleTab(key)}
+                            className="base-icon-button"
+                            aria-label={`Remove ${page.label}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        ),
+                      },
+                    ]
+                  : [];
+              })}
+              onChange={(bottomTabs) => setPrefs({ ...prefs, bottomTabs })}
+            />
+            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+              Add a tab
+            </p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {ALL_PAGES.filter((p) => !tabs.includes(p.key)).map((page) => (
                 <button
@@ -480,12 +531,37 @@ function NavigationManager({ prefs, setPrefs }: { prefs: NavPrefs; setPrefs: (pr
   );
 }
 
-export function SettingsPage({ accountSection }: { accountSection?: ReactNode }) {
-  const [section,setSection]=useState(() => typeof window!=="undefined"&&accountSection&&window.location.hash.includes("section=account")?"account":readStored("base_settings_section_v1")==="account"&&!accountSection?"appearance":readStored("base_settings_section_v1")||"appearance");
-  useEffect(()=>{
-    const select=(event:Event)=>{const value=(event as CustomEvent<string>).detail;if(["appearance","navigation","news","account"].includes(value)){writeStored("base_settings_section_v1",value);setSection(value);}};
-    window.addEventListener("base:settings-section",select);return()=>window.removeEventListener("base:settings-section",select);
-  },[]);
+export function SettingsPage({
+  accountSection,
+}: {
+  accountSection?: ReactNode;
+}) {
+  const [section, setSection] = useState(() => {
+    const requested =
+      typeof window === "undefined"
+        ? null
+        : new URLSearchParams(
+            window.location.hash.split("?")[1] ?? window.location.search,
+          ).get("section");
+    const saved = readStored("base_settings_section_v1") || "appearance";
+    const chosen =
+      requested &&
+      ["appearance", "navigation", "news", "account"].includes(requested)
+        ? requested
+        : saved;
+    return chosen === "account" && !accountSection ? "appearance" : chosen;
+  });
+  useEffect(() => {
+    const select = (event: Event) => {
+      const value = (event as CustomEvent<string>).detail;
+      if (["appearance", "navigation", "news", "account"].includes(value)) {
+        writeStored("base_settings_section_v1", value);
+        setSection(value);
+      }
+    };
+    window.addEventListener("base:settings-section", select);
+    return () => window.removeEventListener("base:settings-section", select);
+  }, []);
   const { preference, setTheme } = useTheme();
   const { accent, setAccent } = useAccent();
   const { collapsed, toggle } = useSidebar();
@@ -494,139 +570,246 @@ export function SettingsPage({ accountSection }: { accountSection?: ReactNode })
   const newsPrefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
   const aiSettings = data.aiSettings ?? DEFAULT_AI_SETTINGS;
   const navPrefs = data.navPrefs ?? DEFAULT_NAV_PREFS;
-  const setNewsPrefs = (prefs: NewsPrefs) => mutate((d) => ({ ...d, newsPrefs: prefs }));
-  const setAiSettings = (settings: AiSettings) => mutate((d) => ({ ...d, aiSettings: settings }));
-  const setNavPrefs = (prefs: NavPrefs) => mutate((d) => ({ ...d, navPrefs: prefs }));
+  const setNewsPrefs = (
+    prefs: NewsPrefs | ((current: NewsPrefs) => NewsPrefs),
+  ) =>
+    mutate((d) => ({
+      ...d,
+      newsPrefs:
+        typeof prefs === "function"
+          ? prefs(d.newsPrefs ?? DEFAULT_NEWS_PREFS)
+          : prefs,
+    }));
+  const setAiSettings = (settings: AiSettings) =>
+    mutate((d) => ({ ...d, aiSettings: settings }));
+  const setNavPrefs = (prefs: NavPrefs) =>
+    mutate((d) => ({ ...d, navPrefs: prefs }));
 
   return (
     <div className="base-page settings-page">
-      <PageHeading title="Settings" description="Preferences for your Base workspace." />
+      <PageHeading
+        title="Settings"
+        description="Preferences for your Base workspace."
+      />
 
       <div className="base-settings-layout">
         <nav aria-label="Settings categories" className="base-settings-nav">
-          {[{id:"appearance",label:"Appearance",icon:MonitorCog},{id:"navigation",label:"Navigation",icon:Layers},{id:"news",label:"News & integrations",icon:Rss},...(accountSection?[{id:"account",label:"Accounts & Sync",icon:KeyRound}]:[])].map(item=><button key={item.id} type="button" aria-current={section===item.id?"page":undefined} onClick={()=>{writeStored("base_settings_section_v1",item.id);setSection(item.id);}}><item.icon className="h-4 w-4"/>{item.label}</button>)}
+          {[
+            { id: "appearance", label: "Appearance", icon: MonitorCog },
+            { id: "navigation", label: "Navigation", icon: Layers },
+            { id: "news", label: "News & integrations", icon: Rss },
+            ...(accountSection
+              ? [{ id: "account", label: "Accounts & Sync", icon: KeyRound }]
+              : []),
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={section === item.id ? "page" : undefined}
+              onClick={() => {
+                writeStored("base_settings_section_v1", item.id);
+                setSection(item.id);
+              }}
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          ))}
         </nav>
         <div className="base-settings-content" key={section}>
-        {section==="account"&&accountSection}
-        {section==="appearance"&&<section className="base-settings-intro"><p className="base-eyebrow">Make it yours</p><h2>A comfortable place to work.</h2><p>Choose an appearance that follows your day and your desktop.</p></section>}
-        {section==="appearance"&&<>
-        <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-5">
-            <MonitorCog className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
-            <h2 className="text-sm font-bold text-[var(--text)]">Appearance</h2>
-          </div>
-
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Theme</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button aria-pressed={preference === "system"} onClick={()=>setTheme("system")} className={cn("flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",preference === "system"?"bg-[var(--text)] text-[var(--bg)] border-[var(--text)]":"bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]")}><MonitorCog className="w-4 h-4"/> System</button>
-              <button
-                aria-pressed={preference === "light"}
-                onClick={() => setTheme("light")}
-                className={cn(
-                  "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
-                  preference === "light"
-                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
-                    : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]"
-                )}
-              >
-                <Sun className="w-4 h-4" strokeWidth={1.9} />
-                Light
-              </button>
-              <button
-                aria-pressed={preference === "dark"}
-                onClick={() => setTheme("dark")}
-                className={cn(
-                  "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
-                  preference === "dark"
-                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
-                    : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]"
-                )}
-              >
-                <Moon className="w-4 h-4" strokeWidth={1.9} />
-                Dark
-              </button>
-            </div>
-
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)] pt-2">Accent colour</p>
-            <div className="flex flex-wrap gap-2">
-              {ACCENTS.map((a) => (
-                <button
-                  key={a.key}
-                  onClick={() => setAccent(a.value)}
-                  title={a.label}
-                  aria-label={a.label}
-                  className={cn(
-                    "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
-                    accent === a.value ? "border-[var(--text)]" : "border-transparent"
-                  )}
-                  style={{ background: a.value }}
-                >
-                  {accent === a.value && <Check className="w-4 h-4 text-white mx-auto" strokeWidth={3} />}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        </>}
-        {section==="navigation"&&<>
-        <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-5">
-            {collapsed ? (
-              <PanelLeftOpen className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
-            ) : (
-              <PanelLeftClose className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />
-            )}
-            <h2 className="text-sm font-bold text-[var(--text)]">Navigation</h2>
-          </div>
-
-          {/* Nav style — classic sidebar vs macOS-style dock */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">Style</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setMode("sidebar")}
-                className={cn(
-                  "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
-                  mode === "sidebar" ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]" : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]"
-                )}
-              >
-                <PanelLeft className="w-4 h-4" strokeWidth={1.9} /> Sidebar
-              </button>
-              <button
-                onClick={() => setMode("dock")}
-                className={cn(
-                  "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
-                  mode === "dock" ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]" : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]"
-                )}
-              >
-                <PanelBottom className="w-4 h-4" strokeWidth={1.9} /> Dock
-              </button>
-            </div>
-            <p className="text-[11px] text-[var(--faint)]">The dock is a floating macOS-style bar (desktop only). Mobile always uses the bottom bar.</p>
-          </div>
-
-          {mode === "sidebar" && (
-            <div className="mt-4 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-4">
-              <div>
-                <p className="text-sm font-medium text-[var(--text)]">Sidebar</p>
-                <p className="text-xs text-[var(--muted)] mt-1">{collapsed ? "Collapsed" : "Expanded"}</p>
-              </div>
-              <button
-                onClick={toggle}
-                className="flex items-center justify-center gap-2 h-9 px-3 rounded-lg bg-[var(--text)] text-[var(--bg)] text-sm font-medium hover:bg-[var(--text-hover)] transition-colors"
-              >
-                {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-                {collapsed ? "Expand" : "Collapse"}
-              </button>
-            </div>
+          {section === "account" && accountSection}
+          {section === "appearance" && (
+            <section className="base-settings-intro">
+              <p className="base-eyebrow">Make it yours</p>
+              <h2>A comfortable place to work.</h2>
+              <p>
+                Choose an appearance that follows your day and your desktop.
+              </p>
+            </section>
           )}
-        </section>
+          {section === "appearance" && (
+            <>
+              <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-5">
+                  <MonitorCog
+                    className="w-4 h-4 text-[var(--text)]"
+                    strokeWidth={1.9}
+                  />
+                  <h2 className="text-sm font-bold text-[var(--text)]">
+                    Appearance
+                  </h2>
+                </div>
 
-        <NavigationManager prefs={navPrefs} setPrefs={setNavPrefs} />
-        </>}
-        {section==="news"&&<><SourceManager prefs={newsPrefs} setPrefs={setNewsPrefs} /><BriefingManager settings={aiSettings} setSettings={setAiSettings} /></>}
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+                    Theme
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      aria-pressed={preference === "system"}
+                      onClick={() => setTheme("system")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
+                        preference === "system"
+                          ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+                          : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]",
+                      )}
+                    >
+                      <MonitorCog className="w-4 h-4" /> System
+                    </button>
+                    <button
+                      aria-pressed={preference === "light"}
+                      onClick={() => setTheme("light")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
+                        preference === "light"
+                          ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+                          : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]",
+                      )}
+                    >
+                      <Sun className="w-4 h-4" strokeWidth={1.9} />
+                      Light
+                    </button>
+                    <button
+                      aria-pressed={preference === "dark"}
+                      onClick={() => setTheme("dark")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
+                        preference === "dark"
+                          ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+                          : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]",
+                      )}
+                    >
+                      <Moon className="w-4 h-4" strokeWidth={1.9} />
+                      Dark
+                    </button>
+                  </div>
+
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)] pt-2">
+                    Accent colour
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {ACCENTS.map((a) => (
+                      <button
+                        key={a.key}
+                        onClick={() => setAccent(a.value)}
+                        title={a.label}
+                        aria-label={a.label}
+                        className={cn(
+                          "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
+                          accent === a.value
+                            ? "border-[var(--text)]"
+                            : "border-transparent",
+                        )}
+                        style={{ background: a.value }}
+                      >
+                        {accent === a.value && (
+                          <Check
+                            className="w-4 h-4 text-white mx-auto"
+                            strokeWidth={3}
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+          {section === "navigation" && (
+            <>
+              <section className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-5">
+                  {collapsed ? (
+                    <PanelLeftOpen
+                      className="w-4 h-4 text-[var(--text)]"
+                      strokeWidth={1.9}
+                    />
+                  ) : (
+                    <PanelLeftClose
+                      className="w-4 h-4 text-[var(--text)]"
+                      strokeWidth={1.9}
+                    />
+                  )}
+                  <h2 className="text-sm font-bold text-[var(--text)]">
+                    Navigation
+                  </h2>
+                </div>
+
+                {/* Nav style — classic sidebar vs macOS-style dock */}
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
+                    Style
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setMode("sidebar")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
+                        mode === "sidebar"
+                          ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+                          : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]",
+                      )}
+                    >
+                      <PanelLeft className="w-4 h-4" strokeWidth={1.9} />{" "}
+                      Sidebar
+                    </button>
+                    <button
+                      onClick={() => setMode("dock")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 h-10 rounded-lg border text-sm font-medium transition-colors",
+                        mode === "dock"
+                          ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+                          : "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)] hover:text-[var(--text)]",
+                      )}
+                    >
+                      <PanelBottom className="w-4 h-4" strokeWidth={1.9} /> Dock
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[var(--faint)]">
+                    The dock is a floating macOS-style bar (desktop only).
+                    Mobile always uses the bottom bar.
+                  </p>
+                </div>
+
+                {mode === "sidebar" && (
+                  <div className="mt-4 flex items-center justify-between gap-4 border-t border-[var(--border)] pt-4">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text)]">
+                        Sidebar
+                      </p>
+                      <p className="text-xs text-[var(--muted)] mt-1">
+                        {collapsed ? "Collapsed" : "Expanded"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={toggle}
+                      className="flex items-center justify-center gap-2 h-9 px-3 rounded-lg bg-[var(--text)] text-[var(--bg)] text-sm font-medium hover:bg-[var(--text-hover)] transition-colors"
+                    >
+                      {collapsed ? (
+                        <PanelLeftOpen className="w-4 h-4" />
+                      ) : (
+                        <PanelLeftClose className="w-4 h-4" />
+                      )}
+                      {collapsed ? "Expand" : "Collapse"}
+                    </button>
+                  </div>
+                )}
+              </section>
+
+              <NavigationManager prefs={navPrefs} setPrefs={setNavPrefs} />
+            </>
+          )}
+          {section === "news" && (
+            <>
+              <NewsSourceSettings prefs={newsPrefs} setPrefs={setNewsPrefs} />
+              <IntegrationSettings />
+              <BriefingManager
+                settings={aiSettings}
+                setSettings={setAiSettings}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

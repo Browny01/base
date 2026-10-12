@@ -26,7 +26,7 @@ large-workspace migration and actual macOS acceptance remain release gates.
 - `apps/cloud`: Workers APIs; D1 tenant-scoped records, accounts, device grants,
   revision CAS, operation receipts and billing; private R2 files and immutable
   recovery archives; KV disposable caching; SQL job outbox with Queues, leases,
-  retries, dead-letter queue and hourly cron. Three additive migrations have
+  retries, dead-letter queue and hourly cron. Four additive migrations have
   been applied to the **new staging database only**.
 - Clerk signature/issuer/origin verification, owner-derived workspace identity,
   short device approval proofs and single-use exchange; desktop sessions go to
@@ -59,6 +59,9 @@ large-workspace migration and actual macOS acceptance remain release gates.
   below Tasks Left/Revenue. Saved widget dimensions/order are retained. Workspace
   confirmations trap focus, start on Cancel and restore the invoking control.
 
+See [website, integrations and notification update](phase-2.5-improvements.md)
+for browser sync/security tests and the latest interface fixes.
+
 ## Verified on Linux, 2026-10-12
 
 Hardware: AMD Ryzen 5 5600G, Arch Linux x86-64, GTK 3.24.52/WebKitGTK 2.52.6.
@@ -66,7 +69,7 @@ Runtime screenshots use Xvfb/X11 with software rendering, not a Wayland/GPU or
 battery measurement. Node 25.9 and Rust 1.98 are build/test tools, not installed
 application runtime dependencies.
 
-- All 139 JavaScript tests passed. Root, desktop and Cloud TypeScript checks; Next production build; ESLint
+- All 148 JavaScript tests passed. Root, desktop, browser and Cloud TypeScript checks; Next production build; ESLint
   (zero errors, four pre-existing warnings); Vite/Tauri release build with
   `.deb`, `.rpm` and AppImage; Rust formatting and Clippy with warnings denied.
 - Standalone service: nine Rust tests. Desktop: ten Rust tests. JavaScript tests
@@ -110,12 +113,14 @@ legacy secrets and existing Swift clients have not been switched or reset.
 Before marking Phase 2.5 complete:
 
 1. Finish local-service integration adapters (currently unsupported integration
-   endpoints return a clear 501), cloud tenant-specific Cal.com/X credentials,
+   endpoints return a clear 501),
    link-preview/favicon, legacy agent/widget compatibility and recovery UI.
    Finish durable offline file uploads and idempotent upload receipts; existing
    JSON outboxes protect record edits, not a failed upload's entire file payload.
-   Cal.com's shared handler preserves its contract but the cloud adapter has no
-   tenant credential yet and reports `configured: false`.
+   Cloud Cal.com/X credentials now have tenant-scoped encrypted storage; real
+   owner provider accounts still need acceptance checks. Local desktop integration
+   requests currently use the fixed hosted adapter, so a standalone Rust service
+   alone does not supply all external provider endpoints.
 2. Finish provider acceptance beyond the isolated staging account: email/Google
    interactive sign-in, expiry, webhook retries/order and downgrade recovery.
    Apple is disabled in the current Clerk instance; Development can use Clerk's

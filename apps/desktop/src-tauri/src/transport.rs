@@ -27,6 +27,7 @@ const PATHS: &[&str] = &[
     "/api/native/sync/chunk",
     "/api/auth/desktop",
     "/api/workspace",
+    "/api/workspace/credentials",
     "/api/workspace/export",
     "/api/workspace/integrations/revoke",
     "/api/devices/revoke",
@@ -48,7 +49,86 @@ const PATHS: &[&str] = &[
     "/api/favicon",
     "/api/tmdb/search",
     "/api/youtube/oembed",
+    "/api/youtube/channel",
 ];
+fn managed_cloud_origin() -> String {
+    let config: Value =
+        serde_json::from_str(include_str!("../../../../packages/core/src/service.json"))
+            .expect("Bundled cloud configuration");
+    config["cloudUrl"]
+        .as_str()
+        .expect("Bundled cloud URL")
+        .to_string()
+}
+fn integration_provider(path: &str) -> Option<&'static str> {
+    match path.split('?').next().unwrap_or("") {
+        "/api/tmdb/search" => Some("tmdb"),
+        "/api/market/charts" | "/api/market/prices" => Some("coingecko"),
+        "/api/calcom/bookings" => Some("calcom"),
+        "/api/social-feed" => Some("x"),
+        _ => None,
+    }
+}
+fn public_integration(path: &str) -> bool {
+    matches!(
+        path.split('?').next().unwrap_or(""),
+        "/api/news"
+            | "/api/news/summary"
+            | "/api/market/charts"
+            | "/api/market/prices"
+            | "/api/fx/rate"
+            | "/api/social-feed"
+            | "/api/live-status"
+            | "/api/tmdb/search"
+            | "/api/youtube/oembed"
+            | "/api/youtube/channel"
+            | "/api/calcom/bookings"
+            | "/api/wallet/balance"
+            | "/api/wallet/tokens"
+    )
+}
+fn integration_entry(scope: &str, provider: &str) -> Result<keyring::Entry, String> {
+    if !["tmdb", "calcom", "x", "coingecko"].contains(&provider) {
+        return Err("Unsupported integration".into());
+    }
+    keyring::Entry::new(
+        "app.base.personal.desktop.integrations",
+        &format!("{scope}:{provider}"),
+    )
+    .map_err(|_| "Secure credential storage is unavailable".into())
+}
+#[tauri::command]
+pub fn integration_status(db: tauri::State<'_, Database>, scope: String) -> Result<Value, String> {
+    workspace(&db, &scope)?;
+    let providers: Vec<Value> = ["tmdb", "calcom", "x", "coingecko"].iter().map(|provider| Ok(json!({"id":provider,"configured":integration_entry(&scope, provider)?.get_password().is_ok()}))).collect::<Result<_, String>>()?;
+    Ok(json!({"providers":providers}))
+}
+#[tauri::command]
+pub fn set_integration_key(
+    db: tauri::State<'_, Database>,
+    scope: String,
+    provider: String,
+    key: Option<String>,
+) -> Result<(), String> {
+    workspace(&db, &scope)?;
+    let entry = integration_entry(&scope, &provider)?;
+    if let Some(key) = key {
+        let value = key.trim();
+        if value.is_empty() || value.len() > 8192 || value.contains(['\r', '\n']) {
+            return Err("Enter a valid integration key".into());
+        }
+        entry
+            .set_password(value)
+            .map_err(|_| "Could not securely save the integration key".to_string())?;
+    } else {
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => (),
+            Err(_) => return Err("Could not remove the integration key".into()),
+        }
+    }
+    db.0.lock().map_err(|e| e.to_string())?.execute("DELETE FROM response_cache WHERE scope=?1 AND (key LIKE '/api/tmdb/%' OR key LIKE '/api/calcom/%' OR key LIKE '/api/social-feed%' OR key LIKE '/api/market/%')", [&scope]).map_err(|e| e.to_string())?;
+    Ok(())
+}
 fn normalized_origin(origin: &str) -> Result<String, String> {
     let parsed = Url::parse(origin).map_err(|_| "Enter a valid service URL.")?;
     let local = matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
@@ -252,22 +332,51 @@ pub async fn api_request(
             path.split('?').next(),
             Some("/api/native/sync" | "/api/auth/desktop")
         );
-    if workspace.origin.is_empty() {
+    let provider_key = if let Some(provider) = integration_provider(&path) {
+        integration_entry(&scope, provider)?.get_password().ok()
+    } else {
+        None
+    };
+    // Keep legacy Vercel integrations and server-side keys working. Standalone
+    // Rust workspaces have a 43-character, URL-safe identity; offline scopes
+    // have no origin. An explicit per-device key also opts into this adapter.
+    let local_integration = public_integration(&path)
+        && (provider_key.is_some()
+            || workspace.origin.is_empty()
+            || (workspace.workspace_id.len() == 43
+                && workspace
+                    .workspace_id
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')));
+    if workspace.origin.is_empty() && !local_integration {
         return cached(&db, &scope, &path).ok_or_else(|| {
-            "Connect an account to use cloud integrations. Local data remains available.".into()
+            "This action needs a connected workspace. Offline records remain available.".into()
         });
     }
-    let url = scoped_url(&workspace.origin, &path)?;
-    let token = credential(&scope)?.get_password();
-    let token = match token {
-        Ok(token) => token,
-        Err(_) => {
-            if cacheable {
-                if let Some(value) = cached(&db, &scope, &path) {
-                    return Ok(value);
+    let url = if local_integration {
+        let validated = scoped_url(&managed_cloud_origin(), &path)?;
+        let mut public_url = validated;
+        public_url.set_path(&format!(
+            "/api/public/{}",
+            public_url.path().trim_start_matches("/api/")
+        ));
+        public_url
+    } else {
+        scoped_url(&workspace.origin, &path)?
+    };
+    let token = if local_integration {
+        None
+    } else {
+        match credential(&scope)?.get_password() {
+            Ok(token) => Some(token),
+            Err(_) => {
+                if cacheable {
+                    if let Some(value) = cached(&db, &scope, &path) {
+                        return Ok(value);
+                    }
                 }
+                return Err("Sign in to synchronize. Your offline changes are retained.".into());
             }
-            return Err("Sign in to synchronize. Your offline changes are retained.".into());
         }
     };
     if !matches!(method.as_str(), "GET" | "POST" | "DELETE") {
@@ -275,10 +384,15 @@ pub async fn api_request(
     }
     let file_upload = url.path() == "/api/blob/upload";
     let method_value = Method::from_bytes(method.as_bytes()).map_err(|e| e.to_string())?;
-    let mut request = transport
-        .client
-        .request(method_value, url)
-        .bearer_auth(token);
+    let mut request = transport.client.request(method_value, url);
+    if let Some(token) = token {
+        request = request.bearer_auth(token);
+    }
+    if local_integration {
+        if let (Some(provider), Some(key)) = (integration_provider(&path), provider_key) {
+            request = request.header(format!("X-Base-Key-{provider}"), key);
+        }
+    }
     if let Some(body) = body_base64 {
         let bytes = STANDARD
             .decode(body)
@@ -608,9 +722,8 @@ pub async fn cloud_sign_in_start(
     db: tauri::State<'_, Database>,
     transport: tauri::State<'_, Transport>,
     login: tauri::State<'_, CloudLogin>,
-    origin: String,
 ) -> Result<Value, String> {
-    let origin = normalized_origin(&origin)?;
+    let origin = normalized_origin(&managed_cloud_origin())?;
     let verifier = format!(
         "{}{}",
         uuid::Uuid::new_v4().simple(),
