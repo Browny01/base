@@ -27,6 +27,20 @@ this is an authentication boundary check, not an authenticated Mac sync test.
 Mac verification and diagnosis of the underlying intermittent Cloud HTTP failure
 remain pending. No production data or credentials were changed.
 
+### Follow-up: temporary HTTP 503
+
+On 14 October the owner reported an unreadable HTTP 503 from Base Cloud, then
+confirmed a manual retry succeeded without reinstalling or changing settings.
+The independent remote staging fixture suite passed queue replay, receipt
+idempotency, account isolation, retained conflicts, private R2 files, rollback
+recovery, device revocation and MCP grant/replay checks. A bounded live tail
+observed seven fixture sync calls returning HTTP 200 and no failing sync calls.
+Synthetic fixtures were cleaned up; production data was not accessed. Clerk
+and Stripe were not exercised by this suite. The original 503 was not captured,
+so its underlying cause remains unconfirmed; no speculative service or data
+changes were made. Historical telemetry querying was unavailable with the
+CLI's current permissions.
+
 ## Priority order
 
 Most important, implemented first:
