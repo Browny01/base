@@ -47,6 +47,20 @@ test("browser writes persist a document/outbox atomically and rebase edits made 
   assert.equal(remote.dailyRevenueTarget,200);
   assert.equal((remote.tasks as Document[]).find(task=>task.id==="one")?.title,"Edited during network request");
   assert.ok(diff({},remote).length>0);
+  await browser.commitBrowserEdit(data=>({...data,dailyRevenueTarget:250}));
+  const queuedBeforeFailure=storage.get("base_sync_v2");
+  const healthyFetch=globalThis.fetch;
+  for(const response of [new Response("<html>Bad gateway</html>",{status:502}),new Response(null,{status:204}),Response.json(null)]) {
+    globalThis.fetch=async()=>response;
+    await browser.sync();
+    assert.equal(storage.get("base_sync_v2"),queuedBeforeFailure);
+    assert.match(browser.browserSyncStatus().error,/offline edits are retained/);
+    assert.doesNotMatch(browser.browserSyncStatus().error,/SyntaxError/);
+  }
+  globalThis.fetch=healthyFetch;
+  await browser.sync();
+  assert.equal(browser.browserSyncStatus().pending,0);
+  assert.equal(remote.dailyRevenueTarget,250);
   await browser.commitBrowserEdit(data=>({...data,tasks:data.tasks.map(task=>task.id==="one"?{...task,title:"Local conflict"}:task)}));
   (remote.tasks as Document[]).find(task=>task.id==="one")!.title="Remote conflict";revision++;
   await browser.sync();

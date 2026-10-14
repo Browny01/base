@@ -3,6 +3,30 @@
 Verified 14 October 2026. This preserves the existing roadmap; Phase 3 has not
 started. Production Vercel/Upstash and `base.lucasbrown.xyz` are unchanged.
 
+## Base 0.1.4 — reported Cloud sync SyntaxError
+
+The owner's Mac trace `json@[native code]` at
+`store-BJSA22lX.js:2:5396` maps exactly to `.json()` on an unsuccessful
+`/api/native/sync` response in the 0.1.3 bundle. The owner confirmed Base Cloud
+was selected. A non-JSON error body masked the HTTP failure with SyntaxError;
+the trace alone does not establish the original HTTP status or upstream cause.
+
+Desktop and legacy browser sync now share a response reader that reports the
+HTTP status, safely retains JSON server error details, and rejects unreadable,
+empty or non-object acknowledgements before persistence. Existing protocol,
+workspace identity, revision and operation validations still run. No invalid
+response can acknowledge pending operations or advance the local cursor.
+
+Regression checks cover native response conversion with HTML 502, text 429,
+malformed 200 and empty 204 bodies, plus null/array/string JSON and server JSON
+errors. The browser sync persistence test verifies exact document/outbox retention
+on failures and successful retry once a healthy response returns. All 163
+JavaScript tests, root/desktop/web type checks and changed-file ESLint passed.
+The live unauthenticated Cloud sync endpoint returned the expected JSON 401;
+this is an authentication boundary check, not an authenticated Mac sync test.
+Mac verification and diagnosis of the underlying intermittent Cloud HTTP failure
+remain pending. No production data or credentials were changed.
+
 ## Priority order
 
 Most important, implemented first:

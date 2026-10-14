@@ -1,8 +1,9 @@
 "use client";
 import { DEFAULT, getData, migrateAll, installLocalSnapshot, type BaseData } from "./store.ts";
-import { diff, equal, overlay, readSlot, validOperation, type Document, type Operation, type Conflict, type SyncResponse, type BrowserSyncStatus } from "../packages/sync/src/protocol.ts";
+import { diff, equal, overlay, readSlot, validOperation, type Document, type Operation, type Conflict, type BrowserSyncStatus } from "../packages/sync/src/protocol.ts";
 import { isRecovery, recoverSnapshot } from "../packages/sync/src/recovery.ts";
 import { prepareBatch } from "../packages/sync/src/upload.ts";
+import { readSyncResponse } from "../packages/sync/src/response.ts";
 
 const KEY = "base_sync_v2";
 type State = { version: 2; document: BaseData; baseline: Document | null; pending: Operation[]; conflicts: Conflict[]; resolvedConflicts?: (Conflict & { choice: "local" | "server"; resolvedAt: number })[]; revision: number; workspaceId: string | null; legacy?: BaseData; recoveryArchives?: { document: BaseData; baseline: Document | null; pending: Operation[]; conflicts: Conflict[]; revision: number; recoveredAt: number }[] };
@@ -98,8 +99,7 @@ export async function sync():Promise<void> {
     report({syncing:true,error:""});
     if(!state!.workspaceId||state!.baseline===null) {
       const response=await fetch("/api/native/sync?protocol=2",{cache:"no-store",signal:AbortSignal.timeout(20_000)});
-      if(!response.ok)throw new Error(`Sync unavailable (${response.status}). Your browser edits are retained.`);
-      const initial=await response.json() as SyncResponse;
+      const initial=await readSyncResponse(response);
       if(initial.protocol!==2||!initial.workspaceId||!initial.data||Array.isArray(initial.data)||!Number.isSafeInteger(initial.revision))throw new Error("Deploy sync v2 before synchronizing this browser.");
       const initialData=initial.data;
       if(state!.workspaceId&&state!.workspaceId!==initial.workspaceId)throw new Error("Workspace identity changed. Export your browser data before switching accounts.");
@@ -123,8 +123,7 @@ export async function sync():Promise<void> {
       if(!response.ok)throw new Error(`Upload failed (${response.status}); your original is retained.`);
     });
     const response=await fetch("/api/native/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({protocol:2,workspaceId:sent.workspaceId,cursor:sent.revision,operations}),signal:AbortSignal.timeout(30_000)});
-    if(!response.ok)throw new Error((await response.json()).error??`Sync failed (${response.status}).`);
-    const result=await response.json() as SyncResponse;
+    const result=await readSyncResponse(response);
     if(result.protocol!==2||result.workspaceId!==sent.workspaceId||!Number.isSafeInteger(result.revision)||(result.revision<sent.revision&&!isRecovery(result,sent.revision)))throw new Error("Invalid sync response; edits were retained.");
     if(result.recovery&&!isRecovery(result,sent.revision))throw new Error("Invalid recovery response; edits were retained.");
     const ids=new Set(operations.map(op=>op.id));

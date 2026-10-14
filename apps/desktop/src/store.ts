@@ -14,11 +14,11 @@ import {
   equal,
   validOperation,
   type Document,
-  type SyncResponse,
   type Operation,
 } from "@/packages/sync/src/protocol";
 import { native, request, documentOf, isTauri, type Workspace } from "./native";
 import { prepareBatch } from "@/packages/sync/src/upload";
+import { readSyncResponse } from "@/packages/sync/src/response";
 import { clearSessionSecret } from "@/lib/vault";
 import { isRecovery, recoverSnapshot } from "@/packages/sync/src/recovery";
 import { importOperations } from "@/packages/sync/src/import";
@@ -235,11 +235,7 @@ export async function sync(): Promise<void> {
       throw new Error(
         "Your session expired. Reconnect your account; offline edits are retained.",
       );
-    if (!res.ok)
-      throw new Error(
-        (await res.json()).error ?? `Sync failed (${res.status}).`,
-      );
-    const response = (await res.json()) as SyncResponse;
+    const response = await readSyncResponse(res);
     if (
       response.protocol !== 2 ||
       response.workspaceId !== sent.workspaceId ||

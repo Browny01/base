@@ -106,8 +106,11 @@ Base 0.1.3 adds source preference recovery, currency/feed choices, Notes linking
 formatted paste, corrected icons and signed updates. See
 [reliability and release checks](phase-2.5-news-notes-updates.md). Linux AppImage
 installation/restart was exercised with retained records/outbox; Mac release
-builds, notification delivery and the intermittent Mac Notes SyntaxError remain
-pending. The suite now contains 161 passing JavaScript tests.
+builds and notification delivery remain pending. Base 0.1.4 maps the supplied
+Mac SyntaxError trace to non-JSON Cloud sync error parsing and reports the HTTP
+status while retaining offline edits. The underlying intermittent Cloud failure
+and Mac verification remain pending. The suite now contains 163 passing
+JavaScript tests.
 
 The 12 October onboarding/profile/shared-note-password checkpoint is documented in
 [onboarding and account checks](phase-2.5-onboarding.md): 153 JavaScript,

@@ -74,7 +74,7 @@ CVC for Plus testing. Never enter a real payment card for these acceptance check
 Remaining integration/file-upload/migration gates are listed in the status
 report. Production data migration and original Phase 3 have not begun.
 
-## Latest reliability and preference fixes (Base 0.1.3)
+## Latest reliability and preference fixes (Base 0.1.4)
 
 Quit the running Base app before opening the new build. To replace the installed
 copy, move the newly built `Base.app` into Applications; replace only the app
@@ -89,8 +89,11 @@ Check that index quotes remain points and commodity units remain labelled.
 In Notes, select text and use Add Link or Cmd+K. Search for another note; the
 picker shows four at a time. Paste bold/coloured text between notes, then restart
 and check formatting persists. Test ordinary typing, Enter and block insertion.
-If the intermittent SyntaxError recurs, use Copy error details and record the
-action; that Mac-specific issue has not been conclusively reproduced on Linux.
+The reported `store-BJSA22lX.js:2:5396` SyntaxError mapped to JSON parsing of an
+unsuccessful sync response, rather than typing or paste. Base 0.1.4 reports the
+HTTP status instead and retains offline edits for retry. If synchronization fails,
+record the new status message and the workspace mode. Other intermittent errors
+still need their own traces; this patch has not been verified on Mac hardware.
 
 Run notification checks from the bundled `Base.app`, not an unbundled executable.
 Normal bundles now receive ad-hoc signing and request macOS notification
