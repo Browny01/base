@@ -102,7 +102,14 @@ application runtime dependencies.
 
 ## Staging and remaining gates
 
-The latest onboarding/profile/shared-note-password checkpoint is documented in
+Base 0.1.3 adds source preference recovery, currency/feed choices, Notes linking/
+formatted paste, corrected icons and signed updates. See
+[reliability and release checks](phase-2.5-news-notes-updates.md). Linux AppImage
+installation/restart was exercised with retained records/outbox; Mac release
+builds, notification delivery and the intermittent Mac Notes SyntaxError remain
+pending. The suite now contains 161 passing JavaScript tests.
+
+The 12 October onboarding/profile/shared-note-password checkpoint is documented in
 [onboarding and account checks](phase-2.5-onboarding.md): 153 JavaScript,
 11 desktop Rust and nine workspace Rust tests pass. Linux packaging and actual
 native/browser staging checks pass within that report's stated limits. Mac and

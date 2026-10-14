@@ -1,5 +1,6 @@
 "use client";
 
+import { pasteNote, noteLink } from "@/lib/note-paste";
 import { EditorDialog } from "./ui/editor-dialog";
 import { editorFormatCommand } from "@/lib/editor-shortcuts";
 import { BaseImage } from "@/lib/image";
@@ -233,6 +234,8 @@ export function WikiEditor({
   const [blocks, setBlocks] = useState<WikiBlock[]>(page.blocks.length ? page.blocks : [newBlock()]);
   const [slash, setSlash] = useState<{ blockId: string; query: string; index: number; viaPlus: boolean } | null>(null);
   const [linkEditor,setLinkEditor]=useState<string|null>(null);
+  const [linkSearch,setLinkSearch]=useState(""), [linkPage,setLinkPage]=useState(0), [linkError,setLinkError]=useState("");
+  const linkPages = allPages.filter(candidate=>candidate.id!==page.id && !candidate.deletedAt && (candidate.title||"Untitled").toLowerCase().includes(linkSearch.toLowerCase()));
   const linkRange=useRef<Range|null>(null);
   const [toolbar, setToolbar] = useState<{ top: number; left: number } | null>(null);
   // ⌘A-twice selects every block at once for a single bulk format action.
@@ -668,11 +671,9 @@ export function WikiEditor({
     }
   };
 
-  // Paste as plain text so external styling (e.g. stuck underlines) never sticks.
+  // Keep supported formatting while stripping executable clipboard content.
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>, block: WikiBlock) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData("text/plain");
-    document.execCommand("insertText", false, text);
+    pasteNote(e, block.type === "code");
     handleInput(block, e.currentTarget);
   };
 
@@ -717,18 +718,26 @@ export function WikiEditor({
     const selection=window.getSelection();if(!selection?.rangeCount||selectedAllRef.current)return;
     linkRange.current=selection.getRangeAt(0).cloneRange();
     const anchor=(selection.anchorNode?.nodeType===3?selection.anchorNode.parentElement:selection.anchorNode as HTMLElement)?.closest("a");
+    setLinkSearch("");setLinkPage(0);setLinkError("");
     setLinkEditor(anchor?.getAttribute("href")??"");
   }
-  function saveLink() {
-    const value=linkEditor?.trim()??"";
-    if(value&&!/^(https?:\/\/|mailto:|#wiki:)/i.test(value)&&/^[a-z][a-z0-9+.-]*:/i.test(value))return;
+  function saveLink(selected?: string) {
+    const value=noteLink(selected ?? linkEditor ?? "");
+    if (value === null) { setLinkError("Enter a valid web/email link, or choose a note below.");return; }
     const range=linkRange.current;setLinkEditor(null);
     requestAnimationFrame(()=>{
-      if(!range)return;
+      if(!range || !range.startContainer.isConnected || !rootRef.current?.contains(range.commonAncestorContainer))return;
       const node=range.startContainer.nodeType===3?range.startContainer.parentElement:range.startContainer as HTMLElement;
       node?.closest<HTMLElement>("[contenteditable]")?.focus();
       const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);
-      markEdit("format");runFormat(value?"createLink":"unlink",value?/^(https?:\/\/|mailto:|#wiki:)/i.test(value)?value:`https://${value}`:undefined);
+      markEdit("format");
+      if (!value) runFormat("unlink");
+      else {
+        const existing=node?.closest("a");
+        if(existing&&existing.contains(range.commonAncestorContainer))existing.setAttribute("href",value);
+        else { const anchor=document.createElement("a"), contents=range.extractContents();for(const nested of contents.querySelectorAll("a"))nested.replaceWith(...nested.childNodes);anchor.setAttribute("href",value);anchor.appendChild(contents);range.insertNode(anchor);selection?.selectAllChildren(anchor); }
+        syncActiveFromSelection();
+      }
     });
   }
   const exec = (cmd: string, value?: string) => {
@@ -814,14 +823,22 @@ export function WikiEditor({
   }, [title, description, blocks]);
 
   return (
-    <div ref={rootRef} onKeyDownCapture={event=>{
+    <div ref={rootRef} onPasteCapture={event=>{
+      const target=(event.target as HTMLElement).closest<HTMLElement>('[contenteditable="true"]');
+      if(!target)return;
+      markEdit("paste"); event.stopPropagation();
+      try {
+        pasteNote({clipboardData:event.clipboardData,currentTarget:target,preventDefault:()=>event.preventDefault()}, !!target.closest('[data-block-id]')?.classList.contains("font-mono"));
+        target.dispatchEvent(new Event("input",{bubbles:true}));
+      } catch(error) { window.dispatchEvent(new CustomEvent("base:editor-error",{detail:String(error)})); }
+    }} onKeyDownCapture={event=>{
       const target=event.target as HTMLElement;
       if(!target.isContentEditable||target.closest('[data-block-id]')?.classList.contains("font-mono"))return;
       const command=editorFormatCommand(event);if(!command)return;
       event.preventDefault();event.stopPropagation();
       if(command==="createLink")editLink();else {markEdit("format");runFormat(command);}
     }} className={cn("relative mx-auto px-6 sm:px-12 py-10", fullWidth ? "max-w-none" : "max-w-[760px]", selectedAll && "nx-allsel")}>
-      {linkEditor!==null&&<EditorDialog title="Edit link" onClose={()=>setLinkEditor(null)}><form onSubmit={event=>{event.preventDefault();saveLink();}}><h2 className="text-lg font-semibold">Link</h2><label className="mt-4 block text-sm">URL<input autoFocus value={linkEditor} onChange={event=>setLinkEditor(event.target.value)} placeholder="https://example.com" className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3"/></label><p className="mt-2 text-xs text-[var(--muted)]">Leave empty to remove the link. Web, email and Base note links are supported.</p><div className="mt-5 flex justify-end gap-2"><button type="button" className="base-button base-button-secondary" onClick={()=>setLinkEditor(null)}>Cancel</button><button className="base-button base-button-primary">Save link</button></div></form></EditorDialog>}
+      {linkEditor!==null&&<EditorDialog title="Edit link" onClose={()=>setLinkEditor(null)}><form onSubmit={event=>{event.preventDefault();saveLink();}}><h2 className="text-lg font-semibold">Link</h2><label className="mt-4 block text-sm">URL<input autoFocus value={linkEditor} onChange={event=>setLinkEditor(event.target.value)} placeholder="https://example.com" className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3"/></label><p className="mt-2 text-xs text-[var(--muted)]">Leave empty to remove the link.</p>{linkError&&<p role="alert" className="mt-2 text-sm text-[var(--c-rose)]">{linkError}</p>}<h3 className="mt-5 text-sm font-medium">Or link to a note</h3><input aria-label="Search notes to link" value={linkSearch} onChange={event=>{setLinkSearch(event.currentTarget.value);setLinkPage(0);}} placeholder="Search your notes…" className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5"/><div className="my-2 grid gap-1">{linkPages.slice(linkPage*4,linkPage*4+4).map(candidate=><button type="button" key={candidate.id} className="flex items-center gap-2 rounded-lg p-2 text-left text-sm hover:bg-[var(--chip)]" onClick={()=>saveLink("#wiki:"+encodeURIComponent(candidate.id))}><FileText className="h-4 w-4 shrink-0"/><span className="truncate">{candidate.title||"Untitled"}</span></button>)}{!linkPages.length&&<p className="p-2 text-xs text-[var(--muted)]">No matching notes.</p>}</div>{linkPages.length>4&&<div className="flex items-center justify-between text-xs"><button type="button" disabled={linkPage===0} onClick={()=>setLinkPage(n=>n-1)}>Previous</button><span>{linkPage+1} / {Math.ceil(linkPages.length/4)}</span><button type="button" disabled={(linkPage+1)*4>=linkPages.length} onClick={()=>setLinkPage(n=>n+1)}>Next</button></div>}<div className="mt-5 flex justify-end gap-2"><button type="button" className="base-button base-button-secondary" onClick={()=>setLinkEditor(null)}>Cancel</button><button className="base-button base-button-primary">Save link</button></div></form></EditorDialog>}
       {/* Icon + title */}
       <div className="mb-5">
         <EmojiButton value={icon} onChange={(e) => { markEdit("icon"); setIcon(e); scheduleSave(); }} />
@@ -1149,7 +1166,7 @@ function BlockRow({
     const a = (e.target as HTMLElement).closest?.("a") as HTMLAnchorElement | null;
     if (!a) return;
     const href = a.getAttribute("href") || "";
-    if (href.startsWith("#wiki:")) { e.preventDefault(); onOpenPage(href.slice(6)); return; }
+    if (href.startsWith("#wiki:")) { e.preventDefault(); try { onOpenPage(decodeURIComponent(href.slice(6))); } catch { onOpenPage(href.slice(6)); } return; }
     if (/^(https?:|mailto:)/.test(href)) { e.preventDefault(); window.open(href, "_blank", "noopener"); }
   };
 
@@ -1405,8 +1422,7 @@ function ToggleBody({ value, onChange }: { value: string; onChange: (html: strin
   const mounted = useRef(false);
   const setEl = (el: HTMLDivElement | null) => { if (el && !mounted.current) { el.innerHTML = value || ""; mounted.current = true; } };
   const onPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    document.execCommand("insertText", false, e.clipboardData.getData("text/plain"));
+    pasteNote(e);
     onChange(normalizeHTML(e.currentTarget.innerHTML));
   };
   return (

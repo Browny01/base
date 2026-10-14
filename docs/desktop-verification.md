@@ -266,11 +266,12 @@ workflow has not been run remotely from this thread.
   memory for retry/export. It is not durable until a write succeeds or is exported;
   force-killing the process can lose that unsaved copy. Successfully saved outbox
   entries survive normal close and process termination.
-- Signed updates require release-time `BASE_DESKTOP_UPDATER_PUBLIC_KEY` and
-  `BASE_DESKTOP_UPDATER_URL`, plus Tauri's private signer key held outside the repo.
-  Normal development builds show that updates are unconfigured. The legacy
-  Sparkle feed and release/install scripts remain unchanged. Test the signed
-  updater and establish its release feed before migrating existing Mac installs.
+- Base 0.1.3 pins the updater public key and staging HTTPS feed in Tauri config.
+  `BASE_DESKTOP_UPDATER_PUBLIC_KEY` / `BASE_DESKTOP_UPDATER_URL` are optional
+  release-time overrides. The private signer remains outside the repo. Linux
+  AppImage update/download/restart is verified; Mac archives are still pending.
+  See [release checks](phase-2.5-news-notes-updates.md). The legacy Sparkle feed
+  and release/install scripts remain unchanged.
   Release builds must also pass `--config src-tauri/tauri.release.conf.json` to
   generate signed updater artifacts, with `TAURI_SIGNING_PRIVATE_KEY` and its
   password supplied securely by the release environment. Linux in-app updates

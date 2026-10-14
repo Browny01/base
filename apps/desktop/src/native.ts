@@ -62,16 +62,16 @@ export async function request(
   });
   if (init.signal?.aborted)
     throw new DOMException("Request aborted", "AbortError");
-  const bytes = Uint8Array.from(atob(result.bodyBase64), (ch) =>
-    ch.charCodeAt(0),
-  );
-  return new Response(bytes, {
-    status: result.status,
-    headers: {
-      "Content-Type": result.contentType,
-      ...(result.cached ? { "X-Base-Cached": "1" } : {}),
-    },
+  return responseOf(result);
+}
+export function responseOf(result: {status:number;contentType:string;bodyBase64:string;cached:boolean}): Response {
+  const bytes = Uint8Array.from(atob(result.bodyBase64), ch => ch.charCodeAt(0));
+  // Fetch forbids bodies for these statuses, including an empty Uint8Array.
+  return new Response([204,205,304].includes(result.status) ? null : bytes, {
+    status:result.status,
+    headers:{"Content-Type":result.contentType,...(result.cached?{"X-Base-Cached":"1"}:{})},
   });
 }
+
 export const documentOf = (data: BaseData): Document =>
   JSON.parse(JSON.stringify(data)) as Document;

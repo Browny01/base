@@ -10,6 +10,7 @@ export interface Env {
   ASSETS?: { fetch: (request: Request) => Promise<Response> };
   DB: D1Database;
   FILES: R2Bucket;
+  RELEASES?: R2Bucket;
   CACHE: KVNamespace;
   JOBS: Queue<{ id: string }>;
   PUBLIC_URL: string;

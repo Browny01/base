@@ -25,7 +25,7 @@ npm run desktop:build
 open apps/desktop/src-tauri/target/release/bundle/macos/Base.app
 ```
 
-Expected tests for this checkpoint: 153 JavaScript, nine standalone workspace
+Expected tests for this checkpoint: 161 JavaScript, nine standalone workspace
 Rust and eleven desktop Rust. macOS build/runtime results must still be recorded on
 your Mac; passing Linux tests does not substitute for them.
 
@@ -73,6 +73,37 @@ CVC for Plus testing. Never enter a real payment card for these acceptance check
 
 Remaining integration/file-upload/migration gates are listed in the status
 report. Production data migration and original Phase 3 have not begun.
+
+## Latest reliability and preference fixes (Base 0.1.3)
+
+Quit the running Base app before opening the new build. To replace the installed
+copy, move the newly built `Base.app` into Applications; replace only the app
+bundle, keeping Application Support and Keychain data. The new ICNS uses the
+house logo. A Dock shortcut pointing to an older app can still open that copy.
+
+In onboarding or Settings → News & integrations, choose the market currency,
+feed types and publications. Existing YouTube sources should remain visible
+and both News and Settings should open even with older partial preferences.
+Check that index quotes remain points and commodity units remain labelled.
+
+In Notes, select text and use Add Link or Cmd+K. Search for another note; the
+picker shows four at a time. Paste bold/coloured text between notes, then restart
+and check formatting persists. Test ordinary typing, Enter and block insertion.
+If the intermittent SyntaxError recurs, use Copy error details and record the
+action; that Mac-specific issue has not been conclusively reproduced on Linux.
+
+Run notification checks from the bundled `Base.app`, not an unbundled executable.
+Normal bundles now receive ad-hoc signing and request macOS notification
+authorization. Verify the test alert and Focus completion with macOS notification
+settings enabled. Linux delivery does not establish Mac delivery.
+
+App updates are under Accounts & Sync. This is the first checkpoint with a pinned
+signing key/feed, so install it manually once. The Linux AppImage signed update
+path has been exercised end-to-end. Mac update archives have not yet been built
+or published; Check for updates currently has no newer Mac release to offer.
+Keep Mac update verification pending until a signed archive is available.
+
+See [fixes, release setup and acceptance results](phase-2.5-news-notes-updates.md).
 
 ## Check the latest interface fixes
 

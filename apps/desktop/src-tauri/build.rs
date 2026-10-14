@@ -19,6 +19,8 @@ fn main() {
             "download_workspace_file",
             "open_external",
             "export_workspace",
+            "notification_permission",
+            "send_notification",
             "check_update",
             "install_update",
             "print_document",

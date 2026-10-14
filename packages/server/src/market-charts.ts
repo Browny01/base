@@ -1,3 +1,4 @@
+import { convertMarketAsset, marketCurrency } from "../../core/src/market-currency.ts";
 import { cachedFetch as fetch } from "./fetch.ts";
 
 import type { AssetData } from "../../core/src/integrations.ts";
@@ -40,7 +41,7 @@ const PRIVATE_ASSETS: AssetData[] = [
   },
 ];
 
-async function getUsdToAud(): Promise<number | null> {
+async function getUsdRates(): Promise<Record<string, number> | null> {
   try {
     const res = await fetch(
       "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",
@@ -51,7 +52,7 @@ async function getUsdToAud(): Promise<number | null> {
     );
     if (res.ok) {
       const d = await res.json();
-      if (typeof d?.usd?.aud === "number") return d.usd.aud;
+      if (typeof d?.usd?.aud === "number" && d.usd.aud > 0) return d.usd;
     }
   } catch {}
   return null;
@@ -164,7 +165,9 @@ async function fetchCryptoAsset(
 }
 
 export async function GET(_request?: Request, apiKey?: string) {
-  const usdToAud = await getUsdToAud();
+  const usdRates = await getUsdRates();
+  const usdToAud = usdRates?.aud ?? null;
+  const currency = marketCurrency(_request ? new URL(_request.url).searchParams.get("currency") : "AUD");
 
   const results = await Promise.allSettled([
     ...YAHOO_ASSETS.map(async (asset) => {
@@ -233,7 +236,7 @@ export async function GET(_request?: Request, apiKey?: string) {
   ];
 
   return Response.json(
-    { assets: allAssets, usdToAud },
+    { assets: allAssets.map(asset => convertMarketAsset(asset, currency, usdRates)), usdToAud, requestedCurrency: currency },
     {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     },

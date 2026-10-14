@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMarketPrice, marketCurrency } from "@/packages/core/src/market-currency";
 import { PageHeading } from "./ui/page-heading";
 
 import { BaseImage } from "@/lib/image";
@@ -37,22 +38,13 @@ import type { NewsArticle } from "@/packages/core/src/integrations";
 import type { SocialFeedItem } from "@/packages/core/src/integrations";
 import {
   CATEGORY_LABEL,
-  DEFAULT_NEWS_PREFS,
+  normalizeNewsPrefs,
   socialFeedQuery,
   type NewsPrefs,
   type VideoCategory,
 } from "@/lib/news-prefs";
 
-function formatPrice(price: number | null, currency = "AUD"): string {
-  if (price === null) return "—";
-  const formatted = price.toLocaleString("en-AU", {
-    minimumFractionDigits: price >= 1000 ? 0 : 2,
-    maximumFractionDigits: price >= 1000 ? 1 : 2,
-  });
-  if (currency === "points") return formatted + " pts";
-  const unit = currency.includes("/") ? "/" + currency.split("/")[1] : "";
-  return (currency.startsWith("USD") ? "US$" : "A$") + formatted + unit;
-}
+const formatPrice = formatMarketPrice;
 
 function timeAgo(dateStr: string): string {
   if (!dateStr) return "";
@@ -355,7 +347,7 @@ function SocialHub({
         </div>
       </div>
 
-      <div className="mb-4">
+      {prefs.feedKinds!.includes("headlines") && (<div className="mb-4">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
             Headlines
@@ -401,7 +393,7 @@ function SocialHub({
             )}
           </div>
         )}
-      </div>
+      </div>)}
 
       <div className="mb-4 flex flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-1">
         {(["all", "crypto", "ai", "irl", "gaming", "general"] as const).map(
@@ -428,7 +420,7 @@ function SocialHub({
         </div>
       ) : (
         <div className="space-y-5">
-          <div>
+          {prefs.feedKinds!.includes("youtube") && (<div>
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
                 YouTube
@@ -492,9 +484,9 @@ function SocialHub({
                 </div>
               )}
             </div>
-          </div>
+          </div>)}
 
-          <div>
+          {prefs.feedKinds!.includes("reddit") && (<div>
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
                 Reddit
@@ -545,9 +537,9 @@ function SocialHub({
                 </div>
               )}
             </div>
-          </div>
+          </div>)}
 
-          <div>
+          {prefs.feedKinds!.includes("x") && (<div>
             <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--faint)]">
                 X
@@ -586,7 +578,7 @@ function SocialHub({
                 <div className="flex h-32 min-w-[280px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border)] px-4 text-center text-sm text-[var(--muted)]">
                   <p>
                     {prefs.x.length
-                      ? "No X posts available. Add X_BEARER_TOKEN to enable synced post fetching."
+                      ? "No X posts available. Add your X integration key in Settings to fetch posts."
                       : "No X accounts configured."}
                   </p>
                   <Link
@@ -598,7 +590,7 @@ function SocialHub({
                 </div>
               )}
             </div>
-          </div>
+          </div>)}
         </div>
       )}
     </section>
@@ -834,7 +826,8 @@ export function NewsPage() {
   const [mktPage, setMktPage] = useState(0);
   const [cols, setCols] = useState(4);
   const { data } = useBase();
-  const prefs = data.newsPrefs ?? DEFAULT_NEWS_PREFS;
+  const prefs = normalizeNewsPrefs(data.newsPrefs);
+  const currency = marketCurrency(data.newsPrefs?.marketCurrency);
 
   const selectedAsset =
     assets.find((asset) => asset.id === selectedAssetId) ??
@@ -865,7 +858,7 @@ export function NewsPage() {
   );
 
   const newsQuery =
-    prefs.newsSources === undefined
+    !prefs.feedKinds!.includes("headlines") ? "?sources=" : prefs.newsSources === undefined
       ? ""
       : "?sources=" + encodeURIComponent(prefs.newsSources.join(","));
   const loadAll = useCallback(
@@ -877,7 +870,7 @@ export function NewsPage() {
       await Promise.allSettled([
         (async () => {
           try {
-            const res = await apiFetch("/api/market/charts", { signal });
+            const res = await apiFetch("/api/market/charts?currency=" + currency, { signal });
             const value = await res.json();
             if (!res.ok || !Array.isArray(value.assets))
               throw new Error(value.error || "Markets could not refresh.");
@@ -920,7 +913,7 @@ export function NewsPage() {
         })(),
       ]);
     },
-    [newsQuery],
+    [newsQuery, currency],
   );
   useEffect(() => {
     const controller = new AbortController();
@@ -1037,7 +1030,7 @@ export function NewsPage() {
         </div>
         <div className="grid content-start gap-4">
           <NewsBriefing />
-          <LiveTracker prefs={prefs} />
+          {prefs.feedKinds!.includes("creators") && <LiveTracker prefs={prefs} />}
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
             <p className="text-xs leading-relaxed text-[var(--muted)]">
               Manage YouTube, Reddit, X, Twitch, and Kick sources from Settings.

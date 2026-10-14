@@ -2,6 +2,7 @@ mod database;
 mod imports;
 mod lifecycle;
 mod note_lock;
+mod notifications;
 mod performance;
 mod transport;
 mod updates;
@@ -115,6 +116,8 @@ fn base_run() {
             transport::download_workspace_file,
             transport::open_external,
             transport::export_workspace,
+            notifications::notification_permission,
+            notifications::send_notification,
             updates::check_update,
             updates::install_update,
             transport::print_document,

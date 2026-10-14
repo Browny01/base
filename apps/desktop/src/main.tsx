@@ -1,13 +1,11 @@
+import { updateInProgress } from "./update-lock";
 import { installNotifications, notifyFocusComplete } from "@/lib/notifications";
 import { installCredentialActions } from "@/components/integration-settings";
 import { createRoot } from "react-dom/client";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import {
-  isPermissionGranted,
-  requestPermission,
-} from "@tauri-apps/plugin-notification";
+
 import { installApiTransport } from "@/lib/api-client";
 import { installPrinter } from "@/lib/print-document";
 import { installNoteVerifier } from "@/lib/note-lock";
@@ -181,15 +179,14 @@ function deepLink(urls: string[]) {
 }
 if (isTauri())
   installNotifications({
-    permission: async () =>
-      (await isPermissionGranted()) ? "granted" : "default",
-    request: requestPermission,
+    permission: () => native<NotificationPermission>("notification_permission", { request: false }),
+    request: () => native<NotificationPermission>("notification_permission", { request: true }),
     send: async (title, body) => {
-      await native("plugin:notification|notify", { options: { title, body } });
+      await native("send_notification", { title, body });
     },
   });
 window.addEventListener("base:focus-complete", () => {
-  void notifyFocusComplete().catch(() => {});
+  void notifyFocusComplete().catch(error => window.dispatchEvent(new CustomEvent("base:notification-error", { detail: String(error) })));
 });
 const root = createRoot(document.getElementById("root")!);
 let vaultSecret: string | null = null;
@@ -269,6 +266,7 @@ if (!isTauri()) {
       deepLink((await getCurrent()) ?? []);
       await onOpenUrl(deepLink);
       await listen<string>("base:menu", ({ payload }) => {
+        if (updateInProgress()) return;
         if (payload.startsWith("/")) window.location.hash = payload;
         else if (payload === "new-task") {
           requestHandoff(HANDOFF_OPEN_NEW_TASK, [LEGACY_HANDOFF_OPEN_NEW_TASK]);

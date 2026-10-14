@@ -1,3 +1,4 @@
+import { desktopUpdate } from "./desktop-updates.ts";
 import { credentialStatus, saveCredential } from "./credentials.ts";
 import { PUBLIC_INTEGRATION_PATHS } from "../../../packages/core/src/providers.ts";
 import {
@@ -61,6 +62,8 @@ async function route(request: Request, env: Env) {
         "Access-Control-Allow-Headers": "Authorization,Content-Type",
       },
     });
+  const release = await desktopUpdate(request, env);
+  if (release) return release;
   if (path === "/api/config" && method === "GET")
     return response({
       clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY ?? "",

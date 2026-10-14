@@ -1,3 +1,4 @@
+import { reportSyntaxError } from "./runtime-errors";
 import { useSyncExternalStore } from "react";
 import {
   DEFAULT,
@@ -182,6 +183,7 @@ export function persistEdit(updater: (data: BaseData) => BaseData) {
     schedule();
   })
     .catch((error) => {
+      reportSyntaxError(error, "Saving or synchronizing the local workspace");
       setStatus({
         error: `This edit could not be saved: ${String(error)}. Please retry or export your data.`,
       });
@@ -368,6 +370,7 @@ export async function sync(): Promise<void> {
     });
   })()
     .catch((error) => {
+      reportSyntaxError(error, "Saving or synchronizing the local workspace");
       if (workspace?.scope !== scopeAtStart) {
         requestedAgain = true;
         return;

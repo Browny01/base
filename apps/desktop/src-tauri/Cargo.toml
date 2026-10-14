@@ -36,9 +36,13 @@ open = "5"
 keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+mac-usernotifications = "0.3.1"
 keyring = { version = "3.6", features = ["apple-native"] }
 
 [profile.release]
 lto = "thin"
 codegen-units = 1
 strip = true
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+notify-rust = "4.18.2"

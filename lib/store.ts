@@ -2,7 +2,7 @@
 
 import { DEFAULT_AI_SETTINGS, normalizeAiSettings, type AiSettings } from "@/lib/ai-settings";
 import { DEFAULT_PROFILE, type UserProfile } from "@/lib/profile";
-import { DEFAULT_NEWS_PREFS, type NewsPrefs } from "@/lib/news-prefs";
+import { DEFAULT_NEWS_PREFS, normalizeNewsPrefs, type NewsPrefs } from "@/lib/news-prefs";
 import { DEFAULT_AUTONOMY_SETTINGS, type AutonomySettings, type AutonomyState, type AutonomyTaskClass } from "@/lib/autonomy";
 import { DEFAULT_NAV_PREFS, type NavPrefs } from "@/lib/nav-config";
 
@@ -916,6 +916,7 @@ function migrateExistingInstall(data: BaseData): BaseData {
 // explicitly: load() only re-parses on a cache miss, so previously-pulled
 // server data would otherwise sit unmigrated in the cache until a reload.
 export function migrateAll(data: BaseData, options: { preserveArchived?: boolean } = {}): BaseData {
+  data = { ...data, newsPrefs: normalizeNewsPrefs(data.newsPrefs) };
   const normalized = migrateTaskTags(migrateBoards(migrateProjects(migrateHabits(migrateIncomeTypes(data)))));
   return migrateExistingInstall(options.preserveArchived ? normalized : migrateAwayChat(purgeOldTrash(normalized)));
 }

@@ -15,7 +15,8 @@ Preview the [website](https://base-cloud-staging.kingbrownyplayz.workers.dev/) o
 [open Base in your browser](https://base-cloud-staging.kingbrownyplayz.workers.dev/app/).
 Cloud uses Clerk Development and Stripe sandbox; the production domain has not
 been cut over. Browser access requires Cloud login. See
-[latest onboarding and account checks](docs/phase-2.5-onboarding.md) and
+[latest reliability, preference and update checks](docs/phase-2.5-news-notes-updates.md),
+[onboarding and account checks](docs/phase-2.5-onboarding.md) and
 [earlier integration fixes](docs/phase-2.5-improvements.md).
 
 ## Highlights

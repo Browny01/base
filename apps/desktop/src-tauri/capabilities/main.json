@@ -21,6 +21,8 @@
     "allow-api-request",
     "allow-open-external",
     "allow-export-workspace",
+    "allow-notification-permission",
+    "allow-send-notification",
     "allow-check-update",
     "allow-install-update",
     "allow-print-document",

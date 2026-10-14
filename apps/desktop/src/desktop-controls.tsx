@@ -1,3 +1,4 @@
+import { ApplicationUpdates } from "./application-updates";
 import { WorkspaceNoteSettings } from "./workspace-note-settings";
 import { NotificationSettings } from "@/components/notification-settings";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -40,8 +41,6 @@ export function DesktopAccountSettings() {
   const confirm = useConfirm();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [update, setUpdate] = useState<string | null>(null);
-  const [updateMessage, setUpdateMessage] = useState("");
   const [offlineWorkspaces, setOfflineWorkspaces] = useState<
     { scope: string; label: string }[]
   >([]);
@@ -116,6 +115,7 @@ export function DesktopAccountSettings() {
         )}
       </div>
       <NotificationSettings />
+      {isTauri() && <ApplicationUpdates />}
       <div className="base-account-actions">
         <button
           onClick={() =>
@@ -165,23 +165,6 @@ export function DesktopAccountSettings() {
             account
           </button>
         )}
-        {isTauri() && (
-          <button
-            onClick={() =>
-              void action(async () => {
-                const version = await native<string | null>("check_update");
-                setUpdate(version);
-                setUpdateMessage(
-                  version
-                    ? `Version ${version} is available.`
-                    : "This build is up to date.",
-                );
-              })
-            }
-          >
-            Check for updates
-          </button>
-        )}
         {!status.local && (
           <button
             disabled={busy || status.hasUnsaved}
@@ -217,22 +200,6 @@ export function DesktopAccountSettings() {
         records; collisions and legacy deletions require review. Original
         snapshots and local workspaces are retained.
       </p>}
-      {updateMessage && (
-        <p role="status" className="my-2 text-xs">
-          {updateMessage}
-        </p>
-      )}
-      {update && (
-        <button
-          disabled={
-            busy || status.pending > 0 || status.saving || status.hasUnsaved
-          }
-          onClick={() => void action(() => native("install_update"))}
-          className="my-2 text-sm underline"
-        >
-          Install signed update and restart
-        </button>
-      )}
       {status.hasUnsaved && (
         <div role="alert" className="my-3 text-sm">
           <p>
@@ -388,8 +355,20 @@ export function DesktopFeedback() {
       toast(String((event as CustomEvent).detail).replace(/^Error: /, ""), {
         duration: 9000,
       });
+    const showSyntax = (value: string) => {
+      const details = value.replace(/https?:\/\/[^\s)]+/g, value => { try { const url = new URL(value); return url.origin + url.pathname; } catch { return "[source]"; } });
+      toast("This edit hit a browser error. Copy its details before retrying or exporting your workspace.", {duration:20000, action:{label:"Copy error details",onClick:()=>{ void navigator.clipboard.writeText(details).catch(()=>{}); }}});
+    };
+    const syntax = (event: ErrorEvent) => { if (event.message.includes("SyntaxError") || event.error?.name === "SyntaxError") showSyntax(String(event.error?.stack || `${event.message} at ${event.filename}:${event.lineno}:${event.colno}`)); };
+    const savedSyntax = (event: Event) => showSyntax(String((event as CustomEvent).detail));
+    const rejected = (event: PromiseRejectionEvent) => { if (event.reason?.name === "SyntaxError" || /SyntaxError|expected pattern/i.test(String(event.reason))) showSyntax(String(event.reason?.stack || event.reason)); };
+    window.addEventListener("base:syntax-error", savedSyntax);
+    window.addEventListener("unhandledrejection", rejected);
+    window.addEventListener("error", syntax);
     window.addEventListener("base:download-error", failed);
-    return () => window.removeEventListener("base:download-error", failed);
+    window.addEventListener("base:notification-error", failed);
+    window.addEventListener("base:editor-error", failed);
+    return () => { window.removeEventListener("base:syntax-error", savedSyntax); window.removeEventListener("unhandledrejection", rejected); window.removeEventListener("error", syntax); window.removeEventListener("base:download-error", failed); window.removeEventListener("base:notification-error", failed); window.removeEventListener("base:editor-error", failed); };
   }, [toast]);
   return null;
 }

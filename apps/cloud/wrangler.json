@@ -26,6 +26,10 @@
     {
       "binding": "FILES",
       "bucket_name": "base-cloud-files-staging"
+    },
+    {
+      "binding": "RELEASES",
+      "bucket_name": "base-desktop-releases-staging"
     }
   ],
   "kv_namespaces": [

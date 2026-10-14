@@ -584,7 +584,7 @@ export function ExtraBlock({ block, onPatch, allPages, currentPageId, pageBlocks
         {heads.length === 0 ? <p className="text-[12.5px] text-[var(--faint)]">Add headings to build a table of contents.</p> : (
           <div className="space-y-0.5">
             {heads.map((h) => (
-              <button key={h.id} onClick={() => document.querySelector(`[data-block-id="${h.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              <button key={h.id} onClick={() => Array.from(document.querySelectorAll<HTMLElement>("[data-block-id]")).find(element=>element.dataset.blockId===h.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 className="block w-full text-left text-[13px] text-[var(--muted)] hover:text-[var(--text)] truncate" style={{ paddingLeft: h.type === "h2" ? 12 : h.type === "h3" ? 24 : 0 }}>
                 {plain(h.text) || "Untitled heading"}
               </button>

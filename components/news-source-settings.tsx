@@ -5,18 +5,23 @@ import { apiFetch } from "@/lib/api-client";
 import { NEWS_SOURCES } from "@/packages/core/src/news-sources";
 import {
   CATEGORY_LABEL,
+  FEED_KINDS,
+  normalizeNewsPrefs,
   uid,
   type NewsPrefs,
   type YoutubeChannel,
 } from "@/lib/news-prefs";
+import { MARKET_CURRENCIES, marketCurrency } from "@/packages/core/src/market-currency";
 type Platform = "youtube" | "reddit" | "x" | "twitch" | "kick";
 export function NewsSourceSettings({
-  prefs,
-  setPrefs,
+  prefs: rawPrefs,
+  setPrefs: writePrefs,
 }: {
   prefs: NewsPrefs;
   setPrefs: (prefs: NewsPrefs | ((current: NewsPrefs) => NewsPrefs)) => void;
 }) {
+  const prefs = normalizeNewsPrefs(rawPrefs);
+  const setPrefs = (next: NewsPrefs | ((current: NewsPrefs) => NewsPrefs)) => writePrefs(current => normalizeNewsPrefs(typeof next === "function" ? next(normalizeNewsPrefs(current)) : next));
   const [platform, setPlatform] = useState<Platform>("youtube"),
     [input, setInput] = useState(""),
     [name, setName] = useState(""),
@@ -168,6 +173,10 @@ export function NewsSourceSettings({
           </p>
         </div>
       </div>
+      <label className="mb-5 grid gap-2 text-sm">Market display currency<select className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2" value={prefs.marketCurrency} onChange={e=>{ const currency = marketCurrency(e.currentTarget.value); setPrefs(current=>({...normalizeNewsPrefs(current),marketCurrency:currency})); }}>{MARKET_CURRENCIES.map(currency=><option key={currency} value={currency}>{currency}</option>)}</select><span className="text-xs text-[var(--muted)]">Stocks, crypto and commodities use this currency. Indices stay in points.</span></label>
+      <h3 className="mb-2 text-sm font-medium">Feeds to include</h3>
+      <div className="base-news-publications mb-5">{FEED_KINDS.map(kind=><label key={kind}><input type="checkbox" checked={prefs.feedKinds!.includes(kind)} onChange={e=>{ const checked=e.currentTarget.checked;setPrefs(current=>{ const normalized=normalizeNewsPrefs(current), active=normalized.feedKinds!;return {...normalized,feedKinds:checked?[...active,kind]:active.filter(item=>item!==kind)}; }); }}/><span><strong>{({headlines:"News headlines",youtube:"YouTube",reddit:"Reddit",x:"X",creators:"Live creators"})[kind]}</strong></span></label>)}</div>
+      <h3 className="mb-2 text-sm font-medium">Headline publications</h3>
       <div className="base-news-publications">
         {NEWS_SOURCES.map((source) => (
           <label key={source.id}>
