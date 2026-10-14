@@ -287,6 +287,36 @@ try {
     ).status,
     401,
   );
+  let syncLoad: { notes: number; tasks: number; bytes: number; requests: number } | undefined;
+  if (process.argv.includes("--sync-load")) {
+    const document:Document={
+      tasks:Array.from({length:25},(_,i)=>({id:`load-task-${i}`,title:`Task ${i}`,done:false})),
+      wikiPages:Array.from({length:100},(_,i)=>({id:`load-note-${i}`,title:`Note ${i}`,blocks:[{id:`block-${i}`,text:"Offline notes. ".repeat(40)}]})),
+    };
+    let pending=diff({},document),revision=0,requests=0;
+    while(pending.length) {
+      const batch=pending.slice(0,200);
+      const body={protocol:2,workspaceId:bob.workspace,cursor:revision,operations:batch};
+      const result=await request("/api/native/sync",bob.token,"POST",body);
+      assert.equal(result.status,200,"Load sync exceeded the free-tier budget");
+      const response=await result.json() as SyncResponse;
+      assert.ok(response.applied.length>0 && response.applied.length<=8);
+      assert.equal(response.conflicts.length,0);
+      if(requests===0) {
+        const retry=await request("/api/native/sync",bob.token,"POST",body);
+        assert.equal(retry.status,200);
+        const repeated=await retry.json() as SyncResponse;
+        assert.deepEqual(repeated.applied,response.applied);
+        assert.equal(repeated.revision,response.revision);
+      }
+      pending=pending.filter(op=>!response.applied.includes(op.id));revision=response.revision;requests++;
+      if(!pending.length) {
+        assert.deepEqual(response.data?.tasks,document.tasks);
+        assert.deepEqual(response.data?.wikiPages,document.wikiPages);
+      }
+    }
+    syncLoad={notes:100,tasks:25,bytes:Buffer.byteLength(JSON.stringify(document)),requests};
+  }
   const device = await request("/api/devices/revoke", alice.token, "POST", {
     deviceId: alice.device,
   });
@@ -299,6 +329,7 @@ try {
     JSON.stringify(
       {
         environment: remote ? "remote staging" : "local workerd",
+        ...(syncLoad ? {syncLoad} : {}),
         checks: [
           "durable offline queue replay",
           "receipt idempotency",

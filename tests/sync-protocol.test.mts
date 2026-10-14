@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { absent, present, diff, mergeOperations, overlay, readSlot, validOperation, type Document, type Operation } from "../packages/sync/src/protocol.ts";
+import { absent, present, diff, mergeOperations, overlay, readSlot, writeSlot, validOperation, type Document, type Operation } from "../packages/sync/src/protocol.ts";
 let sequence = 0;
 const id = () => `op-${++sequence}`;
 const seed = (): Document => ({ tasks: [{ id: "a", title: "before", done: false, unknown: { keep: 1 } }], future: { retained: true } });
+test("path copies preserve the original snapshot and detach incoming values", () => {
+  const before:Document={wikiPages:[{id:"p",blocks:[{id:"b",text:"old"}]},{id:"untouched",blocks:[]}],future:{keep:true}};
+  const original=structuredClone(before);
+  const incoming={text:"new",style:{bold:true}};
+  const op:Operation={id:"copy",baseRevision:0,path:["wikiPages",{id:"p"},"blocks",{id:"b"},"text"],action:"set",before:present("old"),after:present(incoming)};
+  const result=writeSlot(before,op)!;
+  incoming.style.bold=false;
+  assert.deepEqual(before,original);
+  assert.deepEqual(readSlot(result,op.path),present({text:"new",style:{bold:true}}));
+  assert.equal(result.future,before.future);
+  assert.equal((result.wikiPages as Document[])[1],(before.wikiPages as Document[])[1]);
+  const second=writeSlot(result,{...op,id:"second",after:present("again")})!;
+  assert.deepEqual(readSlot(result,op.path),present({text:"new",style:{bold:true}}));
+  assert.deepEqual(readSlot(second,op.path),present("again"));
+  assert.deepEqual(before,original);
+});
 test("field patches merge disjoint concurrent edits and preserve unknown fields", () => {
   const base = seed();
   const local = structuredClone(base); (local.tasks as Document[])[0].title = "local";

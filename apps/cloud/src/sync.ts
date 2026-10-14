@@ -187,7 +187,8 @@ export async function synchronize(
     input.operations.length > 200
   )
     throw new HttpError(400, "Workspace, cursor or protocol mismatch");
-  const operations = await resolveOperations(env, workspace, input.operations);
+  // A partial acknowledgement leaves the remaining operations in every client's outbox.
+  const operations = await resolveOperations(env, workspace, input.operations.slice(0, 8));
   for (let attempt = 0; attempt < 6; attempt++) {
     const snap = await snapshot(env, workspace),
       revision = snap.workspace.revision;

@@ -46,11 +46,43 @@ requests returned 503 with outcome `exceededCpu`, each at 10 ms CPU time (sample
 wall times 422–593 ms). The owner confirmed no VPN/WARP connection. The live
 Worker has no explicit custom CPU limit. This establishes a hosting CPU limit
 as the cause of the recurring incident; the earlier small-fixture test was
-insufficient to establish real-workspace reliability. Workers Paid enablement
-and a real-workspace retry are pending owner action. See the hosting CPU
+insufficient to establish real-workspace reliability. The initial Workers Paid
+recommendation was superseded by the owner's free-tier decision below. See the hosting CPU
 requirement in [Cloud setup](cloud-setup.md#hosting-cpu-requirement). No billing
 change, production data change or speculative conflict-handling rewrite was
 performed.
+
+### Free-tier optimization after owner's decision
+
+The owner explicitly retained Workers Free. The shared `writeSlot` now copies
+only the edited ancestors, retaining unmodified branches and deep-cloning newly
+inserted values. Reordering uses indexed buckets rather than scanning every row
+for every ID. Inputs and previous snapshots stay unchanged. Cloud sync processes
+eight operations per request, acknowledging only that subset; remaining operations
+stay durably queued and retain their original IDs, preconditions and revisions.
+No records, history or conflict protections were removed to meet the CPU budget.
+
+All 165 JavaScript tests, root/desktop/Cloud type checks, changed-file ESLint and
+the Cloud dry-run build passed. Tests include immutable nested edits, partial
+batch retries without duplicate acknowledgements, complete outbox draining and
+existing conflict/deletion/protected-field coverage. Backend optimization deployed
+to staging version `e8f64b7c-ab72-4aef-b673-9f79eb9010c9`; existing desktop clients
+can use it immediately without rebuilding.
+
+On Linux, Node v25.9.0, AMD Ryzen 5 5600G, merging 100 task field edits against
+a 1,648,505-byte synthetic document containing 1,000 notes took a median 485.09 ms
+before and 0.38 ms after, over five runs per implementation. This measures the
+merge function only, not full Workers synchronization or Mac performance.
+
+The real staging fixture suite with `--sync-load` successfully synchronized 100
+notes and 25 tasks (69,200-byte document) over 16 partial commits and verified a
+duplicate first-batch retry. A bounded live tail observed 20 fixture sync calls,
+all HTTP 200, with CPU times 3–23 ms (median 7 ms). Successful outliers used
+Cloudflare's burst flexibility; these are not evidence of a strict sub-10-ms
+guarantee. Fixtures and their objects were cleaned up; production data was not
+accessed. Actual owner workspace verification is pending. Larger snapshots,
+uploads and integrations can still exceed the free-tier budget and may require
+further incremental processing. Billing and production hosting were unchanged.
 
 ## Priority order
 

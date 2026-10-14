@@ -38,6 +38,28 @@ const options = (
   operations: Operation[],
 ) => ({ protocol: 2 as const, workspaceId, cursor, operations });
 
+test("bounded Cloud sync batches acknowledge only processed edits and drain safely after retries", async () => {
+  const {env,account}=cloudEnvironment();
+  const {principal}=await account("batch-fixture");
+  const before:Document={tasks:[]};
+  const after:Document={tasks:Array.from({length:25},(_,i)=>({id:`batch-${i}`,title:`Task ${i}`}))};
+  const operations=diff(before,after);
+  let pending=[...operations],revision=0;
+  const first=await synchronize(env,principal,options(principal.workspace.id,revision,pending));
+  assert.equal(first.applied.length,8);
+  const retry=await synchronize(env,principal,options(principal.workspace.id,revision,pending));
+  assert.equal(retry.revision,first.revision);
+  assert.deepEqual(retry.applied,first.applied);
+  pending=pending.filter(op=>!first.applied.includes(op.id));revision=first.revision;
+  while(pending.length) {
+    const response=await synchronize(env,principal,options(principal.workspace.id,revision,pending));
+    assert.ok(response.applied.length>0 && response.applied.length<=8);
+    assert.equal(response.conflicts.length,0);
+    pending=pending.filter(op=>!response.applied.includes(op.id));revision=response.revision;
+  }
+  assert.deepEqual((await snapshot(env,principal.workspace.id)).data.tasks,after.tasks);
+});
+
 test("cloud receipts, revisions, unknown fields and conflicting offline edits survive retries", async () => {
   const { env, account } = cloudEnvironment();
   const { principal } = await account("alice");

@@ -116,7 +116,8 @@ export function readSlot(doc: Document, path: Segment[], action: Operation["acti
 
 /** Returns null when a containing record was deleted. Never resurrect a parent. */
 export function writeSlot(doc: Document, op: Operation): Document | null {
-  const result = structuredClone(doc);
+  // Copy the edited path only; cloning every note for each field exhausts edge CPU.
+  const result = { ...doc };
   let parent: Json = result;
   for (let i = 0; i < op.path.length - 1; i++) {
     const s = op.path[i];
@@ -126,12 +127,16 @@ export function writeSlot(doc: Document, op: Operation): Document | null {
         if (op.before.exists) return null;
         parent[s] = typeof op.path[i + 1] === "string" ? {} : [];
       }
+      const child: Json = parent[s];
+      parent[s] = Array.isArray(child) ? [...child] : object(child) ? { ...child } : child;
       parent = parent[s];
     } else {
       if (!Array.isArray(parent)) return null;
-      const found: Json | undefined = parent.find(v => object(v) && v.id === s.id);
-      if (found === undefined) return null;
-      parent = found;
+      const index = parent.findIndex(v => object(v) && v.id === s.id);
+      if (index < 0) return null;
+      const child = parent[index] as Document;
+      parent[index] = { ...child };
+      parent = parent[index];
     }
   }
   const leaf = op.path.at(-1)!;
@@ -140,8 +145,14 @@ export function writeSlot(doc: Document, op: Operation): Document | null {
     if (!slot.exists || !Array.isArray(slot.value) || !op.after.exists || !Array.isArray(op.after.value)) return null;
     const ids = op.after.value;
     const rows = slot.value;
-    const ordered = ids.flatMap(id => rows.filter(v => object(v) && v.id === id));
-    ordered.push(...rows.filter(v => !object(v) || !ids.includes(v.id)));
+    const buckets = new Map<Json, Json[]>();
+    for (const row of rows) if (object(row)) {
+      const bucket = buckets.get(row.id) ?? [];
+      bucket.push(row); buckets.set(row.id, bucket);
+    }
+    const ordered = ids.flatMap(id => buckets.get(id) ?? []);
+    const selected = new Set(ids);
+    ordered.push(...rows.filter(v => !object(v) || !selected.has(v.id)));
     return writeSlot(result, { ...op, action: "set", after: present(ordered) });
   }
   if (typeof leaf === "string") {
