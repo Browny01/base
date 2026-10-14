@@ -41,6 +41,17 @@ so its underlying cause remains unconfirmed; no speculative service or data
 changes were made. Historical telemetry querying was unavailable with the
 CLI's current permissions.
 
+The recurrence was subsequently captured in a bounded live tail: 14 sync
+requests returned 503 with outcome `exceededCpu`, each at 10 ms CPU time (sample
+wall times 422–593 ms). The owner confirmed no VPN/WARP connection. The live
+Worker has no explicit custom CPU limit. This establishes a hosting CPU limit
+as the cause of the recurring incident; the earlier small-fixture test was
+insufficient to establish real-workspace reliability. Workers Paid enablement
+and a real-workspace retry are pending owner action. See the hosting CPU
+requirement in [Cloud setup](cloud-setup.md#hosting-cpu-requirement). No billing
+change, production data change or speculative conflict-handling rewrite was
+performed.
+
 ## Priority order
 
 Most important, implemented first:

@@ -21,6 +21,32 @@ Queues for a durable SQL job outbox and an hourly cron. A deployment's public
 URL must equal its configured `PUBLIC_URL`; staging uses its workers.dev URL,
 while production will eventually use `https://base.lucasbrown.xyz`.
 
+### Hosting CPU requirement
+
+Use **Workers Paid** for the managed Base backend. Workers Free allows only
+10 ms of CPU per HTTP invocation; it is suitable for small fixtures, but does
+not reliably cover synchronization of a real workspace. This is the owner's
+Cloudflare hosting subscription, separate from users' Base Cloud Free/Plus
+plans. Workers Paid starts at US$5/month with usage overages; enabling R2 alone
+does not upgrade Workers. No billing subscription is changed by repository
+scripts.
+
+On 14 October, live staging logs captured 14 `/api/native/sync` requests with
+outcome `exceededCpu`, HTTP 503 and CPU time 10 ms. The owner confirmed no VPN
+or WARP was in use. Worker settings had no explicit custom CPU limit. The
+unreadable body is Cloudflare's resource-limit response, outside Base's JSON
+error handler. A successful small-fixture smoke test does not clear this gate.
+
+Enable Workers Paid in the Cloudflare dashboard under Workers & Pages, then
+retry the desktop sync icon. The app retains its existing SQLite records and
+outbox; no reinstall, account reset or data import is needed. Capture live tail
+results and confirm the pending operation count drains before marking the
+incident resolved. On Paid, the default HTTP CPU limit is 30 seconds; establish
+a smaller explicit budget after measuring representative workspace workloads.
+
+References: [Workers CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-time)
+and [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/).
+
 ## Clerk
 
 1. Create/sign in to [Clerk Dashboard](https://dashboard.clerk.com/).
