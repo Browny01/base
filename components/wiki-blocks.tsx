@@ -1,5 +1,7 @@
 "use client";
 
+import { NoteIcon } from "./note-icon";
+
 import { BaseImage } from "@/lib/image";
 
 import { apiFetch } from "@/lib/api-client";
@@ -613,7 +615,7 @@ export function ExtraBlock({ block, onPatch, allPages, currentPageId, pageBlocks
           <p className="px-1 py-1 text-[11px] font-semibold text-[var(--faint)] uppercase tracking-widest flex items-center gap-1.5"><Link2 className="w-3.5 h-3.5" /> Embed a note</p>
           <div className="max-h-44 overflow-y-auto">
             {allPages.filter((p) => p.id !== currentPageId).map((p) => (
-              <button key={p.id} onClick={() => onPatch({ pageId: p.id })} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[13px] text-[var(--text)] hover:bg-[var(--surface-2)]"><span>{p.icon || "📄"}</span><span className="truncate">{p.title || "Untitled"}</span></button>
+              <button key={p.id} onClick={() => onPatch({ pageId: p.id })} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[13px] text-[var(--text)] hover:bg-[var(--surface-2)]"><span><NoteIcon value={p.icon}/></span><span className="truncate">{p.title || "Untitled"}</span></button>
             ))}
           </div>
         </div>
@@ -622,7 +624,7 @@ export function ExtraBlock({ block, onPatch, allPages, currentPageId, pageBlocks
     const preview = target.blocks.map((b) => plain(b.text)).filter(Boolean).slice(0, 6).join("\n");
     return (
       <div className={cn("my-1 p-3", card)}>
-        <button onClick={() => onOpenPage(target.id)} className="flex items-center gap-1.5 text-[13.5px] font-medium text-[var(--text)] hover:underline"><span>{target.icon || "📄"}</span>{target.title || "Untitled"}<ExternalLink className="w-3.5 h-3.5 text-[var(--faint)]" /></button>
+        <button onClick={() => onOpenPage(target.id)} className="flex items-center gap-1.5 text-[13.5px] font-medium text-[var(--text)] hover:underline"><span><NoteIcon value={target.icon}/></span>{target.title || "Untitled"}<ExternalLink className="w-3.5 h-3.5 text-[var(--faint)]" /></button>
         <p className="mt-1.5 text-[13px] text-[var(--muted)] whitespace-pre-line line-clamp-6">{preview || "Empty note."}</p>
         <button onClick={() => onPatch({ pageId: undefined })} className="mt-2 text-[11px] text-[var(--faint)] hover:text-[var(--text)]">Change note</button>
       </div>
@@ -638,7 +640,7 @@ export function ExtraBlock({ block, onPatch, allPages, currentPageId, pageBlocks
           <div className="divide-y divide-[var(--border)]">
             {kids.map((p) => (
               <button key={p.id} onClick={() => onOpenPage(p.id)} className="w-full flex items-center gap-2 py-1.5 text-left hover:bg-[var(--surface-2)] rounded px-1">
-                <span>{p.icon || "📄"}</span><span className="flex-1 truncate text-[13px] text-[var(--text)]">{p.title || "Untitled"}</span>
+                <span><NoteIcon value={p.icon}/></span><span className="flex-1 truncate text-[13px] text-[var(--text)]">{p.title || "Untitled"}</span>
                 <span className="text-[11px] text-[var(--faint)] shrink-0">{new Date(p.updatedAt).toLocaleDateString()}</span>
               </button>
             ))}

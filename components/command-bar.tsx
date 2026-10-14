@@ -1,5 +1,7 @@
 "use client";
 
+import { NoteIcon } from "./note-icon";
+
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { writeStored } from "@/lib/prefs";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -150,7 +152,7 @@ export function CommandBar() {
         className={cn("w-full flex items-center gap-3 px-2.5 h-10 rounded-lg text-left transition-colors", isActive ? "bg-[var(--chip)]" : "bg-transparent")}
       >
         <span className={cn("flex items-center justify-center w-7 h-7 rounded-md border shrink-0 text-[15px]", isActive ? "border-[var(--border-2)] bg-[var(--bg)]" : "border-[var(--border)] bg-[var(--surface-2)]")}>
-          {it.kind === "wiki" ? it.emoji : <Icon className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />}
+          {it.kind === "wiki" ? <NoteIcon value={it.emoji}/> : <Icon className="w-4 h-4 text-[var(--text)]" strokeWidth={1.9} />}
         </span>
         <span className="text-[13.5px] text-[var(--text)] font-medium truncate">{it.label}</span>
         {isCurrent && <span className="text-[11px] text-[var(--faint)] border border-[var(--border)] rounded px-1.5 py-0.5">Current</span>}

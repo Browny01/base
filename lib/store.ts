@@ -608,7 +608,7 @@ export interface WikiPage {
   folderId?: string | null;  // groups top-level pages under a sidebar folder
   title: string;
   description?: string;      // optional subheading under the title
-  icon: string;              // emoji
+  icon: string;              // emoji or bounded offline PNG data URL
   blocks: WikiBlock[];
   fullWidth?: boolean;       // wide layout vs centered column
   locked?: boolean;          // requires a password to view the content

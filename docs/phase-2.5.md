@@ -108,9 +108,11 @@ formatted paste, corrected icons and signed updates. See
 installation/restart was exercised with retained records/outbox; Mac release
 builds and notification delivery remain pending. Base 0.1.4 maps the supplied
 Mac SyntaxError trace to non-JSON Cloud sync error parsing and reports the HTTP
-status while retaining offline edits. The underlying intermittent Cloud failure
-and Mac verification remain pending. The suite now contains 163 passing
-JavaScript tests.
+status while retaining offline edits. The recurring Cloud failure was traced to
+the free-tier CPU limit; bounded commits/path copying were deployed per the
+owner's decision to retain that tier. Actual owner-workspace verification remains
+pending. Base 0.1.5 adds [Notes selection, paragraph and icon fixes](notes-0.1.5.md).
+The suite now contains 167 passing JavaScript tests; Mac verification remains pending.
 
 The 12 October onboarding/profile/shared-note-password checkpoint is documented in
 [onboarding and account checks](phase-2.5-onboarding.md): 153 JavaScript,

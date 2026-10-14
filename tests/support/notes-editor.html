@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Base Notes regression fixture</title></head>
+<body><div id="notes-fixture"></div><script type="module">
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {WikiEditor} from '../../components/wiki-editor.tsx';
+import {runNoteSelectionChecks} from '../../tests/note-selection.browser.ts';
+import '../../apps/desktop/src/desktop.css';
+const checks=runNoteSelectionChecks();
+document.title=`Base Notes: ${checks.checks} DOM checks passed`;
+window.__noteFixture={changes:[],root:createRoot(document.getElementById('notes-fixture')),page:{id:'note-test',icon:'📄',title:'Selection test',description:'Keep this heading',blocks:[{id:'a',type:'text',text:'First paragraph'},{id:'b',type:'text',text:'Second paragraph'},{id:'c',type:'text',text:'Third paragraph'}],createdAt:'2026-10-14',updatedAt:'2026-10-14'}};
+window.__mountNote=()=>window.__noteFixture.root.render(React.createElement(WikiEditor,{key:Date.now(),page:window.__noteFixture.page,allPages:[],fullWidth:false,onChange:patch=>window.__noteFixture.changes.push(patch),onOpenPage:()=>{}}));
+window.__mountNote();
+</script></body></html>

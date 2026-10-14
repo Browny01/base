@@ -1,5 +1,7 @@
 "use client";
 
+import { NoteIcon } from "./note-icon";
+
 import { loadNewsBriefing } from "@/lib/news-briefing";
 import { DEFAULT_AI_SETTINGS } from "@/lib/ai-settings";
 
@@ -309,7 +311,7 @@ export function Dashboard() {
         return (
           <WidgetPanel title="Recent notes" icon={<NotebookText className="w-[15px] h-[15px]" />} href="/notes">
             {recentNotes.length === 0 ? <WidgetEmpty>Your recently edited notes will appear here.</WidgetEmpty> : (
-              <div className="space-y-1">{recentNotes.slice(0, 7).map((page) => <Link key={page.id} href="/notes" onClick={() => localStorage.setItem("base_wiki_active", page.id)} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><span className="text-base shrink-0">{page.icon || "📄"}</span><span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text)] truncate">{page.title || "Untitled"}</span><span className="text-[10.5px] text-[var(--faint)] shrink-0">{new Date(page.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></Link>)}</div>
+              <div className="space-y-1">{recentNotes.slice(0, 7).map((page) => <Link key={page.id} href="/notes" onClick={() => localStorage.setItem("base_wiki_active", page.id)} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]"><span className="text-base shrink-0"><NoteIcon value={page.icon}/></span><span className="flex-1 min-w-0 text-[13px] font-medium text-[var(--text)] truncate">{page.title || "Untitled"}</span><span className="text-[10.5px] text-[var(--faint)] shrink-0">{new Date(page.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></Link>)}</div>
             )}
           </WidgetPanel>
         );

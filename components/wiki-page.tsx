@@ -1,5 +1,8 @@
 "use client";
 
+import { NoteIcon } from "./note-icon";
+import { isNoteImage } from "@/lib/note-icon";
+
 import { verifyNotePassword } from "@/lib/note-lock";
 
 import { printDocument } from "@/lib/print-document";
@@ -168,7 +171,7 @@ function pageToPrintDoc(page: WikiPageT): string {
     table{border-collapse:collapse;margin:.6em 0} th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;font-size:14px} th{background:#f5f5f5}
     img{max-width:100%;border-radius:8px} figcaption{font-size:12px;color:#666;margin-top:4px} .pg-title{font-size:38px;font-weight:800;margin-bottom:.4em}
     .callout{background:#f5f5f5;border:1px solid #e5e5e5;border-radius:8px;padding:10px 14px;margin:.5em 0} details{margin:.4em 0} summary{font-weight:600;cursor:pointer}
-  </style></head><body><div class="pg-title">${page.icon || "📄"} ${title}</div>${body}</body></html>`;
+  </style></head><body><div class="pg-title">${isNoteImage(page.icon)?`<img src="${page.icon}" alt="" style="width:28px;height:28px;object-fit:contain;vertical-align:middle">`:esc(page.icon||"📄")} ${title}</div>${body}</body></html>`;
 }
 
 export function WikiPage() {
@@ -537,7 +540,7 @@ export function WikiPage() {
         </div>
 
         {/* ── Trash ──────────────────────────────────────────────────────── */}
-        <div className="shrink-0 border-t border-[var(--border)] px-1.5 py-1.5">
+        <div className="shrink-0 border-t border-[var(--border)] px-1.5 pt-1.5">
           <button
             onClick={() => setTrashOpen((v) => !v)}
             className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[13px] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
@@ -557,7 +560,7 @@ export function WikiPage() {
                   .sort((a, b) => (b.deletedAt ?? "").localeCompare(a.deletedAt ?? ""))
                   .map((p) => (
                     <div key={p.id} className="group flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[var(--muted)] hover:bg-[var(--surface-2)]">
-                      <span className="shrink-0 text-[13px]">{p.icon || "📄"}</span>
+                      <span className="shrink-0 text-[13px]"><NoteIcon value={p.icon}/></span>
                       <span className="flex-1 truncate text-[12.5px]">{p.title || "Untitled"}</span>
                       <button onClick={() => restorePage(p.id)} title="Restore" className="p-1 rounded text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -595,7 +598,7 @@ export function WikiPage() {
                     onClick={() => { selectPage(p.id); setView("editor"); }}
                     className={cn("truncate hover:text-[var(--text)] transition-colors", i === trail.length - 1 && "text-[var(--text)] font-medium")}
                   >
-                    {p.icon} {p.title || "Untitled"}
+                    <NoteIcon value={p.icon}/> {p.title || "Untitled"}
                   </button>
                 </span>
               ))
@@ -799,7 +802,7 @@ function SearchRow({ page, depth, activeId, onSelect }: { page: WikiPageT; depth
       style={{ paddingLeft: depth * 14 }}
     >
       <button onClick={() => onSelect(page.id)} className="flex-1 flex items-center gap-1.5 py-1.5 min-w-0 text-left text-[13px]">
-        <span className="shrink-0 text-[13px]">{page.icon || "📄"}</span>
+        <span className="shrink-0 text-[13px]"><NoteIcon value={page.icon}/></span>
         <span className="truncate">{page.title || "Untitled"}</span>
         {page.locked && <Lock className="w-3 h-3 shrink-0 text-[var(--faint)]" />}
       </button>
@@ -891,7 +894,7 @@ function TreeNode({
           {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
         <button onClick={() => onSelect(page.id)} className="flex-1 flex items-center gap-1.5 py-1.5 min-w-0 text-left text-[13px]">
-          <span className="shrink-0 text-[13px]">{page.icon || "📄"}</span>
+          <span className="shrink-0 text-[13px]"><NoteIcon value={page.icon}/></span>
           <span className="truncate">{page.title || "Untitled"}</span>
           {page.locked && <Lock className="w-3 h-3 shrink-0 text-[var(--faint)]" />}
         </button>

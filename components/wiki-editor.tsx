@@ -1,6 +1,9 @@
 "use client";
 
-import { pasteNote, noteLink } from "@/lib/note-paste";
+import { pasteNote, noteLink, safeClipboardHTML } from "@/lib/note-paste";
+import { enableNoteDragSelection, replaceNoteRange, noteRangeContent, noteText } from "@/lib/note-selection";
+import { createNoteIcon } from "@/lib/note-icon";
+import { NoteIcon } from "./note-icon";
 import { EditorDialog } from "./ui/editor-dialog";
 import { editorFormatCommand } from "@/lib/editor-shortcuts";
 import { BaseImage } from "@/lib/image";
@@ -177,15 +180,8 @@ function placeCaretAtMarker(el: HTMLElement) {
   m.remove();
 }
 const normalizeHTML = (h: string) => (h === "<br>" || h === "\n" ? "" : h);
-const stripTags = (h: string) => { const d = document.createElement("div"); d.innerHTML = h; return d.textContent || ""; };
-// True when the current selection already covers this block's entire text.
-function isWholeBlockSelected(el: HTMLElement) {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
-  const text = el.textContent ?? "";
-  if (text.length === 0) return false;
-  return sel.toString().length >= text.length && el.contains(sel.anchorNode) && el.contains(sel.focusNode);
-}
+const stripTags = (h: string) => { const d = document.createElement("div"); d.innerHTML = h; return noteText(d); };
+
 
 // ── Image processing (downscale + upload to Vercel Blob, data-URL fallback) ──────
 async function processImage(file: File): Promise<string | null> {
@@ -238,7 +234,7 @@ export function WikiEditor({
   const linkPages = allPages.filter(candidate=>candidate.id!==page.id && !candidate.deletedAt && (candidate.title||"Untitled").toLowerCase().includes(linkSearch.toLowerCase()));
   const linkRange=useRef<Range|null>(null);
   const [toolbar, setToolbar] = useState<{ top: number; left: number } | null>(null);
-  // ⌘A-twice selects every block at once for a single bulk format action.
+  // Select the document body; title and description remain separate fields.
   const [selectedAll, setSelectedAll] = useState(false);
   const selectedAllRef = useRef(false);
   useEffect(() => { selectedAllRef.current = selectedAll; }, [selectedAll]);
@@ -251,6 +247,8 @@ export function WikiEditor({
   const focusRef = useRef<FocusReq>(null);
   useEffect(() => { focusRef.current = focusReq; }, [focusReq]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const logicalSelection=useRef<Range|null>(null);
+  const selectedRange=()=>logicalSelection.current??(window.getSelection()?.rangeCount?window.getSelection()!.getRangeAt(0):null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const insertRef = useRef<(afterId: string) => void>(() => {});
 
@@ -308,6 +306,7 @@ export function WikiEditor({
     const dst = from === "past" ? future.current : past.current;
     const target = src.pop();
     if (!target) return;
+    logicalSelection.current=null;selectedAllRef.current=false;setSelectedAll(false);
     dst.push({ ...latest.current, focus: focusRef.current });
     setTitle(target.title); setIcon(target.icon); setDescription(target.description); setBlocks(target.blocks);
     // contentEditable is uncontrolled, so a restored snapshot has to push its HTML
@@ -457,6 +456,38 @@ export function WikiEditor({
   }, [undo, redo]);
 
   const commitBlocks = (next: WikiBlock[]) => { setBlocks(next); scheduleSave(); };
+  const replaceSelected = (html="") => {
+    const selection=window.getSelection();
+    let edit;
+    if(selectedAllRef.current) {
+      const block=newBlock("text",html);
+      edit={id:block.id,blocks:[block],caretHTML:html+'<span id="__caret__"></span>'};
+    } else {
+      const range=selectedRange();if(!range)return false;
+      edit=replaceNoteRange(latest.current.blocks,refs.current,range,html);
+      if(!edit)return false;
+    }
+    markEdit("selection");selectedAllRef.current=false;setSelectedAll(false);setToolbar(null);setSlash(null);
+    logicalSelection.current=null;selection?.removeAllRanges();commitBlocks(edit.blocks);
+    const next=edit;
+    requestAnimationFrame(()=>{const el=refs.current.get(next.id);if(el){el.innerHTML=next.caretHTML;el.focus();placeCaretAtMarker(el);}});
+    return true;
+  };
+  const selectionEditRef=useRef(replaceSelected);
+  useLayoutEffect(()=>{selectionEditRef.current=replaceSelected;});
+  useEffect(()=>{
+    const root=rootRef.current;if(!root)return;
+    const cleanup=enableNoteDragSelection(root,range=>{logicalSelection.current=range;});
+    const input=(event:InputEvent)=>{
+      if(!event.cancelable||!(event.target as HTMLElement).closest('.nx-block[contenteditable]'))return;
+      const type=event.inputType;
+      if(!type.startsWith("delete") && !["insertText","insertParagraph","insertLineBreak"].includes(type))return;
+      const box=document.createElement("div");box.textContent=event.data??"";
+      if(selectionEditRef.current(type.startsWith("delete")?"":type==="insertParagraph"||type==="insertLineBreak"?"<br><br>":box.innerHTML))event.preventDefault();
+    };
+    root.addEventListener("beforeinput",input);
+    return()=>{cleanup();root.removeEventListener("beforeinput",input);};
+  },[]);
   // `kind` groups consecutive edits so a run of keystrokes undoes as one action.
   const setType = (id: string, type: WikiBlockType) => {
     markEdit("type");
@@ -595,7 +626,7 @@ export function WikiEditor({
     const el = e.currentTarget;
     const mod = e.metaKey || e.ctrlKey;
 
-    // While every block is selected (⌘A twice), format shortcuts hit all blocks.
+    // While the body is selected, format shortcuts hit all blocks.
     if (selectedAllRef.current) {
       const k = e.key.toLowerCase();
       if (mod && (k === "b" || k === "i" || k === "u")) {
@@ -606,15 +637,6 @@ export function WikiEditor({
       if (e.key === "Escape") { e.preventDefault(); setSelectedAll(false); return; }
       if (!mod && e.key.length === 1) setSelectedAll(false); // typing cancels the bulk selection
     }
-    // ⌘A: first press selects the block; a second press selects every block.
-    if (mod && e.key.toLowerCase() === "a") {
-      if (isWholeBlockSelected(el)) {
-        e.preventDefault();
-        window.getSelection()?.removeAllRanges();
-        setSelectedAll(true);
-        return;
-      }
-    }
 
     if (slash && slash.blockId === block.id && slashResults.length) {
       if (e.key === "ArrowDown") { e.preventDefault(); setSlash({ ...slash, index: (slash.index + 1) % slashResults.length }); return; }
@@ -624,6 +646,7 @@ export function WikiEditor({
     }
 
     if (e.key === "Enter" && !e.shiftKey) {
+      if (block.type === "text") return;
       if (block.type === "code") { e.preventDefault(); document.execCommand("insertText", false, "\n"); handleInput(block, el); return; }
       e.preventDefault();
       const isList = block.type === "bulleted" || block.type === "numbered" || block.type === "todo";
@@ -686,6 +709,14 @@ export function WikiEditor({
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const sel = window.getSelection();
+        if(typeof CSS!=="undefined" && "highlights" in CSS && typeof Highlight!=="undefined") {
+          CSS.highlights.delete("base-note-selection");
+          const range=selectedRange();
+          if(range&&!range.collapsed) {
+            const content=noteRangeContent(latest.current.blocks,refs.current,range);
+            if(content&&content.ranges.length>1)CSS.highlights.set("base-note-selection",new Highlight(...content.ranges));
+          }
+        }
         if (!sel || sel.rangeCount === 0 || sel.isCollapsed) { setToolbar(null); return; }
         const anchor = sel.anchorNode;
         const host = anchor && (anchor.nodeType === 3 ? anchor.parentElement : (anchor as HTMLElement))?.closest?.(".nx-block");
@@ -700,7 +731,7 @@ export function WikiEditor({
       });
     };
     document.addEventListener("selectionchange", onSel);
-    return () => { document.removeEventListener("selectionchange", onSel); cancelAnimationFrame(raf); };
+    return () => { document.removeEventListener("selectionchange", onSel); cancelAnimationFrame(raf); if(typeof CSS!=="undefined"&&"highlights" in CSS)CSS.highlights.delete("base-note-selection"); };
   }, []);
 
   const syncActiveFromSelection = () => {
@@ -715,9 +746,9 @@ export function WikiEditor({
     scheduleSave();
   };
   function editLink() {
-    const selection=window.getSelection();if(!selection?.rangeCount||selectedAllRef.current)return;
-    linkRange.current=selection.getRangeAt(0).cloneRange();
-    const anchor=(selection.anchorNode?.nodeType===3?selection.anchorNode.parentElement:selection.anchorNode as HTMLElement)?.closest("a");
+    const selection=window.getSelection(),range=selectedRange();if(!range||selectedAllRef.current)return;
+    linkRange.current=range.cloneRange();
+    const anchor=(selection?.anchorNode?.nodeType===3?selection.anchorNode.parentElement:selection?.anchorNode as HTMLElement)?.closest("a");
     setLinkSearch("");setLinkPage(0);setLinkError("");
     setLinkEditor(anchor?.getAttribute("href")??"");
   }
@@ -727,6 +758,7 @@ export function WikiEditor({
     const range=linkRange.current;setLinkEditor(null);
     requestAnimationFrame(()=>{
       if(!range || !range.startContainer.isConnected || !rootRef.current?.contains(range.commonAncestorContainer))return;
+      if(formatAcrossBlocks(range,value?"createLink":"unlink",value))return;
       const node=range.startContainer.nodeType===3?range.startContainer.parentElement:range.startContainer as HTMLElement;
       node?.closest<HTMLElement>("[contenteditable]")?.focus();
       const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);
@@ -761,8 +793,28 @@ export function WikiEditor({
     requestAnimationFrame(() => next.forEach((b) => { const el = refs.current.get(b.id); if (el && isFormattable(b.type)) el.innerHTML = b.text; }));
   };
   const TAG_FOR: Record<string, string> = { bold: "b", italic: "i", underline: "u", strikeThrough: "s" };
+  const formatAcrossBlocks=(range:Range,cmd:string,value?:string)=>{
+    const content=noteRangeContent(latest.current.blocks,refs.current,range);
+    if(!content||content.ranges.length<2)return false;
+    markEdit("format");
+    for(const part of content.ranges) {
+      const host=(part.startContainer.nodeType===3?part.startContainer.parentElement:part.startContainer as HTMLElement)?.closest<HTMLElement>("[contenteditable]");host?.focus();
+      const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(part);
+      if(cmd==="createLink") {
+        const anchor=document.createElement("a"),fragment=part.extractContents();for(const old of fragment.querySelectorAll("a"))old.replaceWith(...old.childNodes);
+        anchor.href=value!;anchor.append(fragment);part.insertNode(anchor);
+      } else {
+        if(["foreColor","hiliteColor","fontSize"].includes(cmd))document.execCommand("styleWithCSS",false,"true");
+        document.execCommand(cmd,false,value);
+      }
+    }
+    logicalSelection.current=null;
+    commitBlocks(latest.current.blocks.map(block=>{const el=refs.current.get(block.id);return el?{...block,text:el.innerHTML}:block;}));
+    return true;
+  };
   // Routes a toolbar/shortcut command either to the live selection or to all blocks.
   const runFormat = (cmd: string, value?: string) => {
+    const range=selectedRange();if(!selectedAllRef.current&&range&&formatAcrossBlocks(range,cmd,value))return;
     if (!selectedAllRef.current) { exec(cmd, value); return; }
     if (cmd === "removeFormat") { applyToAllBlocks((h) => stripTags(h).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")); return; }
     if (cmd === "createLink") return; // links need a precise range; not supported on "all"
@@ -823,7 +875,23 @@ export function WikiEditor({
   }, [title, description, blocks]);
 
   return (
-    <div ref={rootRef} onPasteCapture={event=>{
+    <div ref={rootRef} onCopyCapture={event=>{
+      if(!(event.target as HTMLElement).closest('[contenteditable="true"]'))return;
+      const range=selectedRange();if(!range)return;
+      const content=noteRangeContent(latest.current.blocks,refs.current,range);
+      if(content&&content.ranges.length>1){event.preventDefault();event.clipboardData.setData("text/plain",content.text);event.clipboardData.setData("text/html",safeClipboardHTML(content.html));}
+    }} onCutCapture={event=>{
+      if(!(event.target as HTMLElement).closest('[contenteditable="true"]'))return;
+      const range=selectedRange();if(!range)return;
+      const content=noteRangeContent(latest.current.blocks,refs.current,range);if(!content)return;
+      const html=safeClipboardHTML(content.html);
+      if(replaceSelected()){event.preventDefault();event.stopPropagation();event.clipboardData.setData("text/plain",content.text);event.clipboardData.setData("text/html",html);}
+    }} onPasteCapture={event=>{
+      if(!(event.target as HTMLElement).closest('[contenteditable="true"]'))return;
+      try {
+        const raw=event.clipboardData.getData("text/html"),box=document.createElement("div");box.textContent=event.clipboardData.getData("text/plain");
+        if(replaceSelected(raw?safeClipboardHTML(raw):box.innerHTML)){event.preventDefault();event.stopPropagation();return;}
+      } catch(error) {event.preventDefault();window.dispatchEvent(new CustomEvent("base:editor-error",{detail:String(error)}));return;}
       const target=(event.target as HTMLElement).closest<HTMLElement>('[contenteditable="true"]');
       if(!target)return;
       markEdit("paste"); event.stopPropagation();
@@ -833,6 +901,20 @@ export function WikiEditor({
       } catch(error) { window.dispatchEvent(new CustomEvent("base:editor-error",{detail:String(error)})); }
     }} onKeyDownCapture={event=>{
       const target=event.target as HTMLElement;
+      if(target.closest('.nx-block[contenteditable]')) {
+        const mod=event.metaKey||event.ctrlKey;
+        if(mod&&event.key.toLowerCase()==="a") {
+          event.preventDefault();event.stopPropagation();
+          const elements=latest.current.blocks.map(block=>refs.current.get(block.id)).filter((el):el is HTMLDivElement=>!!el);
+          if(elements.length){const range=document.createRange();range.selectNodeContents(elements[0]);range.setEnd(elements.at(-1)!,elements.at(-1)!.childNodes.length);logicalSelection.current=range.cloneRange();const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);}
+          selectedAllRef.current=true;setSelectedAll(true);return;
+        }
+        if(event.key.startsWith("Arrow")||event.key==="Escape"){logicalSelection.current=null;document.dispatchEvent(new Event("selectionchange"));}
+        if(!mod&&!event.altKey&&!event.nativeEvent.isComposing && (event.key==="Backspace"||event.key==="Delete"||event.key==="Enter"||event.key.length===1)) {
+          const box=document.createElement("div");box.textContent=event.key.length===1?event.key:"";
+          if(replaceSelected(event.key==="Enter"?"<br><br>":box.innerHTML)){event.preventDefault();event.stopPropagation();return;}
+        }
+      }
       if(!target.isContentEditable||target.closest('[data-block-id]')?.classList.contains("font-mono"))return;
       const command=editorFormatCommand(event);if(!command)return;
       event.preventDefault();event.stopPropagation();
@@ -1365,7 +1447,7 @@ function PageLinkBlock({
           onClick={() => onOpenPage(target.id)}
           className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] hover:bg-[var(--chip)] transition-colors min-w-0"
         >
-          <span className="text-[15px] shrink-0">{target.icon || "📄"}</span>
+          <span className="text-[15px] shrink-0"><NoteIcon value={target.icon}/></span>
           <span className="text-[14px] text-[var(--text)] font-medium underline underline-offset-2 truncate">{target.title || "Untitled"}</span>
         </button>
         <button onClick={() => onPatch({ pageId: undefined })} title="Change page" className="p-1 rounded text-[var(--faint)] hover:text-[var(--text)] hover:bg-[var(--chip)]">
@@ -1388,7 +1470,7 @@ function PageLinkBlock({
           <p className="px-2 py-2 text-[12.5px] text-[var(--faint)]">No pages found</p>
         ) : list.map((p) => (
           <button key={p.id} onClick={() => onPatch({ pageId: p.id })} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-[13.5px] text-[var(--text)] hover:bg-[var(--chip)]">
-            <span className="shrink-0">{p.icon || "📄"}</span><span className="truncate">{p.title || "Untitled"}</span>
+            <span className="shrink-0"><NoteIcon value={p.icon}/></span><span className="truncate">{p.title || "Untitled"}</span>
           </button>
         ))}
       </div>
@@ -1476,6 +1558,8 @@ const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
 
 function EmojiButton({ value, onChange }: { value: string; onChange: (e: string) => void }) {
   const [open, setOpen] = useState(false);
+  const fileRef=useRef<HTMLInputElement>(null);
+  const [error,setError]=useState(""),[loading,setLoading]=useState(false);
   const [q, setQ] = useState("");
   const ql = q.trim().toLowerCase();
   // When searching, match by category label; otherwise show every category.
@@ -1484,11 +1568,18 @@ function EmojiButton({ value, onChange }: { value: string; onChange: (e: string)
 
   return (
     <div className="relative inline-block">
-      <button onClick={() => { setOpen((v) => !v); setQ(""); }} className="text-[44px] leading-none hover:bg-[var(--chip)] rounded-lg px-1 -ml-1 transition-colors" title="Change icon">{value || "📄"}</button>
+      <button onClick={() => { setOpen((v) => !v); setQ(""); }} className="text-[44px] leading-none hover:bg-[var(--chip)] rounded-lg px-1 -ml-1 transition-colors" title="Change icon" aria-label="Change note icon"><NoteIcon value={value}/></button>
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" className="hidden" aria-label="Upload note icon" onChange={async event=>{
+        const file=event.currentTarget.files?.[0];event.currentTarget.value="";if(!file)return;
+        setLoading(true);setError("");
+        try {onChange(await createNoteIcon(file));setOpen(false);}catch(error){setError(error instanceof Error?error.message:"Could not open this image.");}finally{setLoading(false);}
+      }}/>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full mt-1 z-50 w-[332px] bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl p-2 nx-pop">
+            <button disabled={loading} onClick={()=>fileRef.current?.click()} className="base-menu-item w-full mb-2"><ImageIcon className="h-4 w-4"/>{loading?"Preparing image…":"Upload an image"}</button>
+            {error&&<p role="alert" className="px-2 mb-2 text-xs text-[var(--c-rose)]">{error}</p>}
             <input
               autoFocus value={q} onChange={(e) => setQ(e.target.value)}
               placeholder="Filter categories…"

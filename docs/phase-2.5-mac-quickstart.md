@@ -74,7 +74,22 @@ CVC for Plus testing. Never enter a real payment card for these acceptance check
 Remaining integration/file-upload/migration gates are listed in the status
 report. Production data migration and original Phase 3 have not begun.
 
-## Latest reliability and preference fixes (Base 0.1.4)
+## Latest reliability and preference fixes (Base 0.1.5)
+
+Notes checks for this build:
+
+1. Type two paragraphs separated by a blank line, click that blank line and fill
+   it. Ordinary text should stay in the same block; Cmd+Enter adds a new block.
+2. Drag-select across older blocks. Copy, replace/delete and undo the selection.
+   Press Cmd+A once, then Backspace: the body clears while the title stays intact.
+3. Click the note icon and upload an image. Restart and verify the image remains
+   in the editor, sidebar and breadcrumb. Test offline too.
+4. Open the templates popup; test keyboard navigation and reduced motion. Check
+   the bottom of the Trash section aligns with the sidebar.
+
+See [Notes changes and actual verification](notes-0.1.5.md). Mac verification is
+pending; the new source build must be installed manually because no Mac updater
+archive is published yet.
 
 Quit the running Base app before opening the new build. To replace the installed
 copy, move the newly built `Base.app` into Applications; replace only the app
