@@ -1,7 +1,9 @@
+import { requireEditable } from "./access.ts";
 import type { ReadableStream as WorkerStream } from "@cloudflare/workers-types";
 import { entitlements } from "./plans.ts";
 import { HttpError, now, type Env, type Principal } from "./types.ts";
 export async function upload(env: Env, principal: Principal, request: Request) {
+  requireEditable(principal);
   const limit = entitlements(principal.workspace).uploadBytes;
   const advertised = Number(request.headers.get("Content-Length"));
   if (!Number.isSafeInteger(advertised) || advertised <= 0 || !request.body)
@@ -23,7 +25,7 @@ export async function upload(env: Env, principal: Principal, request: Request) {
   try {
     await env.DB.batch([
       env.DB.prepare(
-        "INSERT INTO commit_guards VALUES(?,coalesce((SELECT CASE WHEN document_bytes+file_bytes+reserved_bytes+?<=CASE WHEN plan='plus' AND subscription_status IN ('active','trialing') AND paid_until>? THEN 10000000000 ELSE 250000000 END THEN 1 ELSE 0 END FROM workspaces WHERE id=? AND owner_id IN (SELECT id FROM accounts WHERE status='active')),0))",
+        "INSERT INTO commit_guards VALUES(?,coalesce((SELECT CASE WHEN (SELECT coalesce(sum(document_bytes+file_bytes+reserved_bytes),0) FROM workspaces owned WHERE owned.owner_id=workspaces.owner_id)+?<=CASE WHEN plan='plus' AND subscription_status IN ('active','trialing') AND paid_until>? THEN 10000000000 ELSE 250000000 END THEN 1 ELSE 0 END FROM workspaces WHERE id=? AND owner_id IN (SELECT id FROM accounts WHERE status='active')),0))",
       ).bind(g, size, now(), workspace),
       env.DB.prepare(
         "INSERT INTO files(workspace_id,id,name,mime,size,status,created_at) VALUES(?,?,?,?,?,'pending',?)",
@@ -117,6 +119,7 @@ export async function deleteFile(
   principal: Principal,
   input: Record<string, unknown>,
 ) {
+  requireEditable(principal);
   let id = input.id;
   if (typeof input.url === "string") {
     const url = new URL(input.url);

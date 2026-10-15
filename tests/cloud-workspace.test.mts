@@ -550,6 +550,10 @@ test("Stripe lifecycle reconciles authoritative state despite delayed and replay
       (await snapshot(env, principal.workspace.id)).workspace.plan,
       "plus",
     );
+    const {createWorkspace}=await import("../apps/cloud/src/workspaces.ts");
+    principal.workspace=(await snapshot(env,principal.workspace.id)).workspace;
+    const secondary=await createWorkspace(env,principal,{name:"Paid second workspace"});
+    assert.equal((await snapshot(env,secondary.id)).workspace.plan,"plus");
     delay = true;
     const waiting = new Promise<void>((resolve) => {
       started = resolve;
@@ -562,6 +566,7 @@ test("Stripe lifecycle reconciles authoritative state despite delayed and replay
       (await snapshot(env, principal.workspace.id)).workspace.plan,
       "free",
     );
+    assert.equal((await snapshot(env,secondary.id)).workspace.plan,"free");
     (hold as unknown as () => void)();
     await older;
     await send("evt_active");

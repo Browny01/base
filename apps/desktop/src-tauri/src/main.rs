@@ -109,6 +109,7 @@ fn base_run() {
             transport::connect_account,
             transport::cloud_sign_in_start,
             transport::cloud_sign_in_finish,
+            transport::cloud_workspace_open,
             transport::disconnect_account,
             transport::api_request,
             transport::integration_status,

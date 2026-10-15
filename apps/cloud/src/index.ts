@@ -1,3 +1,6 @@
+import { nodePage, recordHistory } from "./record-sync.ts";
+import { requireOwner, requireEditable, workspaceRole } from "./access.ts";
+import { listWorkspaces, createWorkspace, inviteMember, acceptInvite, members, changeMember, openWorkspace, ownerUsage, billingPrincipal } from "./workspaces.ts";
 import { desktopUpdate } from "./desktop-updates.ts";
 import { credentialStatus, saveCredential } from "./credentials.ts";
 import { PUBLIC_INTEGRATION_PATHS } from "../../../packages/core/src/providers.ts";
@@ -268,12 +271,28 @@ async function route(request: Request, env: Env) {
   }
   const principal = await authenticate(env, request),
     workspace = principal.workspace.id;
+  if (path === "/api/workspaces" && method === "GET") return response({workspaces:await listWorkspaces(env,principal)});
+  if (path === "/api/workspaces/create" && method === "POST") return response(await createWorkspace(env,principal,await body(request,4096)),201);
+  if (path === "/api/workspaces/accept" && method === "POST") return response(await acceptInvite(env,principal,await body(request,4096)));
+  if (path === "/api/workspaces/open" && method === "POST") {
+    const session=await openWorkspace(env,principal,await body(request,4096));
+    if (request.headers.has("Authorization")) return response(session);
+    const {token,...publicSession}=session;
+    return Response.json(publicSession,{headers:{"Cache-Control":"no-store","Set-Cookie":`__Host-base_session=${token}; Path=/; Max-Age=2592000; Secure; HttpOnly; SameSite=Strict`}});
+  }
+  if (path === "/api/workspace/members" && method === "GET") return response({members:await members(env,principal)});
+  if (path === "/api/workspace/members" && method === "POST") return response(await changeMember(env,principal,await body(request,4096)));
+  if (path === "/api/workspace/invite" && method === "POST") return response(await inviteMember(env,principal,await body(request,4096)));
+  if (path === "/api/workspace/credentials" || path === "/api/devices/revoke" || path.startsWith("/api/workspace/integrations") || path.startsWith("/api/workspace/import")) requireOwner(principal);
+  if (!["GET","HEAD"].includes(method) && !["/api/native/sync","/api/auth/browser","/api/auth/desktop","/api/billing/checkout","/api/billing/portal","/api/news/summary"].includes(path)) requireEditable(principal);
   if (
     ["/api/native/sync", "/api/native/sync/chunk", "/api/blob/upload"].includes(
       path,
     )
   )
     await requireSyncDevice(env, principal);
+  if (path === "/api/workspace/record-history" && method === "GET") return response(await recordHistory(env,principal.workspace,url));
+  if (path === "/api/workspace/nodes" && method === "GET") return response(await nodePage(env,workspace,url));
   if (path === "/api/auth/browser" && method === "GET")
     return response({ workspaceId: workspace, deviceId: principal.deviceId, expiresAt: (principal.sessionExpires ?? 0) * 1000 });
   if (path === "/api/auth/browser" && method === "DELETE") {
@@ -298,7 +317,7 @@ async function route(request: Request, env: Env) {
   if (path === "/api/auth/desktop" && method === "DELETE")
     return response(await revokeDevice(env, principal, principal.deviceId));
   if (path === "/api/native/sync" && method === "POST")
-    return response(await synchronize(env, principal, await body(request)));
+    return response({...await synchronize(env, principal, await body(request)),access:workspaceRole(principal)});
   if (path === "/api/native/sync" && method === "GET") {
     const snap = await snapshot(env, workspace);
     return response({
@@ -336,15 +355,18 @@ async function route(request: Request, env: Env) {
     const limits = entitlements(principal.workspace);
     return response({
       id: workspace,
+      name: principal.workspace.name,
+      role: workspaceRole(principal),
+      isOwner: principal.accountId === principal.workspace.owner_id,
       mode: "cloud",
       account,
       plan: effectivePlan(principal.workspace),
       planDetails: limits,
       storageBytes:
-        principal.workspace.document_bytes + principal.workspace.file_bytes,
+        await ownerUsage(env, principal.workspace.owner_id),
       storageLimit: limits.storageBytes,
-      devices: devices.results,
-      integrations: await listMcpGrants(env, principal),
+      devices: principal.accountId === principal.workspace.owner_id ? devices.results : [],
+      integrations: principal.accountId === principal.workspace.owner_id ? await listMcpGrants(env, principal) : [],
       subscriptionStatus: principal.workspace.subscription_status,
       paidUntil: principal.workspace.paid_until * 1000,
     });
@@ -434,9 +456,9 @@ async function route(request: Request, env: Env) {
     return response(await revokeDevice(env, principal, input.deviceId));
   }
   if (path === "/api/billing/checkout" && method === "POST")
-    return response(await checkout(env, principal));
+    return response(await checkout(env, await billingPrincipal(env, principal)));
   if (path === "/api/billing/portal" && method === "POST")
-    return response(await portal(env, principal));
+    return response(await portal(env, await billingPrincipal(env, principal)));
   if (path === "/api/blob/upload" && method === "POST")
     return response(await upload(env, principal, request));
   if (path === "/api/blob/delete" && method === "POST")

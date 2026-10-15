@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cloud-workspace-open"
+description = "Enables the cloud_workspace_open command without any pre-configured scope."
+commands.allow = ["cloud_workspace_open"]
+
+[[permission]]
+identifier = "deny-cloud-workspace-open"
+description = "Denies the cloud_workspace_open command without any pre-configured scope."
+commands.deny = ["cloud_workspace_open"]

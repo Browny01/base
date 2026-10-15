@@ -52,6 +52,7 @@ const fixtures = [0, 1].map(() => {
     token: `base_desktop_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url")}`,
   };
 });
+const extraWorkspaceIds: string[]=[];
 const sqlString = (value: string) => "'" + value.replaceAll("'", "''") + "'";
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -317,6 +318,46 @@ try {
     }
     syncLoad={notes:100,tasks:25,bytes:Buffer.byteLength(JSON.stringify(document)),requests};
   }
+  let recordSync: object | undefined;
+  if (process.argv.includes("--record-sync")) {
+    const {downloadNodes}=await import("../packages/sync/src/download.ts");
+    const document:Document={wikiPages:Array.from({length:120},(_,i)=>({id:`record-${i}`,title:`Note ${i}`,blocks:[{id:`b-${i}`,text:"Workspace content. ".repeat(90)}]}))};
+    let pending=diff({},document),revision=0,commits=0;
+    const timings:number[]=[];
+    while(pending.length) {
+      const operations=pending.slice(0,1),start=performance.now();
+      const result=await request("/api/native/sync",bob.token,"POST",{protocol:2,transport:"nodes-v1",workspaceId:bob.workspace,cursor:revision,operations});
+      assert.equal(result.status,200,"Record write failed");
+      const value=await result.json() as SyncResponse;
+      assert.equal(value.transport,"nodes-v1");assert.equal(value.data,undefined);assert.equal(value.conflicts.length,0);assert.equal(value.applied.length,operations.length);
+      timings.push(performance.now()-start);revision=value.revision;commits++;pending=pending.filter(op=>!value.applied.includes(op.id));
+    }
+    const baseline=await downloadNodes(path=>request(path,bob.token),bob.workspace,{},0,true);
+    assert.deepEqual(baseline.data.wikiPages,document.wikiPages);
+    const before=baseline.data,next={...before,wikiPages:(before.wikiPages as Document[]).map((page,i)=>i===20?{...page,title:"Small edit"}:page)};
+    const operations=diff(before,next,undefined,revision);
+    const input={protocol:2,transport:"nodes-v1",workspaceId:bob.workspace,cursor:revision,operations};
+    const committed=await request("/api/native/sync",bob.token,"POST",input);assert.equal(committed.status,200);
+    const reply=await committed.json() as SyncResponse;
+    const duplicate=await request("/api/native/sync",bob.token,"POST",input);assert.equal(duplicate.status,200);assert.equal((await duplicate.json() as SyncResponse).revision,reply.revision);
+    let pages=0,downloadBytes=0;
+    const updated=await downloadNodes(async path=>{pages++;const r=await request(path,bob.token);downloadBytes+=Buffer.byteLength(await r.clone().text());return r;},bob.workspace,before,revision);
+    assert.deepEqual(updated.data.wikiPages,next.wikiPages);
+    assert.ok(downloadBytes<Buffer.byteLength(JSON.stringify(document))/4);
+    recordSync={notes:120,bytes:Buffer.byteLength(JSON.stringify(document)),commits,incrementalPages:pages,incrementalBytes:downloadBytes,wallMs:{min:Math.round(Math.min(...timings)),max:Math.round(Math.max(...timings)),median:Math.round(timings.sort((a,b)=>a-b)[Math.floor(timings.length/2)])}};
+    // An operator-created paid fixture verifies workspace membership on the real D1 binding.
+    await sql(`UPDATE workspaces SET plan='plus',subscription_status='active',paid_until=${at+3600} WHERE id=${sqlString(alice.workspace)};`);
+    const created=await request("/api/workspaces/create",alice.token,"POST",{name:"Fixture shared workspace"});assert.equal(created.status,201);
+    const other=await created.json() as {id:string};extraWorkspaceIds.push(other.id);
+    const invitation=await request("/api/workspace/invite",alice.token,"POST",{role:"viewable"});assert.equal(invitation.status,200);
+    const code=await invitation.json() as {code:string};assert.equal((await request("/api/workspaces/accept",bob.token,"POST",{code:code.code})).status,200);
+    const opened=await request("/api/workspaces/open",bob.token,"POST",{id:alice.workspace});assert.equal(opened.status,200);
+    const shared=await opened.json() as {token:string};
+    assert.equal((await request("/api/workspace/export",shared.token)).status,200);
+    assert.equal((await request("/api/native/sync",shared.token,"POST",{protocol:2,workspaceId:alice.workspace,cursor:revision,operations:[{}]})).status,403);
+    assert.equal((await request("/api/workspace/members",alice.token,"POST",{accountId:bob.account,role:"remove"})).status,200);
+    assert.equal((await request("/api/workspace/export",shared.token)).status,401);
+  }
   const device = await request("/api/devices/revoke", alice.token, "POST", {
     deviceId: alice.device,
   });
@@ -330,6 +371,7 @@ try {
       {
         environment: remote ? "remote staging" : "local workerd",
         ...(syncLoad ? {syncLoad} : {}),
+        ...(recordSync ? {recordSync} : {}),
         checks: [
           "durable offline queue replay",
           "receipt idempotency",
@@ -351,7 +393,7 @@ try {
     ),
   );
 } finally {
-  const ids = fixtures.map((fixture) => sqlString(fixture.workspace)).join(",");
+  const ids = [...fixtures.map((fixture) => fixture.workspace),...extraWorkspaceIds].map(sqlString).join(",");
   const query = `SELECT 'files/'||workspace_id||'/'||id AS key FROM files WHERE workspace_id IN (${ids}) UNION SELECT key FROM backups WHERE workspace_id IN (${ids}) UNION SELECT key FROM migration_archives WHERE workspace_id IN (${ids}) UNION SELECT key FROM staged_parts WHERE workspace_id IN (${ids}) UNION SELECT key FROM recovery_objects WHERE workspace_id IN (${ids})`;
   const result = await promisify(execFile)(
     process.execPath,
@@ -406,6 +448,10 @@ try {
         "migration_archives",
         "staged_parts",
         "checkout_attempts",
+        "workspace_invites",
+        "workspace_members",
+        "document_versions",
+        "node_history",
         "recovery_objects",
       ]
         .map((table) => `DELETE FROM ${table} WHERE workspace_id IN (${ids});`)

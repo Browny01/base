@@ -1,12 +1,14 @@
 "use client";
 
+import { subscriptionValues } from "@/lib/subscription";
+
 import { PageHeading } from "./ui/page-heading";
 
 import { useState, useCallback } from "react";
 import { useBase } from "@/lib/hooks";
 import { uid, getToday, formatCurrency } from "@/lib/utils";
 import type { IncomeType, PaymentSubscription, SubscriptionFrequency } from "@/lib/store";
-import { Plus, Trash2, TrendingUp, DollarSign, Clock, CheckCircle, CalendarClock, CreditCard, Bell } from "lucide-react";
+import { Plus, Trash2, TrendingUp, DollarSign, Clock, CheckCircle, CalendarClock, CreditCard, Bell, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WalletSection } from "./wallet-section";
 import { PortfolioChart } from "./portfolio-chart";
@@ -42,6 +44,8 @@ export function FinancePage() {
   }, []);
   const [showForm, setShowForm] = useState(false);
   const [showSubForm, setShowSubForm] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<string | null>(null);
+  const [subscriptionError,setSubscriptionError]=useState("");
   const [form, setForm] = useState({
     source: "",
     amount: "",
@@ -107,27 +111,22 @@ export function FinancePage() {
     mutate((d) => ({ ...d, incomeEntries: d.incomeEntries.filter((e) => e.id !== id) }));
   }
 
-  function addSubscription() {
-    if (!subForm.name.trim() || !subForm.amount || !subForm.dueDate) return;
-    mutate((d) => ({
-      ...d,
-      subscriptions: [
-        ...(d.subscriptions ?? []),
-        {
-          id: uid(),
-          name: subForm.name.trim(),
-          amount: parseFloat(subForm.amount),
-          dueDate: subForm.dueDate,
-          frequency: subForm.frequency,
-          category: subForm.category.trim() || "General",
-          notes: subForm.notes.trim() || undefined,
-          active: true,
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    }));
-    setSubForm({ name: "", amount: "", dueDate: getToday(data.profile?.timezone), frequency: "monthly", category: "", notes: "" });
-    setShowSubForm(false);
+  function editSubscription(sub:PaymentSubscription) {
+    setEditingSubscription(sub.id);
+    setSubForm({name:sub.name,amount:String(sub.amount),dueDate:sub.dueDate,frequency:sub.frequency,category:sub.category,notes:sub.notes||""});
+    setSubscriptionError("");setShowSubForm(true);
+  }
+  function resetSubscription() {
+    setEditingSubscription(null);setSubscriptionError("");
+    setSubForm({name:"",amount:"",dueDate:getToday(data.profile?.timezone),frequency:"monthly",category:"",notes:""});
+  }
+  function saveSubscription() {
+    let values;
+    try {values=subscriptionValues(subForm);} catch(error) {setSubscriptionError(error instanceof Error?error.message:String(error));return;}
+    mutate(d=>({...d,subscriptions:editingSubscription
+      ? (d.subscriptions??[]).map(sub=>sub.id===editingSubscription?{...sub,...values}:sub)
+      : [...(d.subscriptions??[]),{...values,id:uid(),active:true,createdAt:new Date().toISOString()}]}));
+    resetSubscription();setShowSubForm(false);
   }
 
   function toggleSubscription(id: string) {
@@ -160,7 +159,7 @@ export function FinancePage() {
       <PageHeading title="Finance" description={"Income, subscriptions and your portfolio."}>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowSubForm(!showSubForm)}
+            onClick={() => {resetSubscription();setShowSubForm(!showSubForm);}}
             className="flex items-center gap-2 px-3 py-2 border border-[var(--border)] hover:bg-[var(--chip)] text-[var(--text)] text-sm font-medium rounded-lg transition-colors"
           >
             <Bell className="w-4 h-4" />
@@ -202,22 +201,25 @@ export function FinancePage() {
                 <p className="text-xs text-[var(--muted)]">{activeSubscriptions.length} active · {formatCurrency(monthlySubscriptions)} / month est.</p>
               </div>
             </div>
-            <button onClick={() => setShowSubForm(!showSubForm)} className="text-xs font-medium text-[var(--text)] hover:opacity-70">
+            <button onClick={() => {resetSubscription();setShowSubForm(!showSubForm);}} className="text-xs font-medium text-[var(--text)] hover:opacity-70">
               {showSubForm ? "Close" : "Add"}
             </button>
           </div>
 
           {showSubForm && (
-            <div className="grid gap-3 border border-[var(--border)] bg-[var(--bg)] rounded-lg p-3 mb-4 md:grid-cols-3">
-              <input className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" placeholder="Netflix, Spotify..." value={subForm.name} onChange={(e) => setSubForm((f) => ({ ...f, name: e.target.value }))} />
-              <input type="number" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" placeholder="Amount" value={subForm.amount} onChange={(e) => setSubForm((f) => ({ ...f, amount: e.target.value }))} />
-              <input type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" value={subForm.dueDate} onChange={(e) => setSubForm((f) => ({ ...f, dueDate: e.target.value }))} />
-              <select className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" value={subForm.frequency} onChange={(e) => setSubForm((f) => ({ ...f, frequency: e.target.value as SubscriptionFrequency }))}>
+            <form aria-label={editingSubscription ? "Edit subscription" : "New subscription"} onSubmit={e=>{e.preventDefault();saveSubscription();}} className="grid gap-3 border border-[var(--border)] bg-[var(--bg)] rounded-lg p-3 mb-4 md:grid-cols-3">
+              <input aria-label="Subscription name" required className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" placeholder="Netflix, Spotify..." value={subForm.name} onChange={(e) => setSubForm((f) => ({ ...f, name: e.target.value }))} />
+              <input aria-label="Subscription amount" required min="0" step="any" type="number" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" placeholder="Amount" value={subForm.amount} onChange={(e) => setSubForm((f) => ({ ...f, amount: e.target.value }))} />
+              <input aria-label="Subscription due date" required type="date" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" value={subForm.dueDate} onChange={(e) => setSubForm((f) => ({ ...f, dueDate: e.target.value }))} />
+              <select aria-label="Subscription frequency" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" value={subForm.frequency} onChange={(e) => setSubForm((f) => ({ ...f, frequency: e.target.value as SubscriptionFrequency }))}>
                 {FREQUENCIES.map((freq) => <option key={freq.value} value={freq.value}>{freq.label}</option>)}
               </select>
-              <input className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" placeholder="Category" value={subForm.category} onChange={(e) => setSubForm((f) => ({ ...f, category: e.target.value }))} />
-              <button onClick={addSubscription} className="bg-[var(--text)] text-[var(--bg)] rounded-lg px-3 py-2 text-sm font-medium hover:bg-[var(--text-hover)]">Save</button>
-            </div>
+              <input className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] outline-none" aria-label="Subscription category" placeholder="Category" value={subForm.category} onChange={(e) => setSubForm((f) => ({ ...f, category: e.target.value }))} />
+              <input aria-label="Subscription notes" className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm outline-none md:col-span-2" placeholder="Notes (optional)" value={subForm.notes} onChange={e=>setSubForm(f=>({...f,notes:e.target.value}))}/>
+              <button type="submit" className="base-button base-button-primary">{editingSubscription ? "Save changes" : "Add subscription"}</button>
+              <button type="button" className="base-button base-button-secondary" onClick={()=>{resetSubscription();setShowSubForm(false);}}>Cancel</button>
+              {subscriptionError&&<p role="alert" className="text-sm text-[var(--c-rose)] md:col-span-3">{subscriptionError}</p>}
+            </form>
           )}
 
           <div className="grid gap-2 lg:grid-cols-2">
@@ -238,8 +240,9 @@ export function FinancePage() {
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <span className={cn("text-xs rounded-full px-2 py-0.5", remaining <= 7 && sub.active ? "bg-[var(--text)] text-[var(--bg)]" : "bg-[var(--chip)] text-[var(--muted)]")}>{dueLabel}</span>
                     <div className="flex items-center gap-1">
+                      <button aria-label={"Edit " + sub.name} onClick={()=>editSubscription(sub)} className="p-1 text-[var(--muted)] hover:text-[var(--text)]"><Pencil className="w-3.5 h-3.5"/></button>
                       <button onClick={() => toggleSubscription(sub.id)} className="text-xs text-[var(--muted)] hover:text-[var(--text)]">{sub.active ? "Pause" : "Resume"}</button>
-                      <button onClick={() => deleteSubscription(sub.id)} className="p-1 text-[var(--muted)] hover:text-[var(--text)]"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button aria-label={"Delete " + sub.name} onClick={() => deleteSubscription(sub.id)} className="p-1 text-[var(--muted)] hover:text-[var(--text)]"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 </div>

@@ -259,6 +259,22 @@ export async function browserCommand<T>(
       window.dispatchEvent(new Event("base:browser-sign-in"));
       result = {};
       break;
+    case "cloud_workspace_open": {
+      const previous=await browserState(false,s=>structuredClone(current(s,String(args.scope))));
+      if (!previous.origin) throw new Error("Sign in before switching Cloud workspaces");
+      const response=await fetch("/api/workspaces/open",{method:"POST",headers:{"Content-Type":"application/json","X-Base-Workspace":previous.workspaceId},body:JSON.stringify({id:args.workspaceId})});
+      const identity=await response.json();
+      if (!response.ok || identity.workspaceId !== args.workspaceId || typeof identity.expiresAt !== "number") throw new Error(identity.error || "Could not open workspace");
+      result=await browserState(true,s=>{
+        current(s,previous.scope);
+        const scope=location.origin+":"+identity.workspaceId;
+        s.workspaces[scope] ??= newBrowserWorkspace(scope,location.origin,identity.workspaceId,args.defaults as Document);
+        s.activeScope=scope;
+        s.access={workspaceId:identity.workspaceId,expiresAt:identity.expiresAt};
+        return structuredClone(current(s));
+      });
+      break;
+    }
     case "cloud_sign_in_finish": {
       const identity = await browserSignIn();
       const defaults = args.defaults as Document;

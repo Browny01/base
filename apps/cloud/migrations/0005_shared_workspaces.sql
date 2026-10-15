@@ -1,0 +1,13 @@
+PRAGMA defer_foreign_keys=ON;
+CREATE TABLE workspace_migration_copy AS SELECT * FROM workspaces;
+CREATE TABLE workspaces_new(id TEXT PRIMARY KEY,owner_id TEXT NOT NULL REFERENCES accounts(id),revision INTEGER NOT NULL DEFAULT 0,document_bytes INTEGER NOT NULL DEFAULT 0,file_bytes INTEGER NOT NULL DEFAULT 0,reserved_bytes INTEGER NOT NULL DEFAULT 0,plan TEXT NOT NULL DEFAULT 'free',customer_id TEXT UNIQUE,subscription_id TEXT UNIQUE,subscription_status TEXT NOT NULL DEFAULT 'none',paid_until INTEGER NOT NULL DEFAULT 0,billing_version INTEGER NOT NULL DEFAULT 0,next_backup_at INTEGER NOT NULL DEFAULT 0,name TEXT NOT NULL DEFAULT 'Personal workspace',billing_workspace_id TEXT REFERENCES workspaces(id));
+DROP TABLE workspaces;
+ALTER TABLE workspaces_new RENAME TO workspaces;
+INSERT INTO workspaces(id,owner_id,revision,document_bytes,file_bytes,reserved_bytes,plan,customer_id,subscription_id,subscription_status,paid_until,billing_version,next_backup_at) SELECT * FROM workspace_migration_copy;
+DROP TABLE workspace_migration_copy;
+CREATE INDEX workspaces_owner ON workspaces(owner_id);
+CREATE TABLE workspace_members(workspace_id TEXT NOT NULL REFERENCES workspaces(id),account_id TEXT NOT NULL REFERENCES accounts(id),role TEXT NOT NULL CHECK(role IN ('editable','viewable')),created_at INTEGER NOT NULL,PRIMARY KEY(workspace_id,account_id));
+CREATE INDEX membership_account ON workspace_members(account_id,workspace_id);
+CREATE TABLE workspace_invites(hash TEXT PRIMARY KEY,workspace_id TEXT NOT NULL REFERENCES workspaces(id),role TEXT NOT NULL CHECK(role IN ('editable','viewable')),expires INTEGER NOT NULL,created_by TEXT NOT NULL REFERENCES accounts(id));
+CREATE TABLE session_accounts(hash TEXT PRIMARY KEY REFERENCES sessions(hash) ON DELETE CASCADE,account_id TEXT NOT NULL REFERENCES accounts(id));
+INSERT INTO session_accounts SELECT s.hash,w.owner_id FROM sessions s JOIN workspaces w ON w.id=s.workspace_id;

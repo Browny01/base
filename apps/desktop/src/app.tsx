@@ -13,7 +13,7 @@ import { AccentProvider } from "@/lib/accent-context";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { usePathname } from "./navigation";
 import { DesktopAccountSettings, DesktopSyncButton, DesktopFeedback } from "./desktop-controls";
-import { useUnsaved, useWorkspaceScope } from "./store";
+import { useUnsaved, useWorkspaceScope, useDesktopStatus } from "./store";
 import { PageSkeleton } from "@/components/ui/page-heading";
 import { isTauri } from "./native";
 import { useBase } from "@/lib/hooks";
@@ -73,10 +73,12 @@ function ReportReady() {
 }
 function WorkspaceEntry() {
   const { data } = useBase();
-  return needsOnboarding(data.profile) ? <Suspense fallback={<PageSkeleton />}><Onboarding /></Suspense> : <WorkspaceShell />;
+  const {viewOnly}=useDesktopStatus();
+  return !viewOnly && needsOnboarding(data.profile) ? <Suspense fallback={<PageSkeleton />}><Onboarding /></Suspense> : <WorkspaceShell />;
 }
 function WorkspaceShell() {
   const unsaved=useUnsaved();
+  const {viewOnly,pending}=useDesktopStatus();
   const path=usePathname(),scope=useWorkspaceScope();
   return <>
     <KeyboardShortcuts />
@@ -85,7 +87,8 @@ function WorkspaceShell() {
       <div className="nx-desktop-sidebar hidden md:flex shrink-0"><Sidebar /></div>
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <TopBar syncControl={<DesktopSyncButton />} /><DesktopFeedback />
-        <main id="base-main" tabIndex={-1} inert={unsaved} className="nx-main flex-1 min-h-0 overflow-y-auto overscroll-contain"><ContentContainer>
+        {viewOnly&&<p role="status" className="px-6 py-2 text-xs border-b border-[var(--border)] text-[var(--muted)]">View only · Ask the owner for editing access. {path!=="/settings"&&"You can browse, copy and export this workspace."} {pending>0&&`${pending} local edits remain saved on this device and need editing access to sync.`}</p>}
+        <main onBeforeInputCapture={e=>{if(viewOnly&&path!=="/settings")e.preventDefault();}} onPasteCapture={e=>{if(viewOnly&&path!=="/settings")e.preventDefault();}} onDropCapture={e=>{if(viewOnly&&path!=="/settings")e.preventDefault();}} id="base-main" tabIndex={-1} inert={unsaved} className="nx-main flex-1 min-h-0 overflow-y-auto overscroll-contain"><ContentContainer>
           <PageRecovery key={`${scope}:${path}`}><Suspense fallback={<PageSkeleton />}><Route /><ReportReady /></Suspense></PageRecovery>
         </ContentContainer></main>
       </div>

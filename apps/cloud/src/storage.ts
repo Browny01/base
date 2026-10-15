@@ -2,7 +2,6 @@ import type { D1PreparedStatement } from "@cloudflare/workers-types";
 import {
   equal,
   type Document,
-  type Json,
 } from "../../../packages/sync/src/protocol.ts";
 import {
   bytes,
@@ -12,33 +11,12 @@ import {
   type Env,
   type WorkspaceRow,
 } from "./types.ts";
-export function encodeDocument(document: Document) {
-  const nodes = new Map<string, string>();
-  for (const [root, value] of Object.entries(document)) {
-    const records =
-      Array.isArray(value) &&
-      value.every(
-        (v) =>
-          v &&
-          typeof v === "object" &&
-          !Array.isArray(v) &&
-          typeof v.id === "string",
-      ) &&
-      new Set(value.map((v) => (v as Document).id)).size === value.length;
-    const key = JSON.stringify([root]);
-    if (records) {
-      nodes.set(
-        key,
-        JSON.stringify({
-          kind: "records",
-          order: (value as Document[]).map((v) => v.id),
-        }),
-      );
-      for (const record of value as Document[])
-        nodes.set(JSON.stringify([root, record.id]), JSON.stringify(record));
-    } else nodes.set(key, JSON.stringify({ kind: "value", value }));
-  }
-  return nodes;
+export { encodeNodes as encodeDocument } from "../../../packages/sync/src/nodes.ts";
+import { encodeNodes as encodeDocument, decodeNodes } from "../../../packages/sync/src/nodes.ts";
+export function documentSize(document: Document) {
+  let size=0;
+  for (const raw of encodeDocument(document).values()) size+=bytes(raw);
+  return size;
 }
 export function split(value: string) {
   const chunks: string[] = [];
@@ -57,28 +35,12 @@ export function decodeDocument(
   const values = new Map<string, string>();
   for (const row of rows)
     values.set(row.node, (values.get(row.node) ?? "") + row.body);
-  const result = Object.create(null) as Document;
-  for (const [key, raw] of values) {
-    const path = JSON.parse(key) as string[];
-    if (path.length !== 1) continue;
-    const metadata = JSON.parse(raw);
-    result[path[0]] =
-      metadata.kind === "records"
-        ? metadata.order.map((id: string) => {
-            const record = values.get(JSON.stringify([path[0], id]));
-            if (record === undefined)
-              throw new Error(
-                "Incomplete stored record; no changes were acknowledged.",
-              );
-            return JSON.parse(record) as Json;
-          })
-        : metadata.value;
-  }
-  return result;
+  return decodeNodes(values);
 }
+
 export async function snapshot(env: Env, workspace: string) {
   const results = await env.DB.batch([
-    env.DB.prepare("SELECT * FROM workspaces WHERE id=?").bind(workspace),
+    env.DB.prepare("SELECT w.*,(SELECT coalesce(sum(document_bytes+file_bytes+reserved_bytes),0) FROM workspaces owned WHERE owned.owner_id=w.owner_id) AS owner_bytes FROM workspaces w WHERE w.id=?").bind(workspace),
     env.DB.prepare(
       "SELECT node,part,body FROM documents WHERE workspace_id=? ORDER BY node,part",
     ).bind(workspace),
@@ -131,7 +93,7 @@ export function guard(
 ) {
   const id = crypto.randomUUID();
   const sql =
-    "INSERT INTO commit_guards VALUES(?,coalesce((SELECT CASE WHEN revision=? AND ((?+file_bytes+reserved_bytes)<=CASE WHEN plan='plus' AND subscription_status IN ('active','trialing') AND paid_until>? THEN 10000000000 ELSE 250000000 END OR ?<=document_bytes) THEN 1 ELSE 0 END FROM workspaces WHERE id=? AND owner_id IN (SELECT id FROM accounts WHERE status='active')),0))";
+    "INSERT INTO commit_guards VALUES(?,coalesce((SELECT CASE WHEN revision=? AND ((?+(SELECT coalesce(sum(file_bytes+reserved_bytes+CASE WHEN owned.id=workspaces.id THEN 0 ELSE document_bytes END),0) FROM workspaces owned WHERE owned.owner_id=workspaces.owner_id))<=CASE WHEN plan='plus' AND subscription_status IN ('active','trialing') AND paid_until>? THEN 10000000000 ELSE 250000000 END OR ?<=document_bytes) THEN 1 ELSE 0 END FROM workspaces WHERE id=? AND owner_id IN (SELECT id FROM accounts WHERE status='active')),0))";
   return {
     begin: env.DB.prepare(sql).bind(
       id,
@@ -184,8 +146,8 @@ export async function replaceForImport(
   if (!data || typeof data !== "object" || Array.isArray(data))
     throw new HttpError(400, "Invalid snapshot");
   const oldKey = await backupBeforeWrite(env, workspace, expected, old.data);
-  const raw = JSON.stringify(data),
-    g = guard(env, workspace, expected, bytes(raw));
+  const size = documentSize(data),
+    g = guard(env, workspace, expected, size);
   await env.DB.batch([
     g.begin,
     ...documentWrites(env, workspace, old.data, data),
@@ -198,7 +160,7 @@ export async function replaceForImport(
     ),
     env.DB.prepare(
       "UPDATE workspaces SET revision=revision+1,document_bytes=? WHERE id=?",
-    ).bind(bytes(raw), workspace),
+    ).bind(size, workspace),
     g.end,
   ]);
   return { archiveId, revision: expected + 1 };

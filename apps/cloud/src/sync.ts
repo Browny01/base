@@ -1,3 +1,5 @@
+import { recordSnapshot, recordSize } from "./record-sync.ts";
+import { requireEditable } from "./access.ts";
 import type { D1PreparedStatement } from "@cloudflare/workers-types";
 import {
   equal,
@@ -18,6 +20,7 @@ import { PROTECTED_AUTONOMY_FIELDS } from "../../../packages/core/src/autonomy-c
 import {
   backupBeforeWrite,
   documentWrites,
+  documentSize,
   guard,
   snapshot,
   split,
@@ -25,7 +28,6 @@ import {
 import { canGrow, entitlements } from "./plans.ts";
 import {
   HttpError,
-  bytes,
   now,
   sha,
   type Env,
@@ -61,6 +63,7 @@ export async function stage(
   principal: Principal,
   input: Record<string, unknown>,
 ) {
+  requireEditable(principal);
   const { uploadId, index, parts, chunk } = input;
   if (
     input.workspaceId !== principal.workspace.id ||
@@ -187,17 +190,19 @@ export async function synchronize(
     input.operations.length > 200
   )
     throw new HttpError(400, "Workspace, cursor or protocol mismatch");
+  if (input.operations.length) requireEditable(principal);
   // A partial acknowledgement leaves the remaining operations in every client's outbox.
-  const operations = await resolveOperations(env, workspace, input.operations.slice(0, 8));
+  const incremental = input.transport === "nodes-v1";
+  const operations = await resolveOperations(env, workspace, input.operations.slice(0, incremental ? 1 : 8));
   for (let attempt = 0; attempt < 6; attempt++) {
-    const snap = await snapshot(env, workspace),
+    const snap = await (incremental ? recordSnapshot(env, workspace, operations) : snapshot(env, workspace)),
       revision = snap.workspace.revision;
     if (input.cursor > revision)
       return {
         protocol: 2,
         workspaceId: workspace,
         revision,
-        data: snap.data,
+        ...(incremental ? {transport:"nodes-v1" as const} : {data: snap.data}),
         applied: [],
         conflicts: [],
         recovery: { reason: "server-reset", previousRevision: input.cursor },
@@ -326,9 +331,7 @@ export async function synchronize(
         protocol: 2,
         workspaceId: workspace,
         revision,
-        ...(input.full || input.cursor !== revision || operations.length
-          ? { data }
-          : {}),
+        ...(incremental ? {transport:"nodes-v1" as const} : input.full || input.cursor !== revision || operations.length ? {data} : {}),
         applied,
         conflicts,
       };
@@ -339,13 +342,13 @@ export async function synchronize(
         updatedAt: Date.now(),
         dataRevision: Number(data.dataRevision ?? 0) + 1,
       };
-    const size = bytes(JSON.stringify(data));
+    const size = incremental ? recordSize(snap.workspace, snap.data, data) : documentSize(data);
     if (!canGrow(snap.workspace, size))
       throw new HttpError(
         402,
         "Cloud storage is full. Offline edits remain on this device; export data, free space or upgrade.",
       );
-    const archive = changed
+    const archive = changed && !incremental
       ? await backupBeforeWrite(env, workspace, revision, snap.data)
       : null;
     const g = guard(env, workspace, revision, size),
@@ -376,7 +379,7 @@ export async function synchronize(
         protocol: 2,
         workspaceId: workspace,
         revision: revision + 1,
-        data,
+        ...(incremental ? {transport:"nodes-v1" as const} : {data}),
         applied,
         conflicts,
       };

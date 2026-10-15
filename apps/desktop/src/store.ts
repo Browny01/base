@@ -1,3 +1,4 @@
+import { downloadNodes } from "@/packages/sync/src/download";
 import { reportSyntaxError } from "./runtime-errors";
 import { useSyncExternalStore } from "react";
 import {
@@ -38,6 +39,7 @@ let status = {
   conflicts: 0,
   lastSync: 0,
   local: true,
+  viewOnly: false,
 };
 let failedEdit: {
   scope: string;
@@ -59,6 +61,8 @@ function setStatus(patch: Partial<typeof status>) {
   status = { ...status, ...patch };
   emit();
 }
+function storedViewOnly(scope:string) {try{return localStorage.getItem("base_workspace_access:"+scope)==="viewable";}catch{return false;}}
+function rememberAccess(scope:string,role:string) {try{localStorage.setItem("base_workspace_access:"+scope,role);}catch{/* server permissions remain authoritative */}}
 function accept(next: Workspace) {
   workspace = next;
   snapshot = normalize(next.document);
@@ -68,6 +72,7 @@ function accept(next: Workspace) {
     pending: next.pending.length,
     conflicts: next.conflicts.length,
     local: !next.origin,
+    viewOnly: !!next.origin && storedViewOnly(next.scope),
   });
 }
 // Serialize all SQLite mutations. Network waits do not block local edits.
@@ -82,7 +87,7 @@ let syncTimer: ReturnType<typeof setTimeout> | null = null;
 let failures = 0;
 let syncing: Promise<void> | null = null;
 let requestedAgain = false;
-function schedule(delay = 750) {
+function schedule(delay = workspace?.workspaceId.startsWith("base_cloud_") ? 150 : 750) {
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = null;
   if (!workspace?.origin || document.hidden || !navigator.onLine) return;
@@ -123,6 +128,7 @@ function mutate(updater: (data: BaseData) => BaseData) {
   void persistEdit(updater).catch(() => {});
 }
 export function persistEdit(updater: (data: BaseData) => BaseData) {
+  if (status.viewOnly) {const message="This workspace is viewable. Ask its owner for editing access.";setStatus({error:message});return Promise.reject(new Error(message));}
   const scopeAtStart = workspace?.scope;
   edits++;
   setStatus({ saving: true });
@@ -206,7 +212,7 @@ export async function sync(): Promise<void> {
     const sent = workspace!;
     setStatus({ syncing: true, error: "" });
     const operations = await prepareBatch(
-      sent.pending,
+      status.viewOnly ? [] : sent.workspaceId.startsWith("base_cloud_") ? sent.pending.slice(0,1) : sent.pending,
       sent.workspaceId,
       async (body) => {
         const response = await request(sent.scope, "/api/native/sync/chunk", {
@@ -220,10 +226,11 @@ export async function sync(): Promise<void> {
           );
       },
     );
-    const res = await request(sent.scope, "/api/native/sync", {
+    let res = await request(sent.scope, "/api/native/sync", {
       method: "POST",
       body: JSON.stringify({
         protocol: 2,
+        ...(sent.workspaceId.startsWith("base_cloud_") ? {transport:"nodes-v1"} : {}),
         workspaceId: sent.workspaceId,
         cursor: sent.revision,
         full: Object.keys(sent.baseline).length === 0,
@@ -231,11 +238,25 @@ export async function sync(): Promise<void> {
       }),
       headers: { "Content-Type": "application/json" },
     });
+    if (res.status === 403 && sent.workspaceId.startsWith("base_cloud_")) {
+      const info = await request(sent.scope,"/api/workspace");
+      if (info.ok && !info.headers.has("X-Base-Cached") && (await info.json()).role === "viewable") {
+        if (workspace?.scope === sent.scope) {rememberAccess(sent.scope,"viewable");setStatus({viewOnly:true});}
+        res = await request(sent.scope,"/api/native/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({protocol:2,transport:"nodes-v1",workspaceId:sent.workspaceId,cursor:sent.revision,operations:[]})});
+      }
+    }
     if (res.status === 401)
       throw new Error(
         "Your session expired. Reconnect your account; offline edits are retained.",
       );
     const response = await readSyncResponse(res);
+    if (response.transport === "nodes-v1") {
+      const reset=!!response.recovery;
+      const downloaded=await downloadNodes(path=>request(sent.scope,path),sent.workspaceId,reset?{}:sent.baseline,reset?0:sent.revision,reset || Object.keys(sent.baseline).length===0);
+      if (downloaded.revision<response.revision) throw new Error("Cloud revision moved backwards; offline edits are retained.");
+      response.data=downloaded.data;
+      response.revision=downloaded.revision;
+    }
     if (
       response.protocol !== 2 ||
       response.workspaceId !== sent.workspaceId ||
@@ -286,6 +307,7 @@ export async function sync(): Promise<void> {
       );
     await serialized(async () => {
       if (!workspace || workspace.scope !== sent.scope) return;
+      if (response.access) rememberAccess(sent.scope,response.access);
       if (isRecovery(response, sent.revision)) {
         const recovered = recoverSnapshot(
           workspace.document,
@@ -381,7 +403,7 @@ export async function sync(): Promise<void> {
       setStatus({ syncing: false });
       const rerun = requestedAgain;
       requestedAgain = false;
-      if (rerun || (!status.error && workspace?.pending.length)) schedule(0);
+      if (rerun || (!status.error && !status.viewOnly && workspace?.pending.length)) schedule(0);
     });
   return syncing;
 }
@@ -404,14 +426,18 @@ export async function connect(origin: string, password: string) {
 export async function connectHosted() {
   return connectNative("connect_hosted_workspace");
 }
+export async function openCloudWorkspace(id: string) {
+  return connectNative("cloud_workspace_open", {workspaceId:id, scope:workspace?.scope});
+}
 export async function completeCloudSignIn() {
   return connectNative("cloud_sign_in_finish");
 }
-async function connectNative(command: string) {
+async function connectNative(command: string, args:Record<string,unknown> = {}) {
   window.dispatchEvent(new Event("base:flush-editors"));
   return serialized(async () => {
     flushLocalWritesBeforeSwitch();
     const next = await native<Workspace>(command, {
+      ...args,
       defaults: documentOf(normalize(documentOf(DEFAULT))),
     });
     clearSessionSecret();

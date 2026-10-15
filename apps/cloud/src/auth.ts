@@ -56,9 +56,9 @@ export async function provision(env: Env, account: string) {
     ).bind(id, account),
   ]);
   const row = await env.DB.prepare(
-    "SELECT w.* FROM workspaces w JOIN accounts a ON a.id=w.owner_id WHERE w.owner_id=? AND a.status='active'",
+    "SELECT w.* FROM workspaces w JOIN accounts a ON a.id=w.owner_id WHERE w.id=? AND a.status='active'",
   )
-    .bind(account)
+    .bind(id)
     .first<WorkspaceRow>();
   if (!row)
     throw new HttpError(
@@ -95,10 +95,10 @@ export async function authenticate(
   }
   if (!token) throw new HttpError(401, "Unauthorized");
   const row = await env.DB.prepare(
-    "SELECT w.*,s.device_id,s.expires AS session_expires FROM sessions s JOIN devices d ON d.workspace_id=s.workspace_id AND d.id=s.device_id JOIN workspaces w ON w.id=s.workspace_id JOIN accounts a ON a.id=w.owner_id WHERE s.hash=? AND s.expires>? AND d.enabled=1 AND a.status='active'",
+    "SELECT w.*,s.device_id,s.expires AS session_expires,coalesce(sa.account_id,w.owner_id) AS actor_id,m.role AS member_role FROM sessions s JOIN devices d ON d.workspace_id=s.workspace_id AND d.id=s.device_id JOIN workspaces w ON w.id=s.workspace_id JOIN accounts a ON a.id=w.owner_id LEFT JOIN session_accounts sa ON sa.hash=s.hash JOIN accounts actor ON actor.id=coalesce(sa.account_id,w.owner_id) LEFT JOIN workspace_members m ON m.workspace_id=w.id AND m.account_id=sa.account_id WHERE s.hash=? AND s.expires>? AND d.enabled=1 AND a.status='active' AND actor.status='active' AND (coalesce(sa.account_id,w.owner_id)=w.owner_id OR m.account_id IS NOT NULL)",
   )
     .bind(await sha(token), now())
-    .first<WorkspaceRow & { device_id: string; session_expires: number }>();
+    .first<WorkspaceRow & { device_id: string; session_expires: number; actor_id: string; member_role: "editable" | "viewable" | null }>();
   if (!row)
     throw new HttpError(
       401,
@@ -116,7 +116,7 @@ export async function authenticate(
   )
     .bind(now(), row.id, row.device_id, now() - 86400)
     .run();
-  return { workspace: row, deviceId: row.device_id, accountId: row.owner_id, sessionExpires: row.session_expires };
+  return { workspace: row, deviceId: row.device_id, accountId: row.actor_id, role: row.member_role ?? undefined, sessionExpires: row.session_expires };
 }
 export async function beginDevice(env: Env, input: Record<string, unknown>) {
   if (
@@ -224,6 +224,7 @@ export async function exchangeDevice(env: Env, input: Record<string, unknown>) {
         flow.device_id,
         expires,
       ),
+      env.DB.prepare("INSERT INTO session_accounts VALUES(?,?)").bind(await sha(token), flow.account_id),
       env.DB.prepare("DELETE FROM commit_guards WHERE id=?").bind(id),
     ]);
   } catch {
@@ -366,8 +367,8 @@ export async function clerkWebhook(env: Env, request: Request) {
         "INSERT INTO accounts(id,status,created_at) VALUES(?,'deleted',?) ON CONFLICT(id) DO UPDATE SET status='deleted'",
       ).bind(account, now()),
       env.DB.prepare(
-        "DELETE FROM sessions WHERE workspace_id IN (SELECT id FROM workspaces WHERE owner_id=?)",
-      ).bind(account),
+        "DELETE FROM sessions WHERE workspace_id IN (SELECT id FROM workspaces WHERE owner_id=?) OR hash IN (SELECT hash FROM session_accounts WHERE account_id=?)",
+      ).bind(account, account),
       env.DB.prepare(
         "INSERT OR REPLACE INTO webhook_events VALUES(?,?,'done')",
       ).bind(id, now()),

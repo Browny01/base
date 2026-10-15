@@ -1,3 +1,4 @@
+import { CloudWorkspaces } from "./cloud-workspaces";
 import { BASE_CLOUD_URL } from "@/packages/core/src/service";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -37,6 +38,9 @@ type Device = {
 type Details = {
   mode: string;
   plan: string;
+  role?: string;
+  isOwner?: boolean;
+  name?: string;
   storageBytes: number;
   storageLimit: number | null;
   account?: { email: string; display_name: string };
@@ -401,11 +405,12 @@ export function WorkspaceSettings({ setupOnly = false }: { setupOnly?: boolean }
           )}
         </div>
       )}
+      {!setupOnly && details?.mode === "cloud" && workspace && <CloudWorkspaces key={workspace.scope} scope={workspace.scope} currentId={workspace.workspaceId} owner={details.isOwner !== false} plus={details.plan === "plus"} blocked={blocked} />}
       {!setupOnly && details && workspace?.origin && (
         <div className="base-workspace-panel">
           <div className="base-workspace-heading">
             <div>
-              <h3>Connected workspace</h3>
+              <h3>{details.name || "Connected workspace"}</h3>
               <p>{details.account?.email || (cloudConnected ? "Base Cloud" : "Your local workspace")}</p>
             </div>
             <span className="base-workspace-status">
@@ -419,7 +424,7 @@ export function WorkspaceSettings({ setupOnly = false }: { setupOnly?: boolean }
           <p className="text-xs text-[var(--muted)]">
             {size(details.storageBytes)}
             {details.storageLimit
-              ? ` of ${size(details.storageLimit)}`
+              ? ` of ${size(details.storageLimit)} shared across owned workspaces`
               : " stored"}{" "}
             · {status.pending} pending changes
           </p>
@@ -437,7 +442,7 @@ export function WorkspaceSettings({ setupOnly = false }: { setupOnly?: boolean }
               aria-label="Cloud storage used"
             />
           )}
-          {details.mode === "cloud" && (
+          {details.mode === "cloud" && details.isOwner !== false && (
             <div className="flex flex-wrap gap-2 mt-4">
               <button
                 disabled={busy}
@@ -478,7 +483,7 @@ export function WorkspaceSettings({ setupOnly = false }: { setupOnly?: boolean }
               </button>
             </div>
           )}
-          <h4 className="text-xs font-medium mt-5 mb-2">Connected devices</h4>
+          {details.isOwner !== false && <h4 className="text-xs font-medium mt-5 mb-2">Connected devices</h4>}
           <div className="grid gap-2">
             {details.devices
               .filter((device) => device.enabled !== 0)

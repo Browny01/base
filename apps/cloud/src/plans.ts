@@ -37,9 +37,9 @@ export function canGrow(
   extraFiles = 0,
 ) {
   const current =
-    workspace.document_bytes + workspace.file_bytes + workspace.reserved_bytes;
+    (workspace.owner_bytes ?? workspace.document_bytes + workspace.file_bytes + workspace.reserved_bytes);
   const proposed =
-    nextDocument + workspace.file_bytes + workspace.reserved_bytes + extraFiles;
+    current - workspace.document_bytes + nextDocument + extraFiles;
   return (
     proposed <= entitlements(workspace).storageBytes || proposed <= current
   );

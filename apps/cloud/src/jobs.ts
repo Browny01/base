@@ -3,6 +3,8 @@ import { entitlements } from "./plans.ts";
 import { HttpError, now, type Env, type WorkspaceRow } from "./types.ts";
 export async function schedule(env: Env) {
   await collectUnreferencedRecovery(env);
+  await env.DB.prepare("DELETE FROM node_history WHERE rowid IN (SELECT h.rowid FROM node_history h JOIN workspaces w ON w.id=h.workspace_id WHERE h.created_at<?-CASE WHEN w.plan='plus' AND w.subscription_status IN ('active','trialing') AND w.paid_until>? THEN 90 ELSE 7 END*86400 LIMIT 1000)").bind(now(),now()).run();
+  await env.DB.prepare("DELETE FROM workspace_invites WHERE expires<?").bind(now()).run();
   // SQL jobs are a durable outbox. Queue delivery can fail without losing work.
   const workspaces = await env.DB.prepare(
     "SELECT * FROM workspaces WHERE next_backup_at<=? ORDER BY next_backup_at LIMIT 100",

@@ -74,7 +74,34 @@ CVC for Plus testing. Never enter a real payment card for these acceptance check
 Remaining integration/file-upload/migration gates are listed in the status
 report. Production data migration and original Phase 3 have not begun.
 
-## Latest reliability and preference fixes (Base 0.1.5)
+## Cloud workspaces and branding (Base 0.1.6)
+
+Build with the commands above and quit any old Base copy before launching.
+The new app, Dock and website icons use the supplied glass emblem. Keep
+Application Support and Keychain data when replacing the app bundle.
+
+1. Open Settings → Accounts & Sync. A Plus account can create an empty named
+   workspace; open it and switch back. Existing records and pending edits must
+   remain separate. Free accounts cannot create extra owned workspaces.
+2. On Plus, create an Editable or Viewable invitation and share the code
+   privately. A second signed-in account joins using that code. Check its access,
+   change the role, then remove it. Billing and access administration stay with
+   the owner. The storage meter is pooled across workspaces the owner owns.
+3. Edit a Finance subscription, including a paused one. Change amount, date,
+   frequency and notes; verify its paused state and existing identity remain.
+4. Disconnect the network, edit an existing Cloud record and quit/reopen Base.
+   Restore connectivity and wait for pending changes to drain. Verify on another
+   device and test concurrent edits/conflict retention. Cloud still keeps a
+   durable local cache while online.
+5. Verify the new Dock icon and browser favicon, then test the browser workspace
+   selector too. The production domain is not cut over; staging still uses Clerk
+   Development and Stripe sandbox. Upgrade through sandbox Checkout for a real
+   Plus acceptance test; synthetic fixtures are not a real billing test.
+
+[Full results and limits](cloud-workspaces-016.md). Actual macOS verification of
+this build remains pending. No Mac updater archive is published yet.
+
+## Earlier Notes fixes (Base 0.1.5)
 
 Notes checks for this build:
 
@@ -93,8 +120,7 @@ archive is published yet.
 
 Quit the running Base app before opening the new build. To replace the installed
 copy, move the newly built `Base.app` into Applications; replace only the app
-bundle, keeping Application Support and Keychain data. The new ICNS uses the
-house logo. A Dock shortcut pointing to an older app can still open that copy.
+bundle, keeping Application Support and Keychain data. The new ICNS uses the supplied glass emblem. A Dock shortcut pointing to an older app can still open that copy.
 
 In onboarding or Settings → News & integrations, choose the market currency,
 feed types and publications. Existing YouTube sources should remain visible

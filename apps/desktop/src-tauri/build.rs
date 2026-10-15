@@ -12,6 +12,7 @@ fn main() {
             "connect_account",
             "cloud_sign_in_start",
             "cloud_sign_in_finish",
+            "cloud_workspace_open",
             "disconnect_account",
             "api_request",
             "integration_status",

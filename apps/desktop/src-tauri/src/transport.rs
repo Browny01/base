@@ -27,6 +27,13 @@ const PATHS: &[&str] = &[
     "/api/native/sync/chunk",
     "/api/auth/desktop",
     "/api/workspace",
+    "/api/workspace/nodes",
+    "/api/workspace/record-history",
+    "/api/workspaces",
+    "/api/workspaces/create",
+    "/api/workspaces/accept",
+    "/api/workspace/members",
+    "/api/workspace/invite",
     "/api/workspace/credentials",
     "/api/workspace/export",
     "/api/workspace/integrations/revoke",
@@ -330,7 +337,13 @@ pub async fn api_request(
     let cacheable = method == "GET"
         && !matches!(
             path.split('?').next(),
-            Some("/api/native/sync" | "/api/auth/desktop")
+            Some(
+                "/api/native/sync"
+                    | "/api/auth/desktop"
+                    | "/api/workspace/nodes"
+                    | "/api/workspaces"
+                    | "/api/workspace/members"
+            )
         );
     let provider_key = if let Some(provider) = integration_provider(&path) {
         integration_entry(&scope, provider)?.get_password().ok()
@@ -831,6 +844,53 @@ pub async fn cloud_sign_in_finish(
     let workspace = Database::activate(&mut connection, &scope, &origin, workspace_id, &defaults)?;
     *login.0.lock().map_err(|e| e.to_string())? = None;
     Ok(workspace)
+}
+
+#[tauri::command]
+pub async fn cloud_workspace_open(
+    db: tauri::State<'_, Database>,
+    transport: tauri::State<'_, Transport>,
+    scope: String,
+    workspace_id: String,
+    defaults: Value,
+) -> Result<Workspace, String> {
+    let current = workspace(&db, &scope)?;
+    if current.origin != managed_cloud_origin()
+        || !current.workspace_id.starts_with("base_cloud_")
+        || !defaults.is_object()
+    {
+        return Err("Connect Base Cloud before opening a Cloud workspace".into());
+    }
+    let token = credential(&scope)?
+        .get_password()
+        .map_err(|_| "Sign in again to switch workspaces")?;
+    let result = auth_json(
+        transport
+            .client
+            .post(format!("{}/api/workspaces/open", current.origin))
+            .bearer_auth(token)
+            .json(&json!({"id":workspace_id}))
+            .send()
+            .await
+            .map_err(|_| "Could not reach Base Cloud")?,
+    )
+    .await?;
+    let token = result["token"]
+        .as_str()
+        .filter(|v| v.len() == 56 && v.starts_with("base_desktop_"))
+        .ok_or("Invalid workspace session")?;
+    let id = result["workspaceId"]
+        .as_str()
+        .filter(|v| *v == workspace_id && v.starts_with("base_cloud_") && v.len() == 51)
+        .ok_or("Invalid Cloud workspace identity")?;
+    workspace_scope_check(&db, &scope)?;
+    let next_scope = format!("{:x}", Sha256::digest(format!("{}/{id}", current.origin)));
+    credential(&next_scope)?
+        .set_password(token)
+        .map_err(|_| "Unlock your OS credential store, then try again")?;
+    let mut connection = db.0.lock().map_err(|e| e.to_string())?;
+    connection.execute("INSERT INTO metadata(key,value) VALUES(?1,'cloud') ON CONFLICT(key) DO UPDATE SET value=excluded.value",[format!("workspace_kind:{next_scope}")]).map_err(|e|e.to_string())?;
+    Database::activate(&mut connection, &next_scope, &current.origin, id, &defaults)
 }
 
 #[tauri::command]

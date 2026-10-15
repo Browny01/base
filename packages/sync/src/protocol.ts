@@ -21,12 +21,14 @@ export type Conflict = {
   revision: number;
   reason: "concurrent-edit" | "deleted-parent" | "protected-field" | "tombstone" | "server-reset";
 };
-export type SyncRequest = { protocol: 2; workspaceId: string; cursor: number; full?: boolean; operations: Operation[] };
+export type SyncRequest = { protocol: 2; workspaceId: string; cursor: number; full?: boolean; transport?: "nodes-v1"; operations: Operation[] };
 export type SyncResponse = {
   protocol: 2;
   workspaceId: string;
   revision: number;
   data?: Document;
+  transport?: "nodes-v1";
+  access?: "owner" | "editable" | "viewable";
   applied: string[];
   conflicts: Conflict[];
   /** A rollback/reset cannot acknowledge edits. Clients archive their prior state. */

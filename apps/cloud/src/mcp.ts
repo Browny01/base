@@ -1,3 +1,4 @@
+import { requireEditable } from "./access.ts";
 import {
   createMcpEngine,
   type McpPersistence,
@@ -11,11 +12,12 @@ import {
 import {
   backupBeforeWrite,
   documentWrites,
+  documentSize,
   guard,
   snapshot,
 } from "./storage.ts";
 import { canGrow, entitlements } from "./plans.ts";
-import { bytes, HttpError, now, type Env, type Principal } from "./types.ts";
+import { HttpError, now, type Env, type Principal } from "./types.ts";
 import { diff, type Document } from "../../../packages/sync/src/protocol.ts";
 import type { BaseData } from "../../../lib/store.ts";
 
@@ -23,19 +25,20 @@ export function workspaceMcp(env: Env, principal: Principal) {
   const id = principal.workspace.id;
   let last: Awaited<ReturnType<typeof snapshot>> | null = null;
   const commit = async (expected: number, before: Document, next: Document) => {
+    requireEditable(principal);
     const current = await snapshot(env, id);
     if (current.workspace.revision !== expected)
       throw new HttpError(
         409,
         "Workspace changed. Reload and retry; no data was overwritten.",
       );
-    if (!canGrow(current.workspace, bytes(JSON.stringify(next))))
+    if (!canGrow(current.workspace, documentSize(next)))
       throw new HttpError(
         402,
         "Cloud storage is full; existing data remains available for export.",
       );
     const archived = await backupBeforeWrite(env, id, expected, before),
-      g = guard(env, id, expected, bytes(JSON.stringify(next)));
+      g = guard(env, id, expected, documentSize(next));
     const deletions = diff(before, next)
       .filter((op) => !op.after.exists)
       .map((op) =>
@@ -58,7 +61,7 @@ export function workspaceMcp(env: Env, principal: Principal) {
         ),
         env.DB.prepare(
           "UPDATE workspaces SET revision=revision+1,document_bytes=? WHERE id=?",
-        ).bind(bytes(JSON.stringify(next)), id),
+        ).bind(documentSize(next), id),
         g.end,
       ]);
     } catch {

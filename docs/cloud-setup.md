@@ -24,8 +24,9 @@ while production will eventually use `https://base.lucasbrown.xyz`.
 ### Hosting CPU requirement
 
 The owner explicitly chose to retain **Workers Free**. It allows only 10 ms of
-CPU per HTTP invocation. Cloud sync therefore processes at most eight operations
-per request; unacknowledged operations remain in the client's durable outbox.
+CPU per HTTP invocation. Cloud sync now uses record-scoped writes and paginated incremental downloads.
+Modern clients send one operation per request; legacy full-snapshot clients keep
+the eight-operation limit. Unacknowledged operations remain in the client's durable outbox. See [0.1.6 verification](cloud-workspaces-016.md).
 The shared patch writer copies edited paths rather than deep-cloning the entire
 workspace for every field. Free-tier reliability must still be measured with
 the actual workspace; large snapshot parsing/encoding, attachments and other

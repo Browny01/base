@@ -29,6 +29,7 @@ export type WorkspaceRow = {
   owner_id: string;
   revision: number;
   document_bytes: number;
+  owner_bytes?: number;
   file_bytes: number;
   reserved_bytes: number;
   plan: string;
@@ -38,12 +39,15 @@ export type WorkspaceRow = {
   paid_until: number;
   billing_version: number;
   next_backup_at: number;
+  name?: string;
+  billing_workspace_id?: string | null;
 };
 export type Principal = {
   workspace: WorkspaceRow;
   deviceId: string;
   accountId: string;
   sessionExpires?: number;
+  role?: "editable" | "viewable";
 };
 export class HttpError extends Error {
   status: number;

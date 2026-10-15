@@ -323,7 +323,10 @@ export async function webhook(env: Env, request: Request) {
           workspace.billing_version,
         )
         .run();
-      if (updated.meta.changes === 1) break;
+      if (updated.meta.changes === 1) {
+        await env.DB.prepare("UPDATE workspaces SET plan=(SELECT plan FROM workspaces WHERE id=?),subscription_status=(SELECT subscription_status FROM workspaces WHERE id=?),paid_until=(SELECT paid_until FROM workspaces WHERE id=?) WHERE billing_workspace_id=?").bind(workspace.id,workspace.id,workspace.id,workspace.id).run();
+        break;
+      }
       if (attempt === 5)
         throw new HttpError(409, "Billing changed concurrently; retry");
     }
