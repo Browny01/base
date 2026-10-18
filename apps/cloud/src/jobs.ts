@@ -3,7 +3,7 @@ import { entitlements } from "./plans.ts";
 import { HttpError, now, type Env, type WorkspaceRow } from "./types.ts";
 export async function schedule(env: Env) {
   await collectUnreferencedRecovery(env);
-  await env.DB.prepare("DELETE FROM node_history WHERE rowid IN (SELECT h.rowid FROM node_history h JOIN workspaces w ON w.id=h.workspace_id WHERE h.created_at<?-CASE WHEN w.plan='plus' AND w.subscription_status IN ('active','trialing') AND w.paid_until>? THEN 90 ELSE 7 END*86400 LIMIT 1000)").bind(now(),now()).run();
+  await env.DB.prepare("DELETE FROM node_history WHERE rowid IN (SELECT h.rowid FROM node_history h JOIN workspaces w ON w.id=h.workspace_id WHERE h.created_at<? AND h.created_at<?-CASE WHEN w.plan='plus' AND w.subscription_status IN ('active','trialing') AND w.paid_until>? THEN 90 ELSE 7 END*86400 LIMIT 1000)").bind(now()-7*86400,now(),now()).run();
   await env.DB.prepare("DELETE FROM workspace_invites WHERE expires<?").bind(now()).run();
   // SQL jobs are a durable outbox. Queue delivery can fail without losing work.
   const workspaces = await env.DB.prepare(
@@ -200,8 +200,9 @@ export async function collectUnreferencedRecovery(env: Env) {
   // Recovery keys are immutable and never reused by client writes. Pending
   // queue jobs are excluded because their stable IDs can be retried later.
   // A full day's grace exceeds the lifetime of an unacknowledged sync request.
+  // Match the indexed TEXT expression so each job check seeks one key.
   const rows = await env.DB.prepare(
-    "SELECT r.workspace_id,r.key FROM recovery_objects r WHERE r.created_at<? AND NOT EXISTS(SELECT 1 FROM backups b WHERE b.workspace_id=r.workspace_id AND b.key=r.key) AND NOT EXISTS(SELECT 1 FROM migration_archives m WHERE m.workspace_id=r.workspace_id AND m.key=r.key) AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.workspace_id=r.workspace_id AND 'recovery/'||j.workspace_id||'/'||j.id||'.json'=r.key AND j.status!='done') LIMIT 100",
+    "SELECT r.workspace_id,r.key FROM recovery_objects r WHERE r.created_at<? AND NOT EXISTS(SELECT 1 FROM backups b WHERE b.workspace_id=r.workspace_id AND b.key=r.key) AND NOT EXISTS(SELECT 1 FROM migration_archives m WHERE m.workspace_id=r.workspace_id AND m.key=r.key) AND NOT EXISTS(SELECT 1 FROM jobs j WHERE j.workspace_id=r.workspace_id AND CAST('recovery/'||j.workspace_id||'/'||j.id||'.json' AS TEXT)=r.key AND j.status!='done') LIMIT 100",
   )
     .bind(now() - 86400)
     .all<{ workspace_id: string; key: string }>();

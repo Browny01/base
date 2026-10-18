@@ -49,6 +49,15 @@ not authorized for this rollout.
 References: [Workers CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-time)
 and [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/).
 
+### D1 daily read allowance
+
+The hourly recovery cleanup previously exhausted the free allowance through
+repeated unindexed backup-key scans. Apply migration 0007 before deploying the
+updated collector. The staging fix reduced its live query from an analytics
+average of 214,174 reads to 1,303 reads; no backup data was removed. See
+[the incident and measured results](d1-hourly-read-fix.md). Free D1 allowances
+reset at 00:00 UTC (08:00 Perth); deployment cannot refund consumed reads.
+
 ## Clerk
 
 1. Create/sign in to [Clerk Dashboard](https://dashboard.clerk.com/).
