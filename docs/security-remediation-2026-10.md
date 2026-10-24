@@ -113,6 +113,11 @@ Local verification on Linux completed:
   in the desktop tree, none in the standalone service.
 - Next, desktop/browser Vite production builds, Worker dry-run and Tauri Linux
   release build pass. No deployment was performed.
+- The rebuilt Linux release launches its bundled onboarding and initializes
+  SQLite with a fresh isolated profile and all external networking unavailable
+  (network namespace with loopback only, Xvfb). It remains running through the
+  15-second check. This startup check does not retest Cloud reconnection or
+  establish performance measurements.
 
 CI additionally builds the iOS app/widget without signing. Its first execution
 and macOS/Windows-native checks remain pending; no physical-device or shared
