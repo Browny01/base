@@ -2,10 +2,15 @@
 
 Phase 2.5 is in progress. Staging: **https://base-cloud-staging.kingbrownyplayz.workers.dev**.
 
+**24 October update:** the owner requested `base.lucasbrown.xyz` for this Cloud
+preview. Its current Vercel hostname returns 404 and the archived deployment
+returns 410. Cloudflare domain attachment is blocked by the existing externally
+managed CNAME (100117); DNS edit access / owner cleanup is required. The working
+workers.dev URL remains available. See [release readiness](release-readiness.md).
+
 Staging is isolated from the existing Next/Vercel
-application. Do not point `base.lucasbrown.xyz` at this Worker until integration
-parity, migration/rollback, live authentication/billing and desktop acceptance
-checks are complete. Never paste keys in chat or commit secret files.
+application. A preview-domain attachment does not clear the integration, migration/rollback,
+live authentication/billing or desktop acceptance gates for a production launch. Never paste keys in chat or commit secret files.
 
 ## Cloudflare
 

@@ -1,3 +1,4 @@
 {
-  "cloudUrl": "https://base-cloud-staging.kingbrownyplayz.workers.dev"
+  "cloudUrl": "https://base-cloud-staging.kingbrownyplayz.workers.dev",
+  "cloudAliases": ["https://base.lucasbrown.xyz"]
 }

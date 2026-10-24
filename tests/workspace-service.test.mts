@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -17,16 +17,14 @@ import {
 } from "../packages/sync/src/protocol.ts";
 const run = promisify(execFile),
   root = fileURLToPath(new URL("../", import.meta.url));
+// First-run compilation on Intel runners is not part of the runtime test budget.
+before(async () => {
+  await run("cargo", ["build", "--quiet", "--locked", "--manifest-path", join(root, "native/BaseWorkspace/Cargo.toml")], { timeout: 600000 });
+}, { timeout: 610000 });
 test(
   "standalone workspace authenticates, retains conflicting offline edits and survives restart",
   { timeout: 120000 },
   async () => {
-    await run("cargo", [
-      "build",
-      "--quiet",
-      "--manifest-path",
-      join(root, "native/BaseWorkspace/Cargo.toml"),
-    ]);
     const binary = join(
         root,
         `native/BaseWorkspace/target/debug/base-workspace${globalThis.process.platform === "win32" ? ".exe" : ""}`,

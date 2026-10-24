@@ -10,6 +10,7 @@ import { installApiTransport } from "@/lib/api-client";
 import { installPrinter } from "@/lib/print-document";
 import { installNoteVerifier } from "@/lib/note-lock";
 import { checkWorkspaceNotePassword } from "@/packages/core/src/workspace-password";
+import { cloudAttachmentPath } from "@/packages/core/src/service";
 import { getData } from "@/lib/store";
 import { installSecretCache } from "@/lib/vault";
 import { readStored } from "@/lib/prefs";
@@ -88,17 +89,8 @@ installCredentialActions({
 });
 const external = (value: string, name = "Attachment") => {
   const workspace = currentWorkspace();
-  let id: string | undefined;
-  try {
-    const url = new URL(value);
-    if (
-      workspace?.origin === url.origin &&
-      /^\/api\/files\/[0-9a-f-]{36}$/i.test(url.pathname)
-    )
-      id = url.pathname.split("/").at(-1);
-  } catch {
-    /* ordinary external URL */
-  }
+  const path = workspace ? cloudAttachmentPath(value, workspace.origin) : null;
+  const id = path?.split("/").at(-1);
   const operation =
     id && workspace
       ? native("download_workspace_file", { scope: workspace.scope, id, name })

@@ -9,6 +9,7 @@ import { PUBLIC_INTEGRATION_PATHS } from "@/packages/core/src/providers";
 import type { Document } from "@/packages/sync/src/protocol";
 import { clerkAppearance } from "@/packages/core/src/clerk-appearance";
 import { checkWorkspaceNotePassword } from "@/packages/core/src/workspace-password";
+import { cloudAttachmentPath } from "@/packages/core/src/service";
 type ClerkClient = {
   user: unknown;
   session?: { getToken: () => Promise<string | null> };
@@ -493,8 +494,29 @@ export async function browserCommand<T>(
       download(await response.blob(), String(args.name ?? "Attachment"));
       break;
     }
-    case "cache_media":
-      throw new Error("Browser uses its image cache.");
+    case "cache_media": {
+      const workspace = await browserState(false, (s) => current(s, String(args.scope)));
+      const path = cloudAttachmentPath(String(args.url), workspace.origin);
+      if (!path || workspace.origin !== location.origin) throw new Error("Browser uses its public image cache.");
+      const response = await fetch(path, { credentials: "same-origin", redirect: "error", headers: { "X-Base-Workspace": workspace.workspaceId } });
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!response.ok || !contentType.startsWith("image/") || !response.body) throw new Error("Workspace image is unavailable.");
+      const reader = response.body.getReader(), chunks: Uint8Array[] = [];
+      let size = 0;
+      for (;;) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > 8 * 1024 * 1024) { await reader.cancel(); throw new Error("Workspace image exceeds the 8 MB cache limit."); }
+        chunks.push(value);
+      }
+      await browserState(false, (s) => current(s, workspace.scope));
+      const bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+      result = { contentType, bodyBase64: encode(bytes), cached: false };
+      break;
+    }
     case "check_update":
       result = null;
       break;

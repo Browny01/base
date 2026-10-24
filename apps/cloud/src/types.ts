@@ -16,6 +16,7 @@ export interface Env {
   PUBLIC_URL: string;
   /** Operator-owned alternate origins retained during a domain transition. */
   PUBLIC_ALIASES?: string;
+  FILE_PUBLIC_URL?: string;
   ENVIRONMENT: "staging" | "production";
   CLERK_WEBHOOK_SIGNING_SECRET?: string;
   CLERK_SECRET_KEY?: string;

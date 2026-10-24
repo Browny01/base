@@ -787,3 +787,32 @@ test("attachment deletion accepts retained service origins without crossing work
   assert.equal(database.prepare("SELECT status FROM files WHERE workspace_id=? AND id=?").get(principal.workspace.id,id)?.status,"deleted");
   assert.equal(database.prepare("SELECT status FROM files WHERE workspace_id=? AND id=?").get(other.workspace.id,id)?.status,"ready");
 });
+
+test("Cloud attachment mapping stays within configured origins and exact file paths", async () => {
+  const {cloudAttachmentPath,BASE_CLOUD_URL} = await import("../packages/core/src/service.ts");
+  const path = "/api/files/" + crypto.randomUUID();
+  const alias = "https://base.lucasbrown.xyz";
+  assert.equal(cloudAttachmentPath(BASE_CLOUD_URL + path, alias), path);
+  assert.equal(cloudAttachmentPath(alias + path, BASE_CLOUD_URL), path);
+  for (const input of ["https://attacker.example"+path,BASE_CLOUD_URL+"/api/workspace",BASE_CLOUD_URL+path+"?token=x",BASE_CLOUD_URL+path+"#fragment","https://user:pass@base.lucasbrown.xyz"+path]) assert.equal(cloudAttachmentPath(input, alias),null);
+  assert.equal(cloudAttachmentPath(BASE_CLOUD_URL+path,"https://attacker.example"),null);
+});
+
+test("uploads keep a canonical origin for installed clients while both origins can read them", async () => {
+  const {env,account} = cloudEnvironment();
+  const {token} = await account("canonical-file-fixture");
+  const original = env.PUBLIC_URL, alias = "https://base-preview.example.com";
+  env.PUBLIC_ALIASES = `${original},${alias}`;
+  env.FILE_PUBLIC_URL = original;
+  const uploaded = await worker.fetch(new Request(alias+"/api/blob/upload?filename=fixture.txt", {
+    method:"POST", headers:{Authorization:`Bearer ${token}`,"Content-Length":"7","Content-Type":"text/plain",Origin:alias},body:"fixture",
+  }),env);
+  assert.equal(uploaded.status,200);
+  const file = await uploaded.json() as {url:string;id:string};
+  assert.equal(file.url, original+"/api/files/"+file.id);
+  for(const origin of [original,alias]) {
+    const read = await worker.fetch(new Request(origin+"/api/files/"+file.id,{headers:{Authorization:`Bearer ${token}`,Origin:origin}}),env);
+    assert.equal(read.status,200);
+    assert.equal(await read.text(),"fixture");
+  }
+});

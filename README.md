@@ -15,8 +15,9 @@ sign-in and Stripe billing. There is no local Node.js server in the desktop app.
 [Open the Cloud preview](https://base-cloud-staging.kingbrownyplayz.workers.dev/app/)
 or [see the website](https://base-cloud-staging.kingbrownyplayz.workers.dev/).
 The current hosted instance uses Clerk Development and Stripe sandbox. The
-legacy Next.js/Vercel application remains available as the migration rollback
-path. Existing production data has not been automatically imported into Cloud.
+legacy Next.js source is retained for migration; its last recorded Vercel
+deployment is currently unavailable (410), and the custom hostname returns 404.
+Existing legacy data has not been automatically imported into Cloud.
 See the [release checklist](docs/release-readiness.md) for verified checks,
 remaining work and distribution limits.
 

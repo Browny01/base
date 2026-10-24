@@ -73,7 +73,7 @@ export async function upload(env: Env, principal: Principal, request: Request) {
     if (saved?.status === "ready")
       return {
         configured: true,
-        url: `${env.PUBLIC_URL}/api/files/${id}`,
+        url: `${env.FILE_PUBLIC_URL ?? env.PUBLIC_URL}/api/files/${id}`,
         id,
         size,
       };
@@ -90,7 +90,7 @@ export async function upload(env: Env, principal: Principal, request: Request) {
   }
   return {
     configured: true,
-    url: `${env.PUBLIC_URL}/api/files/${id}`,
+    url: `${env.FILE_PUBLIC_URL ?? env.PUBLIC_URL}/api/files/${id}`,
     id,
     size,
   };

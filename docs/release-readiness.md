@@ -22,7 +22,7 @@ started. Empty GitHub Issues does not mean there is no outstanding work.
 - GitHub CI passed for the previous 0.1.8 checkpoint on Linux, Apple Silicon,
   Intel Mac, the dependency-security job and the iOS simulator/widget build.
   This is build coverage, not physical-device or installer acceptance.
-- Local 0.1.9 checks: 193 JavaScript tests, four TypeScript checks, ESLint
+- Local 0.1.9 checks: 195 JavaScript tests, four TypeScript checks, ESLint
   (zero errors; four existing warnings), Worker dry-run and browser build pass.
   The independent workspace's nine Rust tests and the desktop's 12 tests plus two
   archive regressions pass. Native desktop tests include
@@ -110,7 +110,7 @@ or mark the entire roadmap complete until the evidence exists.
 
 ## Domain transition
 
-Requested hostname: `https://base.lucasbrown.xyz`. The old service CNAME currently
+Requested hostname: `https://base.lucasbrown.xyz`. Before the requested cutover, its CNAME
 resolves to `543d8cfbde0c15de.vercel-dns-017.com`. Cloudflare OAuth can inspect
 Worker domains/routes, but the DNS-record API returned code 10000 (not authorized)
 and direct D1 status checks returned code 7403. No database reset is an answer to
@@ -121,7 +121,13 @@ Each request uses its matched, allowlisted origin for browser CSRF checks, Clerk
 JWT authorized party, MCP metadata and generated callbacks. Wildcards, forwarded
 Host headers and arbitrary client origins are not accepted. Existing attachment
 URLs can still be deleted through either configured origin, subject to workspace
-ownership. The legacy workers.dev origin must remain available for installed
+ownership. Uploads retain a canonical workers.dev file URL so installed clients continue
+to recognize private attachments. New browser clients resolve those file IDs
+through their own origin and authenticated workspace session, with an 8 MB image
+read limit; download links use the same allowlisted mapping. Public images keep
+their ordinary browser cache. No cross-origin credential forwarding is used.
+
+The legacy workers.dev origin must remain available for installed
 clients, existing device flows, webhooks, file URLs and signed MCP resources.
 
 Changing origins creates a new browser cookie/IndexedDB scope: users must sign
@@ -135,3 +141,40 @@ privately. The existing Vercel deployment must remain independently accessible
 for legacy data. Keep provider webhooks on their working origin until their
 new endpoints have been verified. If migration/production prerequisites are not
 met, a custom domain may only be advertised as a preview with clear status.
+
+### Live cutover blockers found during this check
+
+- The custom hostname currently returns Vercel **404**; the independent URL in
+  the last GitHub deployment returns **410**. An available legacy deployment
+  cannot be assumed. The source and provider data have not been deleted or reset.
+- Cloudflare rejected custom-domain registration with **100117**: an externally
+  managed CNAME must be removed first. The current OAuth token cannot edit DNS;
+  its DNS API request returns **10000**. The dashboard browser is not signed in.
+  The owner must remove only the `base` CNAME pointing to
+  `543d8cfbde0c15de.vercel-dns-017.com`, or provide narrowly scoped DNS access.
+  No other DNS record should be touched. Then attach the custom domain, verify
+  HTTPS, sign-in and private-file behavior, and persist the exact hostname route.
+  The normal Wrangler config omits this still-blocked route so staging deploys
+  continue to succeed. `PUBLIC_ALIASES` is ready; no DNS change is claimed.
+- The installer matrix produced all four platform outputs. GitHub denied the
+  workflow token's release-creation request (**403**, despite `contents: write`).
+  The connected owner CLI successfully created a private draft for `v0.1.9`.
+  No public release or updater publication occurred. For subsequent versions,
+  precreate a draft with the owner CLI before dispatching the workflow; do not
+  put a broad personal token in Actions to bypass the restriction.
+- An Intel CI run counted first-time Rust compilation inside the standalone
+  service runtime test's two-minute budget and timed out. Compilation now has a
+  separate bounded setup hook; the runtime test retains its two-minute timeout.
+  New runs must validate that fix instead of treating the failed run as passed.
+
+Owner draft preparation (after a version bump and appropriate checks):
+
+```bash
+gh release create v0.1.9 --draft --prerelease --target "$(git rev-parse HEAD)" --title "Base 0.1.9 preview" --notes-file docs/release-notes-0.1.9.md
+gh workflow run desktop-release.yml --ref main -f publish_updater=false
+```
+
+The draft already exists for 0.1.9; do not recreate or publish it blindly. Any
+failed publication job can be retried after fixing access, without rebuilding
+successful platform artifacts. Public publication still requires the acceptance
+checks above.

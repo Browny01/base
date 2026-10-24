@@ -9,6 +9,8 @@
   "workers_dev": true,
   "vars": {
     "PUBLIC_URL": "https://base-cloud-staging.kingbrownyplayz.workers.dev",
+    "PUBLIC_ALIASES": "https://base.lucasbrown.xyz,https://base-cloud-staging.kingbrownyplayz.workers.dev",
+    "FILE_PUBLIC_URL": "https://base-cloud-staging.kingbrownyplayz.workers.dev",
     "ENVIRONMENT": "staging",
     "CLERK_PUBLISHABLE_KEY": "pk_test_Y3JlYXRpdmUtdG91Y2FuLTgyMDguY2xlcmsuYWNjb3VudHMuZGV2JA",
     "CLERK_ISSUER": "https://creative-toucan-8208.clerk.accounts.dev",
