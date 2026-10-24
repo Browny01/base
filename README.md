@@ -85,7 +85,7 @@ A local macOS build is ad-hoc signed. Public Developer ID signing/notarization
 needs separate credentials. See [release readiness](docs/release-readiness.md)
 and [Mac quickstart](docs/phase-2.5-mac-quickstart.md).
 
-Run the new browser frontend against the configured hosted APIs:
+Preview the new landing page and browser frontend:
 
 ```bash
 npm run web:dev
@@ -98,7 +98,10 @@ npm run web:build
 npm run cloud:dev
 ```
 
-Cloud local development requires provider configuration and initialized local D1;
+The Vite preview alone does not provide authenticated backend APIs. For a full
+local browser workspace, serve the built assets through the Worker, configure
+its `PUBLIC_URL` for that local origin, and initialize local D1. Cloud local
+development also requires private development-provider configuration;
 see [Cloud setup](docs/cloud-setup.md). `npm run dev` / `npm run build` refer to
 **the legacy Next.js app**, not the new Vite browser client. `npm run ios` opens
 the existing Xcode iPhone project; `npm run mac` opens the legacy WebKit Mac app.
