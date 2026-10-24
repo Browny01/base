@@ -22,14 +22,20 @@ started. Empty GitHub Issues does not mean there is no outstanding work.
 - GitHub CI passed for the previous 0.1.8 checkpoint on Linux, Apple Silicon,
   Intel Mac, the dependency-security job and the iOS simulator/widget build.
   This is build coverage, not physical-device or installer acceptance.
-- Local 0.1.9 checks: 192 JavaScript tests, four TypeScript checks, ESLint
+- Local 0.1.9 checks: 193 JavaScript tests, four TypeScript checks, ESLint
   (zero errors; four existing warnings), Worker dry-run and browser build pass.
-  The independent workspace's nine Rust tests pass. Native desktop tests include
+  The independent workspace's nine Rust tests and the desktop's 12 tests plus two
+  archive regressions pass. Native desktop tests include
   database, transport, archive and updater regressions; current CI is the source
   of truth for the new cross-platform candidate.
 - Browser inspection confirms the complete sidebar icon at 28 px, no crop or
   transform, and a transparent CSS backing. The source PNG and generated web
   icons retain alpha; the dark rounded tile belongs to the supplied artwork.
+
+The Linux AppImage and DEB built locally. The AppImage launched and restarted
+with a retained synthetic habit/check-in in a network namespace without external
+network access. This is an offline package smoke test, not DEB installation,
+Cloud synchronization or a performance benchmark.
 
 ## Distribution preparation
 

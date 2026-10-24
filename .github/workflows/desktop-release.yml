@@ -107,10 +107,13 @@ jobs:
         run: |
           version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
           tag="v$version"
+          notes_file="docs/release-notes-$version.md"
+          test -f "$notes_file"
           if gh release view "$tag" --json isDraft > /tmp/base-release.json 2>/dev/null; then
             node -e "if(!require('/tmp/base-release.json').isDraft)throw Error('Refusing to replace a published release')"
+            gh release edit "$tag" --target "$GITHUB_SHA" --notes-file "$notes_file"
           else
-            gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" --title "Base $version preview" --notes-file docs/release-notes-0.1.9.md
+            gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" --title "Base $version preview" --notes-file "$notes_file"
           fi
           gh release upload "$tag" downloads/* --clobber
   publish-updater:

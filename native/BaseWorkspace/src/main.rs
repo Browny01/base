@@ -1,3 +1,5 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 mod protocol;
 mod store;
 use axum::{
@@ -316,7 +318,9 @@ async fn shutdown() {
             .expect("SIGTERM listener");
         tokio::select! {_=tokio::signal::ctrl_c()=>{},_=term.recv()=>{}}
     }
-    #[cfg(not(unix))]
+    #[cfg(target_os = "windows")]
+    std::future::pending::<()>().await;
+    #[cfg(not(any(unix, target_os = "windows")))]
     {
         let _ = tokio::signal::ctrl_c().await;
     }
@@ -403,6 +407,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(middleware::from_fn_with_state(app.clone(), boundaries))
         .with_state(app);
     let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await?;
+    #[cfg(not(target_os = "windows"))]
     println!("Base Workspace listening on http://127.0.0.1:{port}");
     axum::serve(listener, router)
         .with_graceful_shutdown(async move {

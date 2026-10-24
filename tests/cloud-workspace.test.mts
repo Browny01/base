@@ -771,3 +771,19 @@ test("domain aliases preserve sessions while retaining same-origin browser prote
     assert.equal(denied.status, 403);
   }
 });
+
+test("attachment deletion accepts retained service origins without crossing workspace ownership", async () => {
+  const { deleteFile } = await import("../apps/cloud/src/files.ts");
+  const { env, database, account } = cloudEnvironment();
+  const { principal } = await account("alias-files-owner");
+  const { principal: other } = await account("alias-files-other");
+  const old = env.PUBLIC_URL;
+  env.PUBLIC_URL = "https://base-preview.example.com";
+  env.PUBLIC_ALIASES = old;
+  const id = crypto.randomUUID();
+  for (const owner of [principal, other]) database.prepare("INSERT INTO files(workspace_id,id,name,mime,size,status,created_at) VALUES(?,?,?,'text/plain',1,'ready',?)").run(owner.workspace.id,id,"fixture.txt",now());
+  await assert.rejects(deleteFile(env, principal, {url:`https://attacker.example.com/api/files/${id}`}), /outside this workspace/);
+  await deleteFile(env, principal, {url:`${old}/api/files/${id}`});
+  assert.equal(database.prepare("SELECT status FROM files WHERE workspace_id=? AND id=?").get(principal.workspace.id,id)?.status,"deleted");
+  assert.equal(database.prepare("SELECT status FROM files WHERE workspace_id=? AND id=?").get(other.workspace.id,id)?.status,"ready");
+});
