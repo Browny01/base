@@ -19,6 +19,12 @@ Vercel app, Cloudflare Worker, billing changes or desktop updater artifacts.
   and local workerd tooling paths. These fix the applicable October
   [content-encoding DoS](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c),
   EventSource, integrity and cache-redirect advisories. Wrangler is **4.152.0**.
+- Zod **4.1.11 / 4.4.3** are upgraded to **4.6.7** (fixed >=4.6.6), including
+  Vercel CLI-config's exact dependency and the React Hooks ESLint path.
+  [GHSA-mrhx-c7xc-m3w5 / CVE-2023-54404](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)
+  covers excessive allocation during oversized collection validation. The final
+  hosted audit surfaced this advisory after the earlier local audit; all four
+  npm entries refer to this one issue and its dependency chain.
 - Native TLS uses **rustls 0.23.46**, **rustls-webpki 0.103.16** and
   **webpki-roots / webpki-root-certs 1.0.10**. These address
   RUSTSEC-2026-0346 through 0349 and the CVE-2026-111943 distrust advisories.
@@ -119,9 +125,10 @@ Local verification on Linux completed:
   15-second check. This startup check does not retest Cloud reconnection or
   establish performance measurements.
 
-CI additionally builds the iOS app/widget without signing. Its first execution
-and macOS/Windows-native checks remain pending; no physical-device or shared
-Keychain verification is claimed.
+The unsigned iOS app/widget build passed on GitHub's macOS runner on 24 October.
+The hosted macOS desktop matrix is still running at this checkpoint; Windows
+native checks remain pending. No physical-device or shared Keychain verification
+is claimed.
 
 The approved Linux system update installs **WebKitGTK 2.54.1**, above the
 [WSA-2026-0006](https://webkitgtk.org/security/WSA-2026-0006.html) fix threshold.
