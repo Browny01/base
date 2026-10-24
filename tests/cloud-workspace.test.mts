@@ -748,3 +748,26 @@ test("unconfigured staging sign-in fails clearly before allocating a device flow
     0,
   );
 });
+
+test("domain aliases preserve sessions while retaining same-origin browser protection", async () => {
+  const { env, account } = cloudEnvironment();
+  const original = env.PUBLIC_URL;
+  const alias = "https://base-preview.example.com";
+  env.PUBLIC_ALIASES = `${original},${alias}`;
+  const { token } = await account("domain-transition");
+  for (const origin of [original, alias]) {
+    const response = await worker.fetch(new Request(origin + "/api/workspace", {
+      headers: { Authorization: `Bearer ${token}`, Origin: origin },
+    }), env);
+    assert.equal(response.status, 200);
+    const metadata = await worker.fetch(new Request(origin + "/.well-known/oauth-protected-resource/api/mcp"), env);
+    assert.equal((await metadata.json() as {resource:string}).resource, origin + "/api/mcp");
+  }
+  assert.equal(env.PUBLIC_URL, original, "per-request origin must not mutate shared bindings");
+  for (const origin of [original, "https://attacker.example.com"]) {
+    const denied = await worker.fetch(new Request(alias + "/api/workspace", {
+      method: "POST", headers: { Cookie: `__Host-base_session=${token}`, Origin: origin },
+    }), env);
+    assert.equal(denied.status, 403);
+  }
+});

@@ -27,8 +27,9 @@ the debounce does not omit recent edits. Clipboard errors are reported; older
 clipboard implementations can fall back to plain text. Note icons also accept a
 typed/pasted emoji, including composed families, skin tones and flags.
 
-The sidebar keeps the supplied glass emblem, clips away its app-icon tile, and
-shows it at a larger size. Landing screenshots and replacement instructions are
+The sidebar displays the complete supplied glass app icon at 28 px, including
+its original tile and transparent edges, without a CSS crop or extra backing.
+Landing screenshots and replacement instructions are
 in [landing-screenshots.md](landing-screenshots.md). The new captures use only
 synthetic preview data; the portrait capture represents the mobile web UI.
 

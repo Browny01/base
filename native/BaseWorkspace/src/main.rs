@@ -24,6 +24,7 @@ struct App {
     directory: PathBuf,
     port: u16,
     public_origin: String,
+    shutdown: Arc<tokio::sync::Notify>,
 }
 fn error(code: StatusCode, message: impl Into<String>) -> Response {
     (code, Json(json!({"error":message.into()}))).into_response()
@@ -98,6 +99,13 @@ async fn api(State(app): State<App>, headers: axum::http::HeaderMap, request: Re
     let device = authentication.unwrap();
     let path = request.uri().path().to_owned();
     let method = request.method().clone();
+    if path == "/api/service/stop" && method == axum::http::Method::POST {
+        if device != "base-host-control" {
+            return error(StatusCode::FORBIDDEN, "Host control session required");
+        }
+        app.shutdown.notify_one();
+        return Json(json!({"ok":true})).into_response();
+    }
     let query = request.uri().query().unwrap_or("").to_string();
     let body = match axum::body::to_bytes(request.into_body(), 33_000_000).await {
         Ok(bytes) => bytes,
@@ -270,6 +278,7 @@ fn upload(app: &App, headers: &axum::http::HeaderMap, query: &str, bytes: Bytes)
         file.write_all(&bytes).map_err(|e| e.to_string())?;
         file.sync_all().map_err(|e| e.to_string())?;
         std::fs::rename(&temp, &path).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
         std::fs::File::open(&directory)
             .and_then(|f| f.sync_all())
             .map_err(|e| e.to_string())?;
@@ -383,7 +392,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         directory,
         port,
         public_origin,
+        shutdown: Arc::new(tokio::sync::Notify::new()),
     };
+    let stop = app.shutdown.clone();
     let router = Router::new()
         .route("/health", get(health))
         .route("/api/auth/login", post(login))
@@ -394,7 +405,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await?;
     println!("Base Workspace listening on http://127.0.0.1:{port}");
     axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown())
+        .with_graceful_shutdown(async move {
+            tokio::select! { _ = shutdown() => {}, _ = stop.notified() => {} }
+        })
         .await?;
     FileExt::unlock(&lock)?;
     Ok(())

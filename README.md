@@ -1,329 +1,175 @@
-<img src="public/base-icon-rounded.png" alt="Base" width="200" />
+<p align="center"><img src="public/base-icon-rounded.png" alt="Base" width="112" /></p>
 
 # Base
 
-Base is a personal command center for planning, focus, money, notes, projects,
-and AI-assisted daily work. Its new Tauri desktop workspace bundles the React
-interface locally for Linux and macOS, with SQLite and durable offline edits.
-The new browser workspace and reference-inspired landing page run on the
-Cloudflare staging Worker. Next.js retains the legacy web application and APIs
-as the production rollback path. Existing SwiftUI iPhone and
-legacy Mac applications remain available during migration. Actual macOS
-verification is pending; see [desktop verification](docs/desktop-verification.md).
+Your personal command center for tasks, calendar, projects, notes, habits, focus,
+finances, news and the everyday lists you want to keep together.
 
-Preview the [website](https://base-cloud-staging.kingbrownyplayz.workers.dev/) or
-[open Base in your browser](https://base-cloud-staging.kingbrownyplayz.workers.dev/app/).
-Cloud uses Clerk Development and Stripe sandbox; the production domain has not
-been cut over. Browser access requires Cloud login. See
-[Cloud record sync, shared workspaces and the new branding](docs/cloud-workspaces-016.md),
-[Notes editing and icon checks](docs/notes-0.1.5.md),
-[reliability, preference and update checks](docs/phase-2.5-news-notes-updates.md),
-[onboarding and account checks](docs/phase-2.5-onboarding.md) and
-[earlier integration fixes](docs/phase-2.5-improvements.md).
+Base's desktop interface is bundled locally with **Tauri 2, Rust, React 19,
+TypeScript and Vite**. SQLite retains records and a durable queue of offline
+edits. The browser client uses the same React pages with isolated IndexedDB
+storage. Base Cloud runs on Cloudflare Workers, D1, R2, KV and Queues, with Clerk
+sign-in and Stripe billing. There is no local Node.js server in the desktop app.
 
-## Highlights
+**Status: preview; not yet a general-availability release.**
+[Open the Cloud preview](https://base-cloud-staging.kingbrownyplayz.workers.dev/app/)
+or [see the website](https://base-cloud-staging.kingbrownyplayz.workers.dev/).
+The current hosted instance uses Clerk Development and Stripe sandbox. The
+legacy Next.js/Vercel application remains available as the migration rollback
+path. Existing production data has not been automatically imported into Cloud.
+See the [release checklist](docs/release-readiness.md) for verified checks,
+remaining work and distribution limits.
 
-- **Overview dashboard** - a full-width command center with greeting,
-  task/project summaries, revenue target progress, portfolio trend data, and
-  news briefing cards.
-- **Tasks** - priority/categorised tasks, due dates, recurring settings, manual
-  arrangement, subtasks, completion tracking, and native offline creation.
-- **Calendar** - editable all-day and timed events, recurring series, month and
-  agenda views, plus dated tasks, milestones, payments, exams, workouts, and
-  optional Cal.com bookings in one schedule.
-- **Focus** - deep-work timer with session logging, task tags, notes, and saved
-  focus history.
-- **Projects** - active/on-hold/done project tracking with categories, logos,
-  milestones, notes, documents, files, links, and detail pages.
-- **Notes** - block-based wiki with folders, nested pages, rich blocks, page
-  locks, trash/restore, print/export helpers, graph view, and native offline notes.
-- **Vision board** - full-bleed canvas for photos, notes, music cards, drawings,
-  shapes, arrows, undo/redo, board switching, and image uploads.
-- **Finance** - income/spend ledger, daily revenue target, subscriptions, wallet
-  balances, token data, FX conversion, and portfolio snapshots.
-- **News** - RSS/live news, market cards, AI-written briefings, creator feeds,
-  Reddit/X preferences, and live status checks. This is the only AI surface in
-  the app today - the old standalone AI chat was removed.
-- **Settings** - appearance, navigation mode, accent/theme preferences, personal
-  AI context, news/feed sources, and local app preferences.
-- **Command palette** - `Cmd+K` search across pages, projects, notes, boards,
-  wiki pages, and common actions.
-- **Site-wide keyboard shortcuts** - navigate with `g`+key, create from anywhere
-  with `Cmd+Shift+N/O/E`, and flip theme, sidebar, and navigation mode on the
-  spot. Press `?` for the full sheet. See [Keyboard Shortcuts](#keyboard-shortcuts).
-- **First-run onboarding** - a one-time setup wizard collects a name, timezone,
-  password, and the pages you actually want, then takes you straight to work.
-- **Native iPhone support** - SwiftUI dashboard, tasks, projects, notes, habits,
-  focus, finance, cached news, offline mutation queue, and WidgetKit home-screen
-  widget.
-- **Desktop migration** - Tauri 2, Rust, Vite, locally bundled pages, SQLite,
-  OS credential storage and field-aware synchronization with conflict review.
-  Run `npm run desktop:dev`; build with `npm run desktop:build`.
-- **Legacy Mac support** - the complete live Base interface in a native window, a
-  SwiftUI offline fallback, a reliable `Control+Option+Space` global shortcut,
-  Spotlight/Dock install flow, and Sparkle updates.
-- **Backend integrations** - Upstash Redis/KV persistence, Vercel Blob uploads,
-  Gemini, Perplexity, Cal.com, wallet/token APIs, cron snapshots, and an
-  OAuth-capable MCP server.
+## What is included
 
-## Tech Stack
+- **Dashboard:** arrange and resize widgets for tasks, calendar, projects, money,
+  news and focus.
+- **Tasks and calendar:** priorities, categories, subtasks, dates, recurring events
+  and optional Cal.com bookings.
+- **Projects and vision boards:** milestones, files, links, notes and an editable
+  visual canvas.
+- **Notes:** nested pages and folders, rich blocks, templates, links between
+  notes, custom image/emoji icons, page locks, trash and HTML/plain-text copying.
+- **Habits and streaks:** daily check-ins or numeric goals, activity history,
+  timezone-aware streaks and archive/restore.
+- **Finance and focus:** transactions, editable subscriptions, wallets, currency
+  preferences, focus timer and session history.
+- **News and markets:** configurable RSS/creator feeds, markets, summaries and
+  personal integration keys where supported.
+- **Shopping, reading and watch lists:** reusable custom-colour tags and tag
+  filters; shopping also supports category and priority filters.
+- **Workspace preferences:** onboarding, profile, themes, navigation order,
+  command palette and keyboard shortcuts.
+- **Workspace options:** a separate Rust/SQLite local service on Mac/Linux,
+  connections to an existing service, or hosted Cloud workspaces. Local service
+  lifecycle is independent of the desktop window.
+- **Cloud sharing and billing:** owner-controlled Editable/Viewable membership,
+  Plus entitlements, storage metering and sandbox-tested subscription flows.
+  Production provider configuration and additional acceptance checks remain.
+- **Integrations:** shared API adapters and OAuth-capable MCP. Integration parity
+  for standalone local hosting remains in progress; see [Phase 2.5](docs/phase-2.5.md).
 
-- **Framework:** Next.js 16 App Router, React 19, TypeScript
-- **Styling:** Tailwind CSS v4 with custom monochrome/liquid-glass tokens
-- **Storage:** Upstash Redis/KV for app state, Vercel Blob for uploads
-- **Desktop:** Tauri 2, Rust, React 19, TypeScript, Vite and SQLite
-- **Native iPhone/legacy Mac:** SwiftUI and WidgetKit for iPhone, SwiftUI/WebKit hybrid for Mac,
-  Network framework reconnect detection, Sparkle for Mac updates
-- **AI/search:** Gemini, Perplexity, optional local CLI/Ollama relay (`scripts/base-cli.mjs`)
-- **Deployment:** Vercel with daily cron snapshots
+The existing native **SwiftUI/WidgetKit iPhone** client is retained. Its migration
+into the new workspace/account system is the original Phase 3 and has not started.
+The responsive browser UI is usable on phones today.
 
-> This repo uses a Next.js version with breaking changes. Before changing
-> Next-specific routing, request APIs, proxy behavior, or build configuration,
-> read the relevant guide in `node_modules/next/dist/docs/`.
+## Development
 
-## Project Structure
-
-```text
-app/
-  (app)/                 Authenticated dashboard routes
-  api/                   Route handlers, integrations, MCP, cron, widgets
-  login/                 Password login
-apps/desktop/            Tauri/Rust application and Vite frontend
-packages/core/           Shared integration response types
-packages/sync/           JSON-preserving sync contracts, merge and upload logic
-components/              Page components, navigation, command palette, UI
-lib/                     Store, contexts, sessions, AI context, utilities
-public/                  Brand assets and PWA manifest
-native/BaseCore/         Shared native models, offline store, sync queue, and views
-ios/                     Native SwiftUI iOS project and Base Widget extension
-macos/                   macOS WebKit host, offline fallback, and Sparkle config
-scripts/                 Native install/release helpers, base-cli.mjs local relay
-docs/                    iOS/macOS app notes
-```
-
-The migration retains the web application at the root to preserve Vercel setup.
-Read [migration decisions](docs/native-migration.md) and
-[build/runtime checks](docs/desktop-verification.md) before replacing an existing
-native installation. Production builds require no local Node server.
-
-## Getting Started
-
-Use patched Node **24.22.1** (see `.node-version`) and install the locked dependencies:
+Install the patched Node version in [.node-version](.node-version) (currently
+24.22.1), then install locked dependencies:
 
 ```bash
 npm ci
 ```
 
-See [October security fixes and publication safeguards](docs/security-remediation-2026-10.md)
-for runtime requirements, backports and the manual deployment policy.
-
-Run the web app locally:
+For desktop development, install Rust and the
+[Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/), then:
 
 ```bash
-npm run dev
+npm run desktop:dev
 ```
 
-Open `http://localhost:3000`.
-
-Build for production:
+Build the desktop app and installers on the target platform:
 
 ```bash
-npm run build
+npm run desktop:build
 ```
 
-Run static checks and tests:
+On Apple Silicon, open the built app with:
 
 ```bash
-npm run lint
-npx tsc --noEmit
+open apps/desktop/src-tauri/target/release/bundle/macos/Base.app
+```
+
+A local macOS build is ad-hoc signed. Public Developer ID signing/notarization
+needs separate credentials. See [release readiness](docs/release-readiness.md)
+and [Mac quickstart](docs/phase-2.5-mac-quickstart.md).
+
+Run the new browser frontend against the configured hosted APIs:
+
+```bash
+npm run web:dev
+```
+
+Build its bundled assets, or run the local Cloudflare Worker:
+
+```bash
+npm run web:build
+npm run cloud:dev
+```
+
+Cloud local development requires provider configuration and initialized local D1;
+see [Cloud setup](docs/cloud-setup.md). `npm run dev` / `npm run build` refer to
+**the legacy Next.js app**, not the new Vite browser client. `npm run ios` opens
+the existing Xcode iPhone project; `npm run mac` opens the legacy WebKit Mac app.
+
+## Checks
+
+```bash
 npm test
+npm run typecheck
+npm run desktop:typecheck
+npm run web:typecheck
+npm run cloud:check
+npm run lint
+cargo test --manifest-path native/BaseWorkspace/Cargo.toml
+npm run workspace:bundle
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+npm run desktop:build
 ```
 
-## Keyboard Shortcuts
+Automated builds do not establish actual hardware, notification, clipboard,
+updater or two-device offline/reconnection acceptance. The
+[verification reports](docs/desktop-verification.md) state their limits.
 
-`KeyboardShortcuts` is mounted once in the app layout, so these work on every
-page. Press `?` in the app to see this list in a cheat-sheet. Shortcuts are
-ignored while you're typing in a field, and unknown combos are left to the
-browser (so `Cmd+F`, `Cmd+P`, `Cmd+R` still behave normally).
+## Repository layout
 
-| Keys | Action |
+| Path | Purpose |
 | --- | --- |
-| `Cmd/Ctrl + K` | Search / command palette |
-| `?` | Toggle the shortcut sheet |
-| `g` then `d j v n a t w e m o f r s` | Jump to dashboard, projects, vision, notes, calendar, tasks, shopping, reading, watch, focus, finance, news, settings |
-| `Cmd/Ctrl + Shift + N` | New task |
-| `Cmd/Ctrl + Shift + O` | New project |
-| `Cmd/Ctrl + Shift + E` | New calendar event |
-| `Cmd/Ctrl + Shift + D` | Toggle dark / light mode |
-| `Cmd/Ctrl + \` | Switch between sidebar and dock navigation |
-| `Cmd/Ctrl + B` | Collapse / expand the sidebar |
+| `apps/desktop` | Locally bundled Tauri/Vite desktop client |
+| `apps/web` | Vite browser workspace, landing page and public screenshots |
+| `apps/cloud` | Cloudflare Worker, D1 migrations and service bindings |
+| `packages/core`, `packages/sync` | Shared models, service configuration and sync contracts |
+| `components`, `lib` | Shared React pages, UI, store and business logic |
+| `native/BaseWorkspace` | Independent Rust/SQLite workspace server |
+| `native/BaseCore`, `ios` | Existing SwiftUI models, offline client and WidgetKit |
+| `app`, `macos` | Legacy Next.js backend/UI and Swift/WebKit Mac host |
+| `docs` | Migration, setup, verification and release notes |
 
-On the notes page, `Cmd+N` is a new note and `Cmd+Z` / `Cmd+Shift+Z` are
-undo/redo - those are handled by the editor, so the combos above avoid them.
+## Data and credentials
 
-To add a shortcut, register it in `COMBOS` in `components/keyboard-shortcuts.tsx`
-and add the matching row in `lib/shortcuts.ts`; the cheat-sheet renders straight
-from that registry, so it never needs editing.
+Unknown record fields, legacy Base/Bridge/Nexus keys and supported native
+contracts are retained during migration. Workspace switching keeps scopes
+separate; importing a copy is explicit. Never reset an existing database or
+replace a credential-encryption key to repair connectivity.
 
-## Naming and legacy keys
+Desktop sessions and supported personal integration secrets use OS credential
+storage. Cloud credentials are server-side; browser sessions use HttpOnly
+cookies. Never commit env files, keys, workspace exports or real-user screenshots.
+The [Cloud setup guide](docs/cloud-setup.md) describes private configuration;
+[security remediation](docs/security-remediation-2026-10.md) documents runtime
+requirements and dependency backports. Git-triggered Vercel deployments are
+disabled; publishing source must not redeploy the legacy service.
 
-Base was Nexus, then Bridge, and is now Base. Data keys, env vars, and cookies
-were renamed, but **nothing was dropped**: each rename reads the new name first,
-falls back to the old one, and copies the value forward on first read. Upgrading
-therefore never loses data and never signs anyone out.
+## Roadmap and releases
 
-| What | Current | Still read |
-| --- | --- | --- |
-| Redis data | `base:data` | `bridge:data`, `nexus:data` |
-| Redis revision | `base:data:revision` | `bridge:data:revision`, `nexus:data:revision` |
-| Redis history | `base:data:history` | `bridge:data:history` |
-| Redis password verifier | `base:auth:password` | `bridge:auth:password` |
-| Redis news cache | `base:news:summary:*` | - (a cache; a miss just re-fetches) |
-| localStorage document | `base_data` | `bridge_data`, `nexus_data` |
-| Session cookie | `base_auth` | `bridge_auth` (old cookie is cleared on next login) |
-| Native handoff flags | `base_open_new_task`, `base_open_new_project` | `bridge_open_new_task`, `bridge_open_new_project` |
-| Widget auth header | `x-base-token` | `x-bridge-token` |
-| Local relay token | `BASE_CLI_TOKEN` | `BRIDGE_CLI_TOKEN` |
+The original roadmap is unchanged:
 
-The native handoff flags and the widget header are a live contract with builds
-users have already installed, so the **macOS app writes both** flag names and the
-server accepts both headers until no supported client still emits the old one.
+1. Native desktop migration and offline-first architecture.
+2. Desktop UI redesign and performance work.
+3. Native SwiftUI iPhone modernization.
 
-Two things are deliberately **not** renamed, because they are identity rather than
-branding:
+**Phase 2.5** adds local/managed workspaces, accounts, sharing, billing and the
+Cloudflare migration between Phases 2 and 3. It is still in progress. Recent
+fixes are documented in [Habits, tags and Notes](docs/habits-and-list-tags.md),
+[Cloud record synchronization](docs/cloud-workspaces-016.md) and the
+[release checklist](docs/release-readiness.md). No claim of completed production
+migration, unlimited free-tier capacity or fully verified platform support is made.
 
-- **Bundle identifiers** - `app.bridge.personal`, `app.bridge.personal.mac`, and
-  `app.bridge.personal.BridgeWidget`. A different bundle ID is a different app:
-  existing installs would stop receiving updates. Change these only as a
-  deliberate migration, not as part of a rename.
-- **The Sparkle feed** - the macOS update feed still points at
-  `Browny01/bridge-mac-releases`, which is a published endpoint.
+Release preparation targets a source ZIP, Apple Silicon and Intel DMGs,
+Windows EXE, and Linux AppImage/DEB. All required builds and acceptance gates
+must pass before a draft becomes a public release. Updater signatures are
+separate from Apple notarization and Windows Authenticode signatures.
 
-## Environment Variables
-
-Base can boot with partial configuration, but the production app expects these
-variables depending on the feature set you want enabled:
-
-| Variable | Used for |
-| --- | --- |
-| `BASE_PASSWORD` | Password login; falls back to the project default if unset |
-| `BASE_PASSWORD_HASH` | scrypt hash of the login password (plaintext never needed) |
-| `BASE_SESSION_SECRET` | HMAC session cookie signing |
-| `BASE_AGENT_TOKEN` | Agent/task API authentication |
-| `MCP_TOKEN` | MCP server authentication |
-| `CRON_SECRET` | Daily snapshot cron authorization |
-| `KV_URL`, `REDIS_URL` | Upstash Redis/KV compatibility URLs |
-| `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN` | Redis REST access |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob file uploads |
-| `GEMINI_API_KEY` | News briefing, learning, and summaries |
-| `PERPLEXITY_API_KEY` | Web search and live news lookups |
-| `STRIPE_SECRET_KEY` | Stripe revenue/business stats |
-| `CALCOM_API_KEY` | Cal.com bookings |
-| `BASE_CLI_TOKEN` | Optional local CLI/Ollama relay auth |
-| `BASE_ALLOWED_ORIGIN` | Optional local relay origin allowlist |
-| `BASE_OLLAMA_URL` | Optional local Ollama endpoint |
-
-Every `BASE_*` variable above also accepts its older `BRIDGE_*` (and, for some,
-`NEXUS_*`) name as a fallback, so an existing deployment keeps working without a
-flag day. New variables should be added as `BASE_*` only. See
-[Naming and legacy keys](#naming-and-legacy-keys).
-
-Keep env files local. `.env*` and `.vercel/` are intentionally gitignored.
-
-## Native iOS App
-
-The iPhone app is a real SwiftUI client, not a web view. It opens from local data,
-so tasks, projects, notes, habits, focus sessions, and finance entries remain usable
-without internet. Each change is written to disk immediately and added to a durable
-operation queue. On reconnect, `/api/native/sync` atomically merges those record
-changes into the main Base document and downloads the latest state.
-
-```bash
-npm run ios   # open ios/App/App.xcodeproj
-```
-
-Choose the `App` scheme and your signing team in Xcode, then run on a simulator or
-connected iPhone. The project also includes the `BaseWidget` WidgetKit extension.
-See `docs/ios-app.md` for signing, offline behavior, and installation details.
-
-## macOS App
-
-The macOS app renders the production Base website directly, so it has the same
-layout, routes, and functionality as Base in a browser. If the website cannot
-be reached, it switches to the shared native workspace; offline edits are queued
-and synchronized after reconnecting. Press `Control+Option+Space` from any app to
-bring Base forward. Sparkle distributes Mac app updates.
-
-Useful commands:
-
-```bash
-npm run mac:gen       # generate macOS Xcode project with XcodeGen
-npm run mac           # generate and open the project
-npm run mac:install   # build Release and install Base.app to /Applications
-npm run mac:release   # build/sign/publish a Sparkle update
-```
-
-See `docs/macos-app.md` for release details.
-
-## Deployment
-
-The production app is deployed on Vercel as a Next.js project. `vercel.json`
-declares the framework and schedules the daily snapshot cron:
-
-```json
-{
-  "framework": "nextjs",
-  "crons": [{ "path": "/api/cron/snapshot", "schedule": "0 12 * * *" }]
-}
-```
-
-Connect the Vercel project to GitHub for automatic web/API deployments. Native app
-code ships separately through Xcode/TestFlight on iOS and Sparkle on macOS. The
-native clients use the deployed API for synchronization and news refreshes.
-
-## Available Scripts
-
-| Script | Purpose |
-| --- | --- |
-| `npm run dev` | Start the Next.js dev server |
-| `npm run build` | Create a production Next.js build |
-| `npm run start` | Start the production server |
-| `npm run lint` | Run ESLint |
-| `npm test` | Run the Node test suite |
-| `npm run ios` | Open the native iOS project |
-| `npm run mac:gen` | Generate the macOS Xcode project |
-| `npm run mac` | Generate and open the macOS project |
-| `npm run mac:install` | Install the macOS app locally |
-| `npm run mac:release` | Publish a native macOS Sparkle update |
-
-## Notes for Contributors
-
-- Prefer the existing page/component/store patterns before adding new
-  abstractions.
-- Do not commit secrets, `.vercel/`, local env files, native build output, or
-  generated caches.
-- Put shared iOS/macOS data behavior and screens in `native/BaseCore`; keep only
-  platform lifecycle and shortcut code in the platform folders.
-- Preserve unknown JSON fields when extending native sync so older clients cannot
-  erase newer web-only data.
-- Verify both native targets after shared Swift changes.
-- When changing the macOS shell source, regenerate the project from
-  `macos/project.yml` rather than hand-editing generated project files.
-
-## Roadmap
-
-- **Habits & streaks** - habit tracking with week/habit calendar views,
-  completion streaks, and gentle reminders on web and native.
-- **Offline-first sync v2** - conflict-aware merges with field-level resolution
-  and end-to-end encryption for local native data.
-- **AI planning agent** - turn a project goal into a dated, prioritized task plan
-  using Gemini and pull results back into the calendar. This is the intended
-  successor to the retired AI chat.
-- **Widgets & watch** - additional WidgetKit variants (tasks, calendar, focus) and
-  an Apple Watch companion for quick capture and glanceable summaries.
-- **Multi-workspace** - multiple Base documents per account with per-workspace
-  settings, themes, and sharing/read-only invites.
-- **On-device privacy mode** - a local mode backed by Upstash edges where
-  summaries never leave your own deployment.
-- **Server-side image pipeline** - thumbnail generation, format optimization, and
-  restore/trash-friendly image handling for the vision board and projects.
+To replace the landing screenshots with your own, follow
+[landing-screenshots.md](docs/landing-screenshots.md). Use sanitized sample data.

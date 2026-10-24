@@ -14,6 +14,8 @@ export interface Env {
   CACHE: KVNamespace;
   JOBS: Queue<{ id: string }>;
   PUBLIC_URL: string;
+  /** Operator-owned alternate origins retained during a domain transition. */
+  PUBLIC_ALIASES?: string;
   ENVIRONMENT: "staging" | "production";
   CLERK_WEBHOOK_SIGNING_SECRET?: string;
   CLERK_SECRET_KEY?: string;

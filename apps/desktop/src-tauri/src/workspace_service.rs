@@ -31,14 +31,18 @@ fn bundled_executable() -> Result<PathBuf, String> {
     let installed = app
         .parent()
         .ok_or("App location unavailable")?
-        .join("base-workspace");
+        .join(format!("base-workspace{}", std::env::consts::EXE_SUFFIX));
     if installed.is_file() {
         return Ok(installed);
     }
     // Tauri development executable lives in target/debug or target/release.
     let source = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("binaries")
-        .join(concat!("base-workspace-", env!("BASE_TARGET_TRIPLE")));
+        .join(format!(
+            "base-workspace-{}{}",
+            env!("BASE_TARGET_TRIPLE"),
+            std::env::consts::EXE_SUFFIX
+        ));
     if source.is_file() {
         Ok(source)
     } else {
@@ -52,7 +56,7 @@ fn executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     // restart the backend even after its UI and mount have disappeared.
     let folder = directory(app)?.join("service-bin");
     std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-    let target = folder.join("base-workspace");
+    let target = folder.join(format!("base-workspace{}", std::env::consts::EXE_SUFFIX));
     let bytes = std::fs::read(source).map_err(|e| e.to_string())?;
     let same = std::fs::read(&target)
         .ok()
@@ -69,12 +73,14 @@ fn executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
                 .map_err(|e| e.to_string())?;
         }
         std::fs::rename(temp, &target).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
         std::fs::File::open(&folder)
             .and_then(|f| f.sync_all())
             .map_err(|e| e.to_string())?;
     }
     Ok(target)
 }
+#[cfg(unix)]
 fn run(program: &str, args: &[&str]) -> Result<(), String> {
     let result = Command::new(program)
         .args(args)
@@ -88,6 +94,69 @@ fn run(program: &str, args: &[&str]) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+#[cfg(target_os = "windows")]
+fn task_name(app: &tauri::AppHandle) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    Ok(format!(
+        "BaseWorkspace-{:x}",
+        Sha256::digest(directory(app)?.to_string_lossy().as_bytes())
+    ))
+}
+#[cfg(target_os = "windows")]
+fn powershell(script: &str) -> Result<(), String> {
+    use base64::Engine;
+    use std::os::windows::process::CommandExt;
+    let bytes: Vec<u8> = script.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    let status = Command::new("powershell.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand",
+            &encoded,
+        ])
+        .creation_flags(0x08000000)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !status.status.success() {
+        return Err(format!(
+            "Workspace service management failed: {}",
+            String::from_utf8_lossy(&status.stderr).trim()
+        ));
+    }
+    Ok(())
+}
+#[cfg(target_os = "windows")]
+fn install(app: &tauri::AppHandle) -> Result<(), String> {
+    let binary = executable(app)?;
+    let dir = directory(app)?;
+    powershell(&windows_task_definition(&task_name(app)?, &binary, &dir)?)
+}
+#[cfg(any(target_os = "windows", test))]
+fn windows_task_definition(task: &str, binary: &Path, dir: &Path) -> Result<String, String> {
+    if !task.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') {
+        return Err("Invalid service task name".into());
+    }
+    let quote = |p: &Path| -> Result<String, String> {
+        let p = p.to_str().ok_or("Unsupported service path")?;
+        if p.contains(['\r', '\n', '"']) {
+            return Err("Invalid service path".into());
+        }
+        Ok(p.replace('\'', "''"))
+    };
+    Ok(format!(
+        "$ErrorActionPreference='Stop'; $old=Get-ScheduledTask -TaskName '{task}' -ErrorAction SilentlyContinue; \
+         $action=New-ScheduledTaskAction -Execute '{}' -Argument '--directory \"{}\"'; \
+         $principal=New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited; \
+         $settings=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew; \
+         $definition=New-ScheduledTask -Action $action -Principal $principal -Settings $settings; \
+         if($old){{$definition.Triggers=$old.Triggers}}; \
+         Register-ScheduledTask -TaskName '{task}' -InputObject $definition -Force | Out-Null",
+        quote(binary)?, quote(dir)?
+    ))
 }
 #[cfg(target_os = "linux")]
 fn unit_path(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -217,6 +286,11 @@ pub async fn workspace_service_start(app: tauri::AppHandle) -> Result<Value, Str
         }
     }
     install(&app)?;
+    #[cfg(target_os = "windows")]
+    powershell(&format!(
+        "$ErrorActionPreference='Stop'; Start-ScheduledTask -TaskName '{}'",
+        task_name(&app)?
+    ))?;
     #[cfg(target_os = "linux")]
     {
         // A newly installed unit has no failed state and may not yet be loaded.
@@ -261,6 +335,11 @@ pub async fn workspace_service_start(app: tauri::AppHandle) -> Result<Value, Str
     // A failed first launch must not leave a permanent restart loop behind.
     #[cfg(target_os = "linux")]
     let _ = run("systemctl", &["--user", "stop", "base-workspace.service"]);
+    #[cfg(target_os = "windows")]
+    let _ = powershell(&format!(
+        "Stop-ScheduledTask -TaskName '{}'",
+        task_name(&app)?
+    ));
     #[cfg(target_os = "macos")]
     if let Ok(domain) = user_domain() {
         let _ = run("launchctl", &["bootout", &format!("{domain}/{LABEL}")]);
@@ -272,6 +351,49 @@ pub async fn workspace_service_start(app: tauri::AppHandle) -> Result<Value, Str
 }
 #[tauri::command]
 pub async fn workspace_service_stop(app: tauri::AppHandle) -> Result<Value, String> {
+    #[cfg(target_os = "windows")]
+    {
+        if workspace_service_status(app.clone()).await?["running"] == true {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .map_err(|e| e.to_string())?;
+            let login = client
+                .post("http://127.0.0.1:53318/api/auth/login")
+                .json(&json!({"password":hosted_password(&app)?,"deviceId":"base-host-control"}))
+                .send()
+                .await
+                .map_err(|e| e.to_string())?
+                .error_for_status()
+                .map_err(|e| e.to_string())?
+                .json::<Value>()
+                .await
+                .map_err(|e| e.to_string())?;
+            let token = login["token"]
+                .as_str()
+                .ok_or("Host authentication failed")?;
+            client
+                .post("http://127.0.0.1:53318/api/service/stop")
+                .bearer_auth(token)
+                .send()
+                .await
+                .map_err(|e| e.to_string())?
+                .error_for_status()
+                .map_err(|e| e.to_string())?;
+            for _ in 0..20 {
+                let status = workspace_service_status(app.clone()).await?;
+                if status["running"] != true {
+                    return Ok(status);
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            return Err(
+                "The workspace is finishing active requests. Check its status before restarting."
+                    .into(),
+            );
+        }
+    }
     #[cfg(target_os = "linux")]
     run("systemctl", &["--user", "stop", "base-workspace.service"])?;
     #[cfg(target_os = "macos")]
@@ -287,6 +409,12 @@ pub async fn workspace_service_autostart(
     enabled: bool,
 ) -> Result<(), String> {
     install(&app)?;
+    #[cfg(target_os = "windows")]
+    powershell(&format!(
+        "$ErrorActionPreference='Stop'; $task=Get-ScheduledTask -TaskName '{}'; $task.Triggers=@({}); Set-ScheduledTask -InputObject $task | Out-Null",
+        task_name(&app)?,
+        if enabled { "New-ScheduledTaskTrigger -AtLogOn -User ([Security.Principal.WindowsIdentity]::GetCurrent().Name)" } else { "" }
+    ))?;
     #[cfg(target_os = "linux")]
     run(
         "systemctl",
@@ -387,4 +515,33 @@ pub fn hosted_password(app: &tauri::AppHandle) -> Result<String, String> {
     password_entry(app)?
         .get_password()
         .map_err(|_| "Local workspace credential is unavailable in the OS store".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn windows_task_keeps_paths_literal_and_preserves_existing_login_trigger() {
+        let script = windows_task_definition(
+            "BaseWorkspace-fixture",
+            Path::new("C:/Users/O'Brien/Base/base-workspace.exe"),
+            Path::new("C:/Users/O'Brien/Base/workspace"),
+        )
+        .unwrap();
+        assert!(script.contains("-Execute 'C:/Users/O''Brien/Base/base-workspace.exe'"));
+        assert!(script.contains("--directory \"C:/Users/O''Brien/Base/workspace\""));
+        assert!(script.contains("$definition.Triggers=$old.Triggers"));
+        assert!(script.contains("-LogonType Interactive -RunLevel Limited"));
+        assert!(
+            windows_task_definition("bad';exit", Path::new("base.exe"), Path::new("data")).is_err()
+        );
+        assert!(windows_task_definition(
+            "BaseWorkspace",
+            Path::new("bad\npath"),
+            Path::new("data")
+        )
+        .is_err());
+        #[cfg(target_os = "windows")]
+        powershell(&format!("$errors=$null; [System.Management.Automation.Language.Parser]::ParseInput('{}',[ref]$null,[ref]$errors)|Out-Null; if($errors.Count){{throw 'Invalid task definition syntax'}}", script.replace('\'', "''"))).unwrap();
+    }
 }

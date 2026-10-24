@@ -123,7 +123,8 @@ export async function deleteFile(
   let id = input.id;
   if (typeof input.url === "string") {
     const url = new URL(input.url);
-    if (url.origin !== new URL(env.PUBLIC_URL).origin)
+    if (url.origin !== new URL(env.PUBLIC_URL).origin &&
+        !env.PUBLIC_ALIASES?.split(",").map((value) => value.trim()).includes(url.origin))
       throw new HttpError(400, "File is outside this workspace");
     id = url.pathname.replace(/^\/api\/files\//, "");
   }

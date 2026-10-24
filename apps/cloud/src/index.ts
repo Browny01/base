@@ -494,6 +494,10 @@ function withMcpHeaders(request: Request, env: Env, result: Response) {
 const worker = {
   async fetch(request: Request, env: Env) {
     try {
+      // Select only an explicitly configured origin; never trust Host/Origin as a redirect target.
+      const requestOrigin = new URL(request.url).origin;
+      if (env.PUBLIC_ALIASES?.split(",").map((value) => value.trim()).includes(requestOrigin))
+        env = { ...env, PUBLIC_URL: requestOrigin };
       return withMcpHeaders(request, env, await route(request, env));
     } catch (error) {
       if (error instanceof OAuthError)

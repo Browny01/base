@@ -29,7 +29,7 @@ test(
     ]);
     const binary = join(
         root,
-        "native/BaseWorkspace/target/debug/base-workspace",
+        `native/BaseWorkspace/target/debug/base-workspace${globalThis.process.platform === "win32" ? ".exe" : ""}`,
       ),
       directory = await mkdtemp(join(tmpdir(), "base-workspace-test-"));
     const socket = createServer();
@@ -67,15 +67,24 @@ test(
       }
       throw new Error("Workspace did not become healthy");
     };
-    const stop = async () => {
+    const stop = async (hostControl = globalThis.process.platform === "win32") => {
       if (process.exitCode === null) {
-        process.kill("SIGTERM");
-        assert.equal((await once(process, "exit"))[0], 0);
+        const exited = once(process, "exit");
+        if (hostControl) {
+          const login = await fetch(origin + "/api/auth/login", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password, deviceId: "base-host-control" }),
+          });
+          const { token } = await login.json() as {token:string};
+          assert.equal((await fetch(origin + "/api/service/stop", { method: "POST", headers: {Authorization:`Bearer ${token}`} })).status, 200);
+        } else process.kill("SIGTERM");
+        assert.equal((await exited)[0], 0);
       }
     };
     try {
       const health = await ready();
       assert.equal((await fetch(origin + "/api/workspace")).status, 401);
+      assert.equal((await fetch(origin + "/api/service/stop", { method: "POST" })).status, 401);
       assert.equal(
         (
           await fetch(origin + "/health", {
@@ -124,6 +133,7 @@ test(
       const first = await login("device-one"),
         second = await login("device-two");
       assert.equal(first.response.status, 200);
+      assert.equal((await fetch(origin + "/api/service/stop", { method: "POST", headers: {Authorization:`Bearer ${first.value.token}`} })).status, 403);
       assert.equal(first.value.workspaceId, health.workspaceId);
       const sync = async (
         token: string,
@@ -237,7 +247,7 @@ test(
         ).status,
         401,
       );
-      await stop();
+      await stop(true);
       const sqlite = new DatabaseSync(join(directory, "workspace.sqlite3"));
       const verifier = sqlite
         .prepare("SELECT value FROM metadata WHERE key='password'")

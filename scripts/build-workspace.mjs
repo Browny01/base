@@ -6,10 +6,11 @@ const host = execFileSync("rustc", ["-vV"], { encoding: "utf8" }).match(
   /^host: (.+)$/m,
 )[1];
 const target = process.env.TAURI_ENV_TARGET_TRIPLE || host;
+const extension = target.includes("windows") ? ".exe" : "";
 const destination = resolve(root, "apps/desktop/src-tauri/binaries");
 mkdirSync(destination, { recursive: true });
 // Replace the inode rather than truncating an executable that is still running.
-const output = resolve(destination, `base-workspace-${target}`);
+const output = resolve(destination, `base-workspace-${target}${extension}`);
 const temporary = output + `.build-${process.pid}`;
 const manifest = resolve(root, "native/BaseWorkspace/Cargo.toml");
 if (target === "universal-apple-darwin") {
@@ -43,7 +44,7 @@ if (target === "universal-apple-darwin") {
   copyFileSync(
     resolve(
       root,
-      `native/BaseWorkspace/target/${target}/release/base-workspace`,
+      `native/BaseWorkspace/target/${target}/release/base-workspace${extension}`,
     ),
     temporary,
   );

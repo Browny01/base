@@ -62,8 +62,8 @@ nav > div > a:last-child {
   padding: 75px 20px 0;
 }
 .hero-icon {
-  border-radius: 25px;
-  box-shadow: 0 3px 7px #0001;
+  display: inline-block;
+  background: transparent;
 }
 .eyebrow {
   font-size: 10px;
