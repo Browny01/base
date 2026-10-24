@@ -72,7 +72,7 @@ export function Sidebar() {
         <Link href="/" aria-label="Base home" className="base-brand-mark"><BaseImage
           src="/base-icon-transparent.png"
           alt="Base"
-          className="w-5 h-5 object-contain shrink-0"
+          className="w-9 h-9 object-contain shrink-0"
         /></Link>
         {!collapsed && <span className="text-[14px] font-semibold tracking-tight">Base <span className="font-normal text-[var(--faint)]">/ Personal</span></span>}
         {!collapsed && (

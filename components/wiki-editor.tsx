@@ -2,7 +2,7 @@
 
 import { pasteNote, noteLink, safeClipboardHTML } from "@/lib/note-paste";
 import { enableNoteDragSelection, replaceNoteRange, noteRangeContent, noteText } from "@/lib/note-selection";
-import { createNoteIcon } from "@/lib/note-icon";
+import { createNoteIcon, customNoteEmoji } from "@/lib/note-icon";
 import { NoteIcon } from "./note-icon";
 import { EditorDialog } from "./ui/editor-dialog";
 import { editorFormatCommand } from "@/lib/editor-shortcuts";
@@ -216,13 +216,14 @@ async function processImage(file: File): Promise<string | null> {
 type FocusReq = { id: string; caret: "start" | "end" } | null;
 
 export function WikiEditor({
-  page, onChange, fullWidth, allPages, onOpenPage,
+  page, onChange, fullWidth, allPages, onOpenPage, exportPageRef,
 }: {
   page: WikiPage;
   onChange: (patch: Partial<WikiPage>) => void;
   fullWidth: boolean;
   allPages: WikiPage[];
   onOpenPage: (id: string) => void;
+  exportPageRef?: { current: (() => WikiPage) | null };
 }) {
   const [title, setTitle] = useState(page.title);
   const [icon, setIcon] = useState(page.icon);
@@ -241,6 +242,11 @@ export function WikiEditor({
 
   const latest = useRef({ title, icon, description, blocks });
   useLayoutEffect(() => { latest.current = { title, icon, description, blocks }; });
+  useLayoutEffect(() => {
+    if (!exportPageRef) return;
+    exportPageRef.current = () => ({ ...page, ...latest.current });
+    return () => { exportPageRef.current = null; };
+  }, [exportPageRef, page]);
 
   const refs = useRef(new Map<string, HTMLDivElement>());
   const [focusReq, setFocusReq] = useState<FocusReq>(null);
@@ -1561,6 +1567,7 @@ function EmojiButton({ value, onChange }: { value: string; onChange: (e: string)
   const fileRef=useRef<HTMLInputElement>(null);
   const [error,setError]=useState(""),[loading,setLoading]=useState(false);
   const [q, setQ] = useState("");
+  const [custom, setCustom] = useState("");
   const ql = q.trim().toLowerCase();
   // When searching, match by category label; otherwise show every category.
   const cats = ql ? EMOJI_CATEGORIES.filter((c) => c.label.toLowerCase().includes(ql)) : EMOJI_CATEGORIES;
@@ -1580,6 +1587,10 @@ function EmojiButton({ value, onChange }: { value: string; onChange: (e: string)
           <div className="absolute left-0 top-full mt-1 z-50 w-[332px] bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl p-2 nx-pop">
             <button disabled={loading} onClick={()=>fileRef.current?.click()} className="base-menu-item w-full mb-2"><ImageIcon className="h-4 w-4"/>{loading?"Preparing image…":"Upload an image"}</button>
             {error&&<p role="alert" className="px-2 mb-2 text-xs text-[var(--c-rose)]">{error}</p>}
+            <form className="mb-3 flex gap-2" onSubmit={event => { event.preventDefault(); const emoji = customNoteEmoji(custom); if (emoji) { onChange(emoji); setOpen(false); setCustom(""); } }}>
+              <input aria-label="Type or paste an emoji" value={custom} onChange={event => setCustom(event.target.value)} placeholder="Type or paste any emoji…" maxLength={64} className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2.5 py-2 text-sm" />
+              <button disabled={!customNoteEmoji(custom)} className="base-button base-button-secondary">Use</button>
+            </form>
             <input
               autoFocus value={q} onChange={(e) => setQ(e.target.value)}
               placeholder="Filter categories…"
@@ -1610,50 +1621,4 @@ function EmojiButton({ value, onChange }: { value: string; onChange: (e: string)
       )}
     </div>
   );
-}
-
-// Plain-text export of a page's blocks (used by the page options menu).
-export function blocksToText(blocks: WikiBlock[]): string {
-  return blocks.map((b) => {
-    const t = stripTags(b.text);
-    switch (b.type) {
-      case "h1": return `# ${t}`;
-      case "h2": return `## ${t}`;
-      case "h3": return `### ${t}`;
-      case "bulleted": return `• ${t}`;
-      case "numbered": return `1. ${t}`;
-      case "todo": return `${b.checked ? "[x]" : "[ ]"} ${t}`;
-      case "quote": return `> ${t}`;
-      case "code": return "```\n" + t + "\n```";
-      case "callout": return `${b.emoji || "💡"} ${t}`;
-      case "toggle": return `▸ ${t}${b.body ? "\n  " + stripTags(b.body) : ""}`;
-      case "pagelink": return "↪ [linked page]";
-      case "divider": return "---";
-      case "image": return b.caption ? `[image: ${b.caption}]` : "[image]";
-      case "table": return (b.table?.rows ?? []).map((r) => r.map((c) => stripTags(c)).join(" | ")).join("\n");
-      case "board": return (b.board ?? []).map((col) => `${col.title}:\n` + col.cards.map((c) => `  - ${c.text}`).join("\n")).join("\n");
-      case "chart": return `[${b.chart?.kind ?? "bar"} chart] ` + (b.chart?.data ?? []).map((d) => `${d.label}: ${d.value}`).join(", ");
-      case "sticky": return `📝 ${t}`;
-      case "bookmark": return `🔖 ${t || ""} ${b.url ?? ""}`.trim();
-      case "embed": case "video": case "audio": case "file": return `[${b.type}] ${b.fileName ?? b.url ?? ""}`.trim();
-      case "gallery": return `[gallery: ${(b.images ?? []).length} images]`;
-      case "columns": return (b.cols ?? []).map((c) => stripTags(c)).join("\n\n");
-      case "tabs": case "accordion": return (b.panels ?? []).map((p) => `${p.title}\n${stripTags(p.body)}`).join("\n");
-      case "toc": return "[table of contents]";
-      case "labeleddivider": return `--- ${t} ---`;
-      case "synced": return "↪ [embedded note]";
-      case "progress": return `${t}: ${b.value ?? 0}%`;
-      case "checklist": return (b.checks ?? []).map((c) => `${c.done ? "[x]" : "[ ]"} ${c.text}`).join("\n");
-      case "counter": return `${t}: ${b.value ?? 0}`;
-      case "countdown": return `${t} — ${b.date ?? ""}`;
-      case "rating": return `${t}: ${b.value ?? 0}/5`;
-      case "pageindex": return "[sub-page index]";
-      case "properties": return (b.props ?? []).map((p) => `${p.key}: ${p.value}`).join("\n");
-      case "math": return `$ ${t} $`;
-      case "diagram": return "```mermaid\n" + t + "\n```";
-      case "sketch": return "[sketch]";
-      case "button": return `[${t || "Button"}]`;
-      default: return t;
-    }
-  }).join("\n");
 }

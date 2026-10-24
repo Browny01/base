@@ -3,7 +3,7 @@
 import {
   LayoutDashboard, ShoppingCart, BookOpen, Play,
   FolderKanban, LayoutGrid, NotebookText, CalendarDays,
-  CheckSquare, Timer, DollarSign, Wallet, Newspaper, Settings,
+  CheckSquare, Timer, DollarSign, Wallet, Newspaper, Settings, Flame,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,6 +30,7 @@ export const ALL_PAGES: NavPage[] = [
   { key: "notes",       href: "/notes",       label: "Notes",        icon: NotebookText,   section: "Build",    keywords: "wiki docs pages" },
   { key: "calendar",    href: "/calendar",    label: "Calendar",     icon: CalendarDays,   section: "Systems",  keywords: "events agenda schedule bookings dates" },
   { key: "tasks",       href: "/tasks",       label: "Tasks",        icon: CheckSquare,    section: "Systems",  keywords: "todo kanban" },
+  { key: "habits",      href: "/habits",      label: "Habits & streaks", icon: Flame,       section: "Systems",  keywords: "daily habits streaks consistency routines" },
   { key: "focus",       href: "/focus",       label: "Focus",        icon: Timer,          section: "Systems",  keywords: "pomodoro timer" },
   { key: "finance",     href: "/finance",     label: "Finance",      icon: DollarSign,     section: "Intel",    keywords: "money wallet crypto" },
   { key: "money",       href: "/money",       label: "Money",        icon: Wallet,         section: "Intel",    keywords: "cash income expenses", defaultHidden: true },
@@ -45,7 +46,7 @@ export const SETTINGS_PAGE: NavPage = {
   section: "", keywords: "preferences appearance theme navigation",
 };
 
-export const DEFAULT_SIDEBAR_ORDER = ["dashboard", "tasks", "calendar", "focus", "projects", "notes", "vision", "finance", "money", "news", "wishlist", "readinglist", "watchlist"];
+export const DEFAULT_SIDEBAR_ORDER = ["dashboard", "tasks", "habits", "calendar", "focus", "projects", "notes", "vision", "finance", "money", "news", "wishlist", "readinglist", "watchlist"];
 export const DEFAULT_BOTTOM_TABS = ["dashboard", "projects", "tasks"];
 
 // The always-visible desktop dock row (everything else sits in "More").

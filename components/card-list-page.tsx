@@ -1,6 +1,9 @@
 "use client";
 
 import { PageHeading } from "./ui/page-heading";
+import { ItemTags, TagFilters } from "./list-tags";
+import { matchesListFilters } from "@/lib/list-tags";
+import type { ListTag } from "@/lib/store";
 
 import { BaseImage } from "@/lib/image";
 
@@ -17,6 +20,7 @@ export interface MediaCardLike {
   checked: boolean;
   createdAt: string;
   order?: number;
+  tags?: ListTag[];
 }
 
 export interface CardConfig<T extends MediaCardLike> {
@@ -57,29 +61,30 @@ export function CardListPage<T extends MediaCardLike>({
   const { mutate } = useBase();
   const [showForm, setShowForm] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
-  function write(next: T[]) {
-    mutate((d) => ({ ...d, [config.dataKey]: next }) as unknown as BaseData);
+  function write(update: (current: T[]) => T[]) {
+    mutate((d) => ({ ...d, [config.dataKey]: update(d[config.dataKey] as unknown as T[]) }) as unknown as BaseData);
   }
 
   function append(item: T) {
-    const nextOrder = items.reduce((m, i) => Math.max(m, i.order ?? -1), -1) + 1;
-    write([...items, { ...item, order: nextOrder } as T]);
+    write(current => [...current, { ...item, order: current.reduce((m, i) => Math.max(m, i.order ?? -1), -1) + 1 } as T]);
     setShowForm(false);
   }
 
   function toggle(id: string) {
-    write(items.map((i) => (i.id === id ? { ...i, checked: !i.checked } as T : i)));
+    write(current => current.map((i) => (i.id === id ? { ...i, checked: !i.checked } as T : i)));
   }
 
   function remove(id: string) {
-    write(items.filter((i) => i.id !== id));
+    write(current => current.filter((i) => i.id !== id));
   }
 
   function clearDone() {
-    write(items.filter((i) => !i.checked));
+    const visible = new Set(done.map(item => item.id));
+    write(current => current.filter(item => !visible.has(item.id)));
   }
 
   // Drop `dragId` onto the slot occupied by `targetId`, then renumber so `order`
@@ -93,10 +98,10 @@ export function CardListPage<T extends MediaCardLike>({
     const [moved] = ordered.splice(from, 1);
     ordered.splice(to, 0, moved);
     const orderMap = new Map(ordered.map((i, idx) => [i.id, idx]));
-    write(items.map((i) => (orderMap.has(i.id) ? { ...i, order: orderMap.get(i.id)! } as T : i)));
+    write(current => current.map((i) => (orderMap.has(i.id) ? { ...i, order: orderMap.get(i.id)! } as T : i)));
   }
 
-  const view = filter ? items.filter(filter) : items;
+  const view = items.filter(item => (!filter || filter(item)) && matchesListFilters(item, tagFilter));
   const unchecked = view.filter((i) => !i.checked).sort(orderSort);
   const done = view.filter((i) => i.checked).sort(orderSort);
 
@@ -123,6 +128,7 @@ export function CardListPage<T extends MediaCardLike>({
       </div>
 
       {filterBar && <div className="mb-4">{filterBar}</div>}
+      <TagFilters items={items} selected={tagFilter} onChange={setTagFilter}/>
 
       {/* Add form */}
       {showForm && (
@@ -206,6 +212,7 @@ export function CardListPage<T extends MediaCardLike>({
                 <div className="p-2.5 flex-1">
                   <p className="text-[13px] font-semibold text-[var(--text)] leading-snug line-clamp-2">{title}</p>
                   {subtitle && <p className="text-[11px] text-[var(--faint)] truncate mt-0.5">{subtitle}</p>}
+                  <ItemTags item={item} dataKey={config.dataKey} title={title}/>
                 </div>
               </div>
             );
@@ -216,16 +223,17 @@ export function CardListPage<T extends MediaCardLike>({
       {/* Done section */}
       {done.length > 0 && (
         <div className="mt-6">
-          <button onClick={() => setShowDone((v) => !v)} className="flex items-center gap-2 mb-3 group">
+          <div className="flex items-center gap-2 mb-3 group"><button onClick={() => setShowDone((v) => !v)} className="flex items-center gap-2" aria-expanded={showDone}>
             {showDone ? <ChevronDown className="w-4 h-4 text-[var(--faint)]" /> : <ChevronUp className="w-4 h-4 text-[var(--faint)]" />}
             <h2 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-widest">{config.doneLabel(done.length)}</h2>
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); clearDone(); }}
               className="text-[10px] text-[var(--faint)] hover:text-[var(--text)] transition-colors uppercase tracking-wide font-semibold"
             >
               Clear
             </button>
-          </button>
+          </div>
 
           {showDone && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 opacity-60">
@@ -245,6 +253,7 @@ export function CardListPage<T extends MediaCardLike>({
                       <div className="min-w-0">
                         <p className="text-[13px] font-semibold text-[var(--text)] leading-snug line-clamp-2 line-through">{title}</p>
                         {subtitle && <p className="text-[11px] text-[var(--faint)] truncate mt-0.5">{subtitle}</p>}
+                        <ItemTags item={item} dataKey={config.dataKey} title={title}/>
                       </div>
                       <button
                         onClick={() => toggle(item.id)}

@@ -1,6 +1,9 @@
 "use client";
 
 import { PageHeading } from "./ui/page-heading";
+import { ItemTags, TagFilters } from "./list-tags";
+import { matchesListFilters } from "@/lib/list-tags";
+import type { ListTag } from "@/lib/store";
 
 import { BaseImage } from "@/lib/image";
 
@@ -32,6 +35,7 @@ export interface LazyItem {
   url?: string;
   order?: number;
   author?: string;
+  tags?: ListTag[];
 }
 
 export interface ListExtraField { key: string; label: string; placeholder: string }
@@ -424,6 +428,9 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   const items = (data[cfg.dataKey] as unknown as LazyItem[]) ?? [];
 
   const [showForm, setShowForm] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -443,14 +450,13 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   function changeSort(next: ListSort) { writeStored(sortKey, next); }
   function changeDensity(next: ListDensity) { writeStored(densityKey, next); }
 
-  function write(next: LazyItem[]) {
-    mutate((d) => ({ ...d, [cfg.dataKey]: next }) as BaseData);
+  function write(update: (current: LazyItem[]) => LazyItem[]) {
+    mutate((d) => ({ ...d, [cfg.dataKey]: update(d[cfg.dataKey] as unknown as LazyItem[]) }) as BaseData);
   }
 
   function addItem(v: FormValues) {
-    const nextOrder = items.reduce((m, i) => Math.max(m, i.order ?? -1), -1) + 1;
-    write([
-      ...items,
+    write(current => [
+      ...current,
       {
         id: uid(),
         name: v.name,
@@ -461,7 +467,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
         createdAt: new Date().toISOString(),
         icon: v.icon || undefined,
         url: normalizeUrl(v.url),
-        order: nextOrder,
+        order: current.reduce((m, i) => Math.max(m, i.order ?? -1), -1) + 1,
         ...(v.author ? { author: v.author } : {}),
       },
     ]);
@@ -470,7 +476,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
 
   function saveEdit(id: string, v: FormValues) {
     write(
-      items.map((item) =>
+      current => current.map((item) =>
         item.id === id
           ? {
               ...item,
@@ -489,19 +495,20 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
   }
 
   function toggleItem(id: string) {
-    write(items.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item)));
+    write(current => current.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item)));
   }
 
   function deleteItem(id: string) {
-    write(items.filter((item) => item.id !== id));
+    write(current => current.filter((item) => item.id !== id));
   }
 
   function clearChecked() {
-    write(items.filter((item) => !item.checked));
+    const visible = new Set(checked.map(item => item.id));
+    write(current => current.filter(item => !visible.has(item.id)));
   }
 
   function setPriority(id: string, p: ListPriority) {
-    write(items.map((item) => (item.id === id ? { ...item, priority: p } : item)));
+    write(current => current.map((item) => (item.id === id ? { ...item, priority: p } : item)));
   }
 
   // Drop `dragId` onto the slot occupied by `targetId`, then renumber the whole
@@ -515,7 +522,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
     const [moved] = ordered.splice(from, 1);
     ordered.splice(to, 0, moved);
     const orderMap = new Map(ordered.map((i, idx) => [i.id, idx]));
-    write(items.map((i) => (orderMap.has(i.id) ? { ...i, order: orderMap.get(i.id)! } : i)));
+    write(current => current.map((i) => (orderMap.has(i.id) ? { ...i, order: orderMap.get(i.id)! } : i)));
   }
 
   function nudge(id: string, dir: -1 | 1) {
@@ -525,8 +532,9 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
     if (target) moveTo(id, target);
   }
 
-  const unchecked = sortItems(items.filter((i) => !i.checked), sort);
-  const checked = sortItems(items.filter((i) => i.checked), sort);
+  const view = items.filter(item => matchesListFilters(item, tagFilter, categoryFilter, priorityFilter));
+  const unchecked = sortItems(view.filter((i) => !i.checked), sort);
+  const checked = sortItems(view.filter((i) => i.checked), sort);
   const totalCost = unchecked.reduce((sum, i) => sum + i.price, 0);
 
   return (
@@ -567,6 +575,15 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
           {cfg.densityOptions && <DensityMenu value={density} onChange={changeDensity} />}
         </div>
       )}
+
+      {/* New item form */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <select aria-label="Filter by category" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-xs"><option value="">All categories</option>{cfg.categories.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}</select>
+        <select aria-label="Filter by priority" value={priorityFilter} onChange={event => setPriorityFilter(event.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-xs"><option value="">All priorities</option>{PRIORITIES.map(priority => <option key={priority.value} value={priority.value}>{priority.label}</option>)}</select>
+        {(categoryFilter || priorityFilter) && <button onClick={() => { setCategoryFilter(""); setPriorityFilter(""); }} className="text-xs text-[var(--muted)] underline">Clear filters</button>}
+      </div>
+      <TagFilters items={items} selected={tagFilter} onChange={setTagFilter}/>
+      {items.length > 0 && view.length === 0 && <p className="py-8 text-center text-sm text-[var(--muted)]">No items match these filters.</p>}
 
       {/* New item form */}
       {showForm && (
@@ -694,6 +711,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
                     <p className={cn("truncate text-[var(--text)]", roomy ? "text-base font-medium" : "text-sm")}>{item.name}</p>
                   )}
                   {item.author && <p className={cn("truncate text-[var(--faint)]", roomy ? "text-xs" : "text-[11px]")}>{item.author}</p>}
+                  <ItemTags item={item} dataKey={cfg.dataKey} title={item.name}/>
                 </div>
 
                 {/* Price */}
@@ -729,9 +747,9 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
       {/* Checked items */}
       {checked.length > 0 && (
         <div className="mt-6">
-          <button
-            onClick={() => setShowCompleted((v) => !v)}
-            className="flex items-center gap-2 mb-3 group"
+          <div className="flex items-center gap-2 mb-3 group"><button
+            onClick={() => setShowCompleted((v) => !v)} aria-expanded={showCompleted}
+            className="flex items-center gap-2"
           >
             {showCompleted ? (
               <ChevronDown className="w-4 h-4 text-[var(--faint)]" />
@@ -740,14 +758,14 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
             )}
             <h2 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-widest">
               {cfg.gotLabel(checked.length)}
-            </h2>
+            </h2></button>
             <button
               onClick={(e) => { e.stopPropagation(); clearChecked(); }}
               className="text-[10px] text-[var(--faint)] hover:text-[var(--text)] transition-colors uppercase tracking-wide font-semibold"
             >
               Clear
             </button>
-          </button>
+          </div>
 
           {showCompleted && (
             <div className={roomy ? "space-y-3" : "space-y-1.5"}>
@@ -774,6 +792,7 @@ export function ListPage({ cfg }: { cfg: ListPageConfig }) {
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-sm text-[var(--text)] line-through">{item.name}</p>
                       {item.author && <p className={cn("truncate text-[var(--faint)]", roomy ? "text-xs" : "text-[11px]")}>{item.author}</p>}
+                      <ItemTags item={item} dataKey={cfg.dataKey} title={item.name}/>
                     </div>
                     {priceStr && (
                       <span className={cn("tabular text-[var(--muted)] shrink-0", roomy ? "text-base font-semibold" : "text-sm font-medium")}>

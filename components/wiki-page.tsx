@@ -15,7 +15,8 @@ import { useToast } from "@/lib/toast-context";
 import { useConfirm } from "@/lib/confirm-context";
 import { uid, cn } from "@/lib/utils";
 import type { WikiPage as WikiPageT, WikiBlock, WikiFolder } from "@/lib/store";
-import { WikiEditor, blocksToText } from "@/components/wiki-editor";
+import { WikiEditor } from "@/components/wiki-editor";
+import { copyNotePage } from "@/lib/note-export";
 import { WikiGraph } from "@/components/wiki-graph";
 import {
   Plus, FileText, Network, ChevronRight, Trash2, NotebookText, ChevronDown,
@@ -178,6 +179,7 @@ export function WikiPage() {
   const { data, mutate } = useBase();
   const { toast } = useToast();
   const confirm = useConfirm();
+  const exportPageRef = useRef<(() => WikiPageT) | null>(null);
   const allWiki = useMemo(() => data.wikiPages ?? [], [data.wikiPages]);
   const pages = useMemo(() => allWiki.filter((p) => !p.deletedAt), [allWiki]);          // live pages
   const deletedPages = useMemo(() => allWiki.filter((p) => p.deletedAt), [allWiki]);    // in Trash
@@ -381,8 +383,8 @@ export function WikiPage() {
   }
 
   async function copyContents(page: WikiPageT) {
-    const text = `${page.title || "Untitled"}\n\n${blocksToText(page.blocks)}`;
-    try { await navigator.clipboard.writeText(text); } catch { /* clipboard may be blocked */ }
+    try { await copyNotePage(exportPageRef.current?.() ?? page); toast("Page contents copied"); }
+    catch { toast("Could not copy this page. Allow clipboard access and try again."); }
   }
 
   function downloadPdf(page: WikiPageT) {
@@ -706,6 +708,7 @@ export function WikiPage() {
           ) : activePage ? (
             <div className="h-full overflow-y-auto">
               <WikiEditor
+                exportPageRef={exportPageRef}
                 key={activePage.id}
                 page={activePage}
                 fullWidth={!!activePage.fullWidth}

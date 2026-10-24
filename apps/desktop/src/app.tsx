@@ -30,6 +30,7 @@ class PageRecovery extends Component<{children:ReactNode},{error:Error|null}> {
 
 const Dashboard = lazy(() => import("@/components/dashboard").then(m => ({ default: m.Dashboard })));
 const Tasks = lazy(() => import("@/components/tasks-page").then(m => ({ default: m.TasksPage })));
+const Habits = lazy(() => import("@/components/habits-page").then(m => ({ default: m.HabitsPage })));
 const Calendar = lazy(() => import("@/components/calendar-page").then(m => ({ default: m.CalendarPage })));
 const Projects = lazy(() => import("@/components/projects-page").then(m => ({ default: m.ProjectsPage })));
 const Project = lazy(() => import("@/components/project-detail").then(m => ({ default: m.ProjectDetail })));
@@ -48,6 +49,7 @@ function Route() {
   switch (path) {
     case "/": return <Dashboard />;
     case "/tasks": return <Tasks />;
+    case "/habits": return <Habits />;
     case "/calendar": return <Calendar />;
     case "/projects": return <Projects />;
     case "/notes": return <Notes />;

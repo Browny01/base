@@ -155,6 +155,7 @@ export interface PaymentSubscription {
 }
 
 export interface Habit {
+  archived?: boolean;
   id: string;
   name: string;
   emoji: string;
@@ -171,6 +172,8 @@ export interface HabitLog {
   value?: string;      // for input habits
 }
 
+export interface ListTag { id: string; name: string; color: string; }
+
 // ── Shopping List (wish-list style) ──────────────────────────────────────────
 
 export type ShoppingCategory =
@@ -178,6 +181,7 @@ export type ShoppingCategory =
   | "books" | "fitness" | "accessories" | "other";
 
 export interface ShoppingListItem {
+  tags?: ListTag[];
   id: string;
   name: string;
   category: ShoppingCategory;
@@ -205,6 +209,7 @@ export interface Bookmark {
 export type ReadingCategory = "fiction" | "non-fiction" | "self-help" | "business" | "tech" | "biography" | "other";
 
 export interface ReadingListItem {
+  tags?: ListTag[];
   id: string;
   name: string;
   author: string;           // optional; "" when unknown
@@ -218,6 +223,7 @@ export interface ReadingListItem {
 export type WatchKind = "movie" | "tv" | "youtube";
 
 export interface WatchListItem {
+  tags?: ListTag[];
   id: string;
   kind: WatchKind;
   title: string;
