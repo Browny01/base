@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "hardcoded-widget-token"
+description = "A widget credential must come from Keychain, never a Swift literal"
+regex = '''static\s+let\s+token\s*=\s*"([^"\r\n]+)"'''
+secretGroup = 1
+
+[[allowlists]]
+description = "Clerk's public browser key is intentionally bundled"
+condition = "AND"
+paths = ['''(^|/)apps/cloud/wrangler\.json$''']
+regexTarget = "match"
+regexes = ['''CLERK_PUBLISHABLE_KEY[^\r\n]*pk_(test|live)_''']

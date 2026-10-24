@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        B20000000000000000000011 /* WidgetCredentials.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001; };
+        B20000000000000000000012 /* WidgetCredentials.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001; };
 		3916C4C245D629DF0CD07ADE /* BaseWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F46F757067608199DDF3EB /* BaseWidget.swift */; };
 		44DAC6B12B0AB6C5BE3A4081 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 74AF4CCE00CE3575EF9F6285 /* Foundation.framework */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -43,6 +45,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        B20000000000000000000001 /* WidgetCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetCredentials.swift; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -138,6 +141,7 @@
 				A10000000000000000000001 /* BaseData.swift */,
 				A10000000000000000000002 /* BaseStore.swift */,
 				A10000000000000000000003 /* BaseViews.swift */,
+                B20000000000000000000001 /* WidgetCredentials.swift */,
 			);
 			name = BaseCore;
 			path = ../../native/BaseCore;
@@ -249,6 +253,7 @@
 				A10000000000000000000011 /* BaseData.swift in Sources */,
 				A10000000000000000000012 /* BaseStore.swift in Sources */,
 				A10000000000000000000013 /* BaseViews.swift in Sources */,
+                B20000000000000000000011 /* WidgetCredentials.swift in App Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,6 +262,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3916C4C245D629DF0CD07ADE /* BaseWidget.swift in Sources */,
+                B20000000000000000000012 /* WidgetCredentials.swift in Widget Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -399,6 +405,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = App/Info.plist;
+                CODE_SIGN_ENTITLEMENTS = App/WidgetKeychain.entitlements;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -421,6 +428,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = App/Info.plist;
+                CODE_SIGN_ENTITLEMENTS = App/WidgetKeychain.entitlements;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -444,6 +452,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BaseWidget/Info.plist;
+                CODE_SIGN_ENTITLEMENTS = BaseWidget/WidgetKeychain.entitlements;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -470,6 +479,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BaseWidget/Info.plist;
+                CODE_SIGN_ENTITLEMENTS = BaseWidget/WidgetKeychain.entitlements;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

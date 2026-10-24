@@ -20,32 +20,41 @@ struct BaseSummary: Codable {
 }
 
 enum BaseAPI {
-    // Personal single-user app. The token matches the server default
-    // (BASE_AGENT_TOKEN / BASE_PASSWORD, legacy BRIDGE_* names still work).
-    static let base = "https://base.lucasbrown.xyz"
-    static let token = ""
-
     static func fetchSummary() async -> BaseSummary {
+        guard let connection = try? WidgetCredentials.load() else { return .init() }
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         df.timeZone = .current
         let date = df.string(from: Date())
 
-        guard var comps = URLComponents(string: "\(base)/api/widget/summary") else { return .init() }
+        guard var comps = URLComponents(string: "\(connection.origin)/api/widget/summary") else { return .init() }
         comps.queryItems = [
-            URLQueryItem(name: "token", value: token),
             URLQueryItem(name: "date", value: date),
         ]
         guard let url = comps.url else { return .init() }
         do {
             var req = URLRequest(url: url)
+            req.setValue(connection.token, forHTTPHeaderField: "x-base-token")
             req.timeoutInterval = 12
             req.cachePolicy = .reloadIgnoringLocalCacheData
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let session = URLSession(configuration: .ephemeral, delegate: WidgetRedirectPolicy(), delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            let (data, response) = try await session.data(for: req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return .init() }
             return try JSONDecoder().decode(BaseSummary.self, from: data)
         } catch {
             return .init()
         }
+    }
+}
+
+// Never forward a widget credential to a redirected origin or login page.
+private final class WidgetRedirectPolicy: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
     }
 }
 

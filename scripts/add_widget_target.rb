@@ -39,10 +39,15 @@ group.clear
 swift_ref = group.new_reference("BaseWidget.swift")
 group.new_reference("Info.plist")
 widget.source_build_phase.add_file_reference(swift_ref)
+core = project.main_group.children.find { |g| g.respond_to?(:name) && g.name == "BaseCore" }
+credentials = core&.files&.find { |f| f.path == "WidgetCredentials.swift" }
+raise "Shared WidgetCredentials.swift reference missing from BaseCore" unless credentials
+widget.source_build_phase.add_file_reference(credentials)
 
 widget.build_configurations.each do |c|
   bs = c.build_settings
   bs["INFOPLIST_FILE"] = "BaseWidget/Info.plist"
+  bs["CODE_SIGN_ENTITLEMENTS"] = "BaseWidget/WidgetKeychain.entitlements"
   bs["PRODUCT_BUNDLE_IDENTIFIER"] = widget_bundle_id
   bs["PRODUCT_NAME"] = "$(TARGET_NAME)"
   bs["SWIFT_VERSION"] = "5.0"

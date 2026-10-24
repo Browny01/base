@@ -107,7 +107,7 @@ against larger workloads in phase 2. No macOS performance result is available.
 These images show isolated fixture data in the actual bundled GTK/WebKit app:
 
 - [Offline unlocked note](screenshots/desktop-phase1/notes-offline.png)
-- [Conflict review](screenshots/desktop-phase1/conflict-review.png)
+- Conflict review was verified; its original screenshot was removed for privacy.
 - [Offline project detail](screenshots/desktop-phase1/project-offline.png)
 - [Native Linux menu](screenshots/desktop-phase1/native-menu.png)
 

@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     "native/BaseWorkspace/target/**",
     "apps/desktop/src-tauri/target/**",
     "apps/desktop/src-tauri/gen/**",
+    "vendor/**",
   ]),
 ]);
 

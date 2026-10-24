@@ -1,3 +1,5 @@
+import { checkedCredential } from "./revoked-credentials.ts";
+
 // Environment access, in one place.
 //
 // The app was Nexus, then Bridge, and is now Base. New deployments set BASE_*,
@@ -6,7 +8,7 @@
 // currently still has BRIDGE_PASSWORD_HASH / BRIDGE_SESSION_SECRET set.
 
 export function basePassword(): string | undefined {
-  return process.env.BASE_PASSWORD ?? process.env.BRIDGE_PASSWORD ?? process.env.NEXUS_PASSWORD;
+  return checkedCredential(process.env.BASE_PASSWORD ?? process.env.BRIDGE_PASSWORD ?? process.env.NEXUS_PASSWORD);
 }
 
 // Optional scrypt hash of the login password ("<salt-base64>:<hash-base64>").
@@ -17,12 +19,18 @@ export function basePasswordHash(): string | undefined {
 }
 
 export function baseAgentToken(): string | undefined {
-  return process.env.BASE_AGENT_TOKEN ?? process.env.BRIDGE_AGENT_TOKEN ?? process.env.NEXUS_AGENT_TOKEN ?? basePassword();
+  return checkedCredential(process.env.BASE_AGENT_TOKEN ?? process.env.BRIDGE_AGENT_TOKEN ?? process.env.NEXUS_AGENT_TOKEN ?? basePassword());
+}
+
+// A dedicated read-only widget secret is not accepted by agent/write APIs.
+// The fallback keeps existing installations compatible while they migrate.
+export function baseWidgetToken(): string | undefined {
+  return checkedCredential(process.env.BASE_WIDGET_TOKEN ?? process.env.BRIDGE_WIDGET_TOKEN ?? baseAgentToken());
 }
 
 // Secret used to sign session tokens. Prefer a dedicated random secret; it
 // falls back to the login password (never a hardcoded constant) so existing
 // deployments keep working until BASE_SESSION_SECRET is set.
 export function baseSessionSecret(): string | undefined {
-  return process.env.BASE_SESSION_SECRET ?? process.env.BRIDGE_SESSION_SECRET ?? process.env.NEXUS_SESSION_SECRET ?? basePassword();
+  return checkedCredential(process.env.BASE_SESSION_SECRET ?? process.env.BRIDGE_SESSION_SECRET ?? process.env.NEXUS_SESSION_SECRET ?? basePassword());
 }

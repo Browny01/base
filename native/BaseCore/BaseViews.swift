@@ -112,6 +112,9 @@ private struct SyncToolbar: ToolbarContent {
     @ObservedObject var store: BaseStore
 
     var body: some ToolbarContent {
+        #if os(iOS)
+        ToolbarItem(placement: .automatic) { WidgetSettingsButton() }
+        #endif
         ToolbarItem(placement: .automatic) {
             Button {
                 Task { await store.sync() }

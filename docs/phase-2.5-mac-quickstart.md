@@ -9,8 +9,11 @@ Keychain entries. Extract this ZIP into a new directory beside your old checkout
 ## Build and open
 
 Use Terminal in the extracted `base-desktop-phase2.5` directory. Xcode Command
-Line Tools, Node/npm and Rust are needed to build; the installed app does not
-need a Node server. If those tools are already installed from Phase 2, reuse them.
+Line Tools, Node **24.22.1** (or patched supported 26.12.1+) and Rust are needed
+to build; the installed app does not need a Node server. Older Node releases,
+including Node 25, are rejected by the project installation policy. With mise,
+use `mise exec node@24.22.1 -- npm ci`; with nvm, run `nvm install 24.22.1`
+and `nvm use 24.22.1` before the commands below.
 
 ```bash
 npm ci

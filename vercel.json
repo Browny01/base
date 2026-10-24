@@ -1,12 +1,12 @@
 {
+  "git": {
+    "deploymentEnabled": false
+  },
   "framework": "nextjs",
   "crons": [
     {
       "path": "/api/cron/snapshot",
       "schedule": "0 12 * * *"
     }
-  ],
-  "git": {
-    "deploymentEnabled": false
-  }
+  ]
 }

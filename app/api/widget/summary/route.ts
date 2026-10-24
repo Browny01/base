@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { readCurrentData } from "@/lib/base-data";
-import { baseAgentToken } from "@/lib/env";
+import { baseWidgetToken } from "@/lib/env";
 import { calcStreak } from "@/lib/utils";
+import { timingSafeEqual } from "node:crypto";
 
 // Read-only summary for the iOS home-screen widget. Guarded by a token (query
 // ?token= or x-base-token header) so it can be fetched from the WidgetKit
@@ -34,8 +35,11 @@ export async function GET(req: NextRequest) {
     || req.headers.get("x-base-token")
     || req.headers.get("x-bridge-token")
     || "";
-  const expected = baseAgentToken();
-  if (token !== expected) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const expected = baseWidgetToken();
+  if (!expected || !token || Buffer.byteLength(token) !== Buffer.byteLength(expected)
+      || !timingSafeEqual(Buffer.from(token), Buffer.from(expected))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
   const redis = getRedis();
   if (!redis) return NextResponse.json({ error: "not configured" }, { status: 503 });

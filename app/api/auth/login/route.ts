@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkedCredential } from "@/lib/revoked-credentials";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { basePassword, basePasswordHash } from "@/lib/env";
@@ -51,6 +52,7 @@ function safeEqual(a: string, b: string): boolean {
 // during onboarding (stored in Redis as a browser-side PBKDF2/AES-GCM verifier).
 // Env values come first: an operator's deployment config is authoritative.
 async function verifyPassword(password: string): Promise<boolean> {
+  try { checkedCredential(password); } catch { return false; }
   const hashSpec = basePasswordHash();
   if (hashSpec) {
     const colon = hashSpec.indexOf(":");

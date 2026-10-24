@@ -108,11 +108,14 @@ native installation. Production builds require no local Node server.
 
 ## Getting Started
 
-Install dependencies:
+Use patched Node **24.22.1** (see `.node-version`) and install the locked dependencies:
 
 ```bash
-npm install
+npm ci
 ```
+
+See [October security fixes and publication safeguards](docs/security-remediation-2026-10.md)
+for runtime requirements, backports and the manual deployment policy.
 
 Run the web app locally:
 

@@ -70,7 +70,7 @@ workspace capacity, signing/updates and actual macOS/multiple-device acceptance.
 Phase 3 has not started.
 
 Screenshots: [Clerk](screenshots/desktop-phase25/clerk-staging-sign-in.png),
-[Portal cancellation](screenshots/desktop-phase25/stripe-staging-cancellation.png).
+Portal cancellation was verified; its original screenshot was removed for privacy.
 
 References: [Clerk CSP requirements](https://clerk.com/docs/guides/secure/best-practices/csp-headers),
 [Apple setup](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/apple),
