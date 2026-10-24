@@ -20,7 +20,7 @@
     "desktop:build": "npm run tauri -w @base/desktop -- build",
     "desktop:frontend": "npm run build -w @base/desktop",
     "desktop:typecheck": "npm run typecheck -w @base/desktop",
-    "desktop:check": "cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "desktop:check": "npm run workspace:bundle && cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "typecheck": "tsc --noEmit",
     "cloud:dev": "npm run dev -w @base/cloud",
     "cloud:check": "npm run check -w @base/cloud",

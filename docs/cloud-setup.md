@@ -144,6 +144,7 @@ npm test
 npm run typecheck
 npm run desktop:typecheck
 cargo test --manifest-path native/BaseWorkspace/Cargo.toml
+npm run workspace:bundle
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run desktop:build
 open apps/desktop/src-tauri/target/release/bundle/macos/Base.app

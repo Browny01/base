@@ -23,13 +23,17 @@ npm run desktop:typecheck
 npm run cloud:check
 npm run web:typecheck
 cargo test --manifest-path native/BaseWorkspace/Cargo.toml
+npm run workspace:bundle
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 npm run desktop:build
 open apps/desktop/src-tauri/target/release/bundle/macos/Base.app
 ```
 
-Expected tests for this checkpoint: 161 JavaScript, nine standalone workspace
-Rust and eleven desktop Rust. macOS build/runtime results must still be recorded on
+Build the workspace service before desktop Cargo checks/tests, even if you do
+not plan to start a local workspace; Tauri validates its bundled resource path.
+
+Expected tests for this checkpoint: 185 JavaScript, nine standalone workspace
+Rust and eleven desktop Rust (plus two Linux security regression tests). macOS build/runtime results must still be recorded on
 your Mac; passing Linux tests does not substitute for them.
 
 For development with hot reload, run `npm run desktop:dev`. No `npm run dev` or

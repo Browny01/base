@@ -11,7 +11,7 @@ has not started. The remaining release/integration checks below stay open.
 
 ## Build and run
 
-Use Node 24 or newer and Rust 1.90 or newer. From the repository root:
+Use Node 24.22.1 (or supported 26.12.1+) and Rust 1.90 or newer. From the repository root:
 
 ```sh
 npm ci
@@ -19,6 +19,7 @@ npm run typecheck
 npm run desktop:typecheck
 npm run lint
 npm test
+npm run workspace:bundle
 cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
@@ -26,6 +27,10 @@ npm run build
 npm run desktop:frontend
 npm run desktop:dev
 ```
+
+Build the workspace service before invoking Cargo directly: Tauri validates its
+bundled service path during checks and tests too. `npm run desktop:check` prepares
+it automatically, as do Tauri's development and production build hooks.
 
 The development command uses Vite during development. Installed production
 builds load `frontendDist` from the executable bundle and require no web server,

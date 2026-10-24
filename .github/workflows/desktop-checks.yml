@@ -44,6 +44,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck && npm run desktop:typecheck && npm run lint && npm test
       - run: npm run build && npm run desktop:frontend
+      - name: Build workspace service required by Tauri
+        run: npm run workspace:bundle
       - run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
       - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
